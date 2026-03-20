@@ -298,6 +298,110 @@ class ResidualAdaptiveResampler(dde.callbacks.Callback):
 
 
 # ---------------------------------------------------------------------------
+# Greedy Adaptive Resampling
+# ---------------------------------------------------------------------------
+
+class GreedyResampler(dde.callbacks.Callback):
+    """Greedy collocation-point resampling based on PDE residual magnitude.
+
+    Unlike RAD (which samples probabilistically from p \u221d |r|^k), greedy
+    resampling deterministically selects the top-N candidate points with
+    the largest PDE residual.  ``greedy_fraction`` controls the mix between
+    greedy-selected and uniform-random points to maintain domain coverage.
+
+    Every ``period`` training steps:
+      1. Generate ``num_candidates`` random points in the domain.
+      2. Evaluate PDE residual at each candidate.
+      3. Select the top ``greedy_fraction * num_domain`` points by |r|.
+      4. Fill the remaining points with uniform random samples.
+      5. Replace all domain points with the combined set.
+
+    Parameters
+    ----------
+    pde_residual : callable
+        Lightweight PDE function  (x, y) -> r  (single tensor, not list).
+    period : int
+        Resample every this many training steps.
+    num_candidates : int
+        Number of random candidate points to evaluate.
+    greedy_fraction : float
+        Fraction of domain points selected greedily (0.0 = uniform,
+        1.0 = fully greedy).  Default 0.5.
+    eval_batch_size : int
+        Batch size for residual evaluation (controls peak memory).
+    """
+
+    def __init__(self, pde_residual, period: int = 1000,
+                 num_candidates: int = 50000,
+                 greedy_fraction: float = 0.5,
+                 eval_batch_size: int = 5000):
+        super().__init__()
+        self.pde_residual = pde_residual
+        self.period = period
+        self.num_candidates = num_candidates
+        self.greedy_fraction = greedy_fraction
+        self.eval_batch_size = eval_batch_size
+
+    def on_epoch_end(self):
+        step = self.model.train_state.step
+        if step == 0 or step % self.period != 0:
+            return
+
+        data = self.model.data
+        geom = data.geom
+        num_domain = data.num_domain
+
+        # 1. Generate candidate points
+        X_cand = geom.random_points(self.num_candidates)
+
+        # 2. Evaluate PDE residual in batches
+        all_residuals = []
+        for i in range(0, len(X_cand), self.eval_batch_size):
+            batch = X_cand[i:i + self.eval_batch_size]
+            res = self.model.predict(batch, operator=self.pde_residual)
+            all_residuals.append(np.abs(res))
+        Y = np.concatenate(all_residuals, axis=0).ravel().astype(np.float64)
+
+        # 3. Greedy selection: top-N by residual magnitude
+        n_greedy = int(num_domain * self.greedy_fraction)
+        n_uniform = num_domain - n_greedy
+
+        top_ids = np.argsort(Y)[-n_greedy:] if n_greedy > 0 else np.array([], dtype=int)
+        X_greedy = X_cand[top_ids] if n_greedy > 0 else np.empty((0, X_cand.shape[1]))
+
+        # 4. Uniform random fill from remaining candidates
+        if n_uniform > 0:
+            remaining_mask = np.ones(len(X_cand), dtype=bool)
+            if n_greedy > 0:
+                remaining_mask[top_ids] = False
+            remaining_ids = np.where(remaining_mask)[0]
+            uniform_ids = np.random.choice(
+                remaining_ids,
+                size=min(n_uniform, len(remaining_ids)),
+                replace=False,
+            )
+            X_uniform = X_cand[uniform_ids]
+        else:
+            X_uniform = np.empty((0, X_cand.shape[1]))
+
+        # 5. Combine and replace domain points
+        X_new = np.concatenate([X_greedy, X_uniform], axis=0)
+        data.replace_with_anchors(X_new)
+
+        greedy_min_r = Y[top_ids].min() if n_greedy > 0 else 0.0
+        print(f"  [Greedy] step {step}: {n_greedy} greedy + {n_uniform} uniform pts "
+              f"(max|r|={Y.max():.4e}, mean|r|={Y.mean():.4e}, "
+              f"greedy min|r|={greedy_min_r:.4e})")
+
+        # Sync test data
+        data.test_x = data.train_x
+        data.test_y = data.train_y
+        self.model.train_state.set_data_test(
+            data.test_x, data.test_y,
+        )
+
+
+# ---------------------------------------------------------------------------
 # Initial / boundary conditions
 # ---------------------------------------------------------------------------
 
@@ -431,6 +535,102 @@ def build_model(cfg: Dict) -> Tuple[dde.Model, dde.data.TimePDE]:
     return model, data
 
 
+def build_model_numerical_ic(
+    cfg: Dict,
+    tmin_override: float,
+    tmax_override: float,
+    phi_ic_func,
+    phi_t_ic_func,
+) -> Tuple[dde.Model, dde.data.TimePDE]:
+    """Build a model with numerical (non-analytic) initial conditions.
+
+    Used by curriculum learning: the IC comes from evaluating a previously
+    trained PINN at the split time, rather than from the analytic Gaussian.
+
+    Parameters
+    ----------
+    cfg : dict
+        Full experiment config (network architecture, lambdas, etc. are read
+        from here; domain tmin/tmax are overridden).
+    tmin_override, tmax_override : float
+        Time window for this sub-problem.
+    phi_ic_func : callable(x_np) -> np.ndarray
+        Returns phi(x, tmin_override) for numpy array x of shape (N,1).
+    phi_t_ic_func : callable(inputs_tensor, outputs_tensor) -> tensor
+        DeepXDE OperatorBC-compatible function returning phi_t - target.
+    """
+    xmin = float(cfg["domain"]["xmin"])
+    xmax = float(cfg["domain"]["xmax"])
+
+    geom = dde.geometry.Interval(xmin, xmax)
+    timedomain = dde.geometry.TimeDomain(tmin_override, tmax_override)
+    geomtime = dde.geometry.GeometryXTime(geom, timedomain)
+
+    pde_func = _make_pde_func(cfg)
+
+    # IC: displacement
+    ic_disp = dde.icbc.IC(
+        geomtime, phi_ic_func, lambda _, on_initial: on_initial
+    )
+
+    # IC: velocity (OperatorBC)
+    ic_vel = dde.icbc.OperatorBC(
+        geomtime, phi_t_ic_func,
+        lambda x, on_boundary: np.isclose(x[1], tmin_override),
+    )
+
+    # BCs: same Sommerfeld conditions as original
+    df_cfg = cfg.get("pinn", {}).get("decay_factor", {})
+    use_decay_factor = df_cfg.get("enabled", False)
+    df_tau = float(df_cfg.get("tau", 0.0)) if use_decay_factor else 0.0
+
+    def bc_left_func(inputs, outputs, X):
+        phi_x = dde.grad.jacobian(outputs, inputs, i=0, j=0)
+        phi_t = dde.grad.jacobian(outputs, inputs, i=0, j=1)
+        bc = phi_t - phi_x
+        if use_decay_factor:
+            bc = bc - outputs / df_tau
+        return bc
+
+    bc_left = dde.icbc.OperatorBC(
+        geomtime, bc_left_func,
+        lambda x, on_boundary: on_boundary and np.isclose(x[0], xmin),
+    )
+
+    def bc_right_func(inputs, outputs, X):
+        phi_x = dde.grad.jacobian(outputs, inputs, i=0, j=0)
+        phi_t = dde.grad.jacobian(outputs, inputs, i=0, j=1)
+        bc = phi_t + phi_x
+        if use_decay_factor:
+            bc = bc - outputs / df_tau
+        return bc
+
+    bc_right = dde.icbc.OperatorBC(
+        geomtime, bc_right_func,
+        lambda x, on_boundary: on_boundary and np.isclose(x[0], xmax),
+    )
+
+    ic_bcs = [ic_disp, ic_vel, bc_left, bc_right]
+
+    Nr = int(cfg["pinn"]["Nr"])
+    Ni = int(cfg["pinn"]["Ni"])
+    Nb = int(cfg["pinn"]["Nb"])
+
+    data = dde.data.TimePDE(
+        geomtime, pde_func, ic_bcs,
+        num_domain=Nr, num_boundary=Nb, num_initial=Ni,
+    )
+
+    layers = [2] + [int(w) for w in cfg["pinn"]["hidden_layers"]] + [1]
+    net = dde.nn.FNN(layers, "tanh", "Glorot uniform")
+
+    A_bound = float(cfg["initial_data"]["A"])
+    net.apply_output_transform(lambda x, y: A_bound * torch.tanh(y))
+
+    model = dde.Model(data, net)
+    return model, data
+
+
 # ---------------------------------------------------------------------------
 # Training
 # ---------------------------------------------------------------------------
@@ -517,22 +717,37 @@ def train_pinn(
             anchor_frac = float(adaptive_cfg.get("anchor_fraction", 0.0))
 
             pde_residual = _make_pde_residual_only(cfg)
-            callbacks_adam.append(
-                ResidualAdaptiveResampler(
-                    pde_residual=pde_residual,
-                    period=rad_period,
-                    num_candidates=num_cand,
-                    k=k, c=c,
-                    method=method,
-                    num_add=num_add,
-                    eval_batch_size=eval_bs,
-                    anchor_fraction=anchor_frac,
+            if method == "greedy":
+                greedy_frac = float(adaptive_cfg.get("greedy_fraction", 0.5))
+                callbacks_adam.append(
+                    GreedyResampler(
+                        pde_residual=pde_residual,
+                        period=rad_period,
+                        num_candidates=num_cand,
+                        greedy_fraction=greedy_frac,
+                        eval_batch_size=eval_bs,
+                    )
                 )
-            )
-            anchor_str = f", anchor={anchor_frac:.0%}" if anchor_frac > 0 else ""
-            print(f"[PINN] Adaptive sampling: {method} "
-                  f"(period={rad_period}, k={k}, c={c}, "
-                  f"candidates={num_cand}{anchor_str})")
+                print(f"[PINN] Adaptive sampling: greedy "
+                      f"(period={rad_period}, greedy_fraction={greedy_frac}, "
+                      f"candidates={num_cand})")
+            else:
+                callbacks_adam.append(
+                    ResidualAdaptiveResampler(
+                        pde_residual=pde_residual,
+                        period=rad_period,
+                        num_candidates=num_cand,
+                        k=k, c=c,
+                        method=method,
+                        num_add=num_add,
+                        eval_batch_size=eval_bs,
+                        anchor_fraction=anchor_frac,
+                    )
+                )
+                anchor_str = f", anchor={anchor_frac:.0%}" if anchor_frac > 0 else ""
+                print(f"[PINN] Adaptive sampling: {method} "
+                      f"(period={rad_period}, k={k}, c={c}, "
+                      f"candidates={num_cand}{anchor_str})")
         else:
             callbacks_adam.append(
                 dde.callbacks.PDEPointResampler(period=resample_period)
@@ -732,19 +947,49 @@ def _convert_loss_history(
 def _combine_loss_histories(lh_adam, lh_lbfgs, adam_iters: int = 0) -> Dict[str, List]:
     """Concatenate Adam and L-BFGS loss histories.
 
-    DeepXDE's L-BFGS LossHistory already continues step numbering from where
-    Adam left off, so no step_offset is needed for the L-BFGS portion.
-    If the first L-BFGS step duplicates the last Adam step, skip it.
+    DeepXDE accumulates LossHistory across successive ``model.train()``
+    calls, so both *lh_adam* and *lh_lbfgs* may contain the **full**
+    training history (Adam + L-BFGS).  We detect this by checking
+    whether the two objects share the same data, and if so use only one
+    copy and split it at ``adam_iters``.
     """
-    h1 = _convert_loss_history(lh_adam, step_offset=0, phase="adam")
-    h2 = _convert_loss_history(lh_lbfgs, step_offset=0, phase="lbfgs")
+    h_full = _convert_loss_history(lh_lbfgs, step_offset=0, phase="lbfgs")
+    h_adam_raw = _convert_loss_history(lh_adam, step_offset=0, phase="adam")
 
-    # Drop duplicate overlap step (L-BFGS often re-logs the initial state)
+    # Detect duplication: if lbfgs contains the full history (its steps
+    # start at or near 0 and cover the adam range), use it as the single
+    # source of truth and split by adam_iters.
+    lbfgs_starts_early = (h_full["steps"] and h_full["steps"][0] <= adam_iters)
+    lbfgs_has_all = len(h_full["steps"]) >= len(h_adam_raw["steps"])
+
+    if adam_iters > 0 and lbfgs_starts_early and lbfgs_has_all:
+        # Split the single accumulated history at adam_iters
+        split = 0
+        for i, s in enumerate(h_full["steps"]):
+            if s > adam_iters:
+                split = i
+                break
+        else:
+            split = len(h_full["steps"])
+
+        combined: Dict[str, List] = {}
+        for key in h_full:
+            if key == "phase":
+                combined[key] = ["adam"] * split + ["lbfgs"] * (len(h_full[key]) - split)
+            else:
+                combined[key] = h_full[key]  # already a single contiguous list
+        return combined
+
+    # Fallback: genuinely separate histories — concatenate normally
+    h1 = h_adam_raw
+    h2 = h_full
+
+    # Drop duplicate overlap step
     if h1["steps"] and h2["steps"] and h2["steps"][0] <= h1["steps"][-1]:
         for key in h2:
             h2[key] = h2[key][1:]
 
-    combined: Dict[str, List] = {}
+    combined = {}
     for key in h1:
         combined[key] = h1[key] + h2[key]
     return combined

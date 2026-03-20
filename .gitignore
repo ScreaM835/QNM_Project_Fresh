@@ -21,3 +21,4 @@ venv_csd3/
 *.snm
 *.toc
 *.synctex.gz
+.pip.lock

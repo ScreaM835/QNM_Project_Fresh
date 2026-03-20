@@ -1,57 +1,105 @@
+"""
+3D waveform surface plot — continuous smooth rendering.
+
+Usage:
+    python scripts/plot_3d_waveform.py [--data PATH] [--out PATH]
+                                       [--zoom-x XMIN XMAX]
+                                       [--elev E] [--azim A]
+"""
+import argparse
 import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-import os
+from matplotlib import cm
+from scipy.ndimage import uniform_filter
+
+
+def smooth_downsample(phi, x, t, nx_out=300, nt_out=300):
+    """Anti-aliased downsampling: low-pass filter then sub-sample."""
+    sx = max(1, len(x) // nx_out)
+    st = max(1, len(t) // nt_out)
+    # light Gaussian-ish smoothing to avoid aliasing
+    phi_smooth = uniform_filter(phi, size=(st, sx))
+    return phi_smooth[::st, ::sx], x[::sx], t[::st]
+
 
 def main():
-    # Load the FD data
-    data_path = 'outputs/pinn/zerilli_l2/zerilli_l2_fd.npz'
-    print(f"Loading data from {data_path}...")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data", default=None,
+                        help="Path to *_fd.npz (auto-detected if omitted)")
+    parser.add_argument("--out", default="outputs/pinn/waveform_3d.png")
+    parser.add_argument("--zoom-x", nargs=2, type=float, default=None,
+                        metavar=("XMIN", "XMAX"),
+                        help="Zoom into a spatial sub-range, e.g. --zoom-x -20 60")
+    parser.add_argument("--elev", type=float, default=30)
+    parser.add_argument("--azim", type=float, default=-60)
+    args = parser.parse_args()
+
+    # ---- Locate data ----
+    if args.data:
+        data_path = args.data
+    else:
+        import glob
+        candidates = sorted(glob.glob("outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/*_fd.npz"))
+        if not candidates:
+            candidates = sorted(glob.glob("outputs/pinn/zerilli_l2_paper/*_fd.npz"))
+        if not candidates:
+            candidates = sorted(glob.glob("outputs/pinn/*/*.npz"))
+        data_path = candidates[0]
+    print(f"Loading {data_path}")
     data = np.load(data_path)
-    
-    x = data['x']
-    t = data['t']
-    phi = data['phi']
-    
-    print(f"Data loaded. x shape: {x.shape}, t shape: {t.shape}, phi shape: {phi.shape}")
+    x, t, phi = data["x"], data["t"], data["phi"]
+    print(f"  x: {x.shape}  t: {t.shape}  phi: {phi.shape}")
 
-    # Create a meshgrid for plotting
-    X, T = np.meshgrid(x, t)
+    # ---- Optional spatial zoom ----
+    if args.zoom_x:
+        mask = (x >= args.zoom_x[0]) & (x <= args.zoom_x[1])
+        x = x[mask]
+        phi = phi[:, mask]
+        print(f"  Zoomed x to [{args.zoom_x[0]}, {args.zoom_x[1]}], {len(x)} pts")
 
-    # Create the figure
-    fig = plt.figure(figsize=(14, 10))
-    ax = fig.add_subplot(111, projection='3d')
+    # ---- Smooth downsample for rendering ----
+    phi_ds, x_ds, t_ds = smooth_downsample(phi, x, t, nx_out=350, nt_out=350)
+    X, T = np.meshgrid(x_ds, t_ds)
+    print(f"  Plot grid: {X.shape}")
 
-    # Downsample the data for plotting so it doesn't crash or take forever
-    # We want roughly a 200x200 grid for a smooth but manageable 3D surface
-    stride_t = max(1, len(t) // 200)
-    stride_x = max(1, len(x) // 200)
+    # ---- Normalise colour to amplitude ----
+    vmax = max(abs(phi_ds.min()), abs(phi_ds.max()))
 
-    print(f"Plotting surface with strides: t={stride_t}, x={stride_x}...")
-    surf = ax.plot_surface(X[::stride_t, ::stride_x], 
-                           T[::stride_t, ::stride_x], 
-                           phi[::stride_t, ::stride_x], 
-                           cmap='plasma', # Plasma is great for highlighting peaks and valleys
-                           edgecolor='none',
-                           alpha=0.9)
+    # ---- Plot ----
+    fig = plt.figure(figsize=(14, 9))
+    ax = fig.add_subplot(111, projection="3d")
 
-    # Add labels and title
-    ax.set_xlabel('Space (x*)', fontsize=12, labelpad=10)
-    ax.set_ylabel('Time (t)', fontsize=12, labelpad=10)
-    ax.set_zlabel('Wave Amplitude (u)', fontsize=12, labelpad=10)
-    ax.set_title('The 3D Landscape of a Black Hole Ringdown (FD Solution)', fontsize=16, pad=20)
+    surf = ax.plot_surface(
+        X, T, phi_ds,
+        rcount=300, ccount=300,     # high polygon count → smooth
+        cmap="RdBu_r",             # diverging: red for +, blue for −
+        vmin=-vmax, vmax=vmax,
+        edgecolor="none",
+        antialiased=True,
+        alpha=0.95,
+    )
 
-    # Adjust the viewing angle to clearly see the time evolution
-    # elev=30 (look slightly down), azim=-50 (look from the side to see time progress)
-    ax.view_init(elev=35, azim=-55)
+    ax.set_xlabel(r"Tortoise coordinate $x_*$", fontsize=13, labelpad=12)
+    ax.set_ylabel(r"Time $t/M$", fontsize=13, labelpad=12)
+    ax.set_zlabel(r"$\Phi(x_*,\,t)$", fontsize=13, labelpad=10)
+    ax.set_title("Zerilli Waveform — FD Reference Solution",
+                 fontsize=15, pad=15)
+    ax.view_init(elev=args.elev, azim=args.azim)
 
-    # Add a color bar
-    fig.colorbar(surf, shrink=0.5, aspect=10, label='Amplitude', pad=0.1)
+    # Subtle grid style
+    ax.xaxis.pane.fill = False
+    ax.yaxis.pane.fill = False
+    ax.zaxis.pane.fill = False
+    ax.xaxis.pane.set_edgecolor("grey")
+    ax.yaxis.pane.set_edgecolor("grey")
+    ax.zaxis.pane.set_edgecolor("grey")
 
-    # Save the plot
-    out_path = 'outputs/pinn/zerilli_l2/waveform_3d.png'
-    plt.savefig(out_path, dpi=300, bbox_inches='tight')
-    print(f"Successfully saved 3D plot to {out_path}")
+    fig.colorbar(surf, shrink=0.55, aspect=12, pad=0.08,
+                 label=r"Amplitude $\Phi$")
+
+    plt.savefig(args.out, dpi=250, bbox_inches="tight")
+    print(f"Saved → {args.out}")
+
 
 if __name__ == "__main__":
     main()

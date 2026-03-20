@@ -1,0 +1,97 @@
+# Zerilli (even parity) l=2 — Levenberg-Marquardt optimizer
+#
+# Base: greedy_f03_lbfgs30k (current best RMSD=0.000817)
+# Change: L-BFGS phase replaced with Levenberg-Marquardt
+# Motivation: LM exploits the nonlinear least-squares structure of the
+#   PINN loss (L = Σ r²) using the Gauss-Newton approximation H ≈ JᵀJ.
+#   With ~5k parameters, the 5k×5k JᵀJ system is directly solvable.
+#
+# References:
+#   Taylor et al. (2022), arXiv:2205.07430
+#   Shahab et al. (2026), arXiv:2602.08515
+#   Dangel et al. (NeurIPS 2024), arXiv:2405.15603
+
+experiment:
+  name: zerilli_l2_lm
+
+physics:
+  M: 1.0
+  l: 2
+  potential: zerilli
+  pde_sign: standard
+
+domain:
+  xmin: -50.0
+  xmax: 150.0
+  tmin: 0.0
+  tmax: 50.0
+
+initial_data:
+  A: 1.0
+  x0: 4.0
+  sigma: 5.0
+  velocity_profile: outgoing
+
+fd:
+  dx: 0.2
+  dt: 0.1
+  scheme: rk4_mol
+
+pinn:
+  seed: 1234
+  dtype: float64
+
+  Nr: 32000
+  Ni: 800
+  Nb: 400
+
+  hidden_layers: [80, 40, 20, 10]
+  activation: tanh
+  output_transform: tanh_bound
+
+  # Full 7-component weights for Adam phase (DeepXDE)
+  lambda: [100.0, 100.0, 100.0, 1.0, 100.0, 1.0, 1.0]
+
+  tau_est: 0.0
+
+  adam:
+    lr: 1.0e-3
+    iters: 10000
+    resample_period: 100
+
+  # L-BFGS not used — LM replaces it
+  lbfgs:
+    iters: 0
+
+# --- Levenberg-Marquardt configuration ---
+lm:
+  enabled: true
+  iters: 500               # LM iterations (typically converges in 100-500)
+  mu_init: 1.0             # initial damping parameter
+  mu_factor: 10.0          # μ *= factor on reject, μ /= factor on accept
+  mu_min: 1.0e-12          # floor for damping
+  mu_max: 1.0e12           # ceiling (triggers early stop)
+
+  # Collocation points for LM phase (can differ from Adam's Nr)
+  # Fewer points than Adam since each LM iter is more expensive
+  # (~8ms/residual → 5k pts ≈ 50s/iter on cluster)
+  Nr: 5000                 # PDE domain points
+  Ni: 800                  # initial condition points
+  Nb: 400                  # boundary points (split 200 left + 200 right)
+
+  resample_every: 50       # resample collocation points every N LM iterations
+  jacobian_chunk: 500      # process this many residuals per backward batch
+  log_every: 1             # print progress every N iterations
+  checkpoint_every: 50     # save checkpoint every N iterations
+
+  # Loss weights for LM residuals: [r_pde, ic, iv, bl, br]
+  # Note: no gradient-enhanced r_x, r_t (too expensive for per-sample Jacobian)
+  lambda: [100.0, 1.0, 100.0, 1.0, 1.0]
+
+evaluation:
+  xq: 10.0
+
+qnm:
+  t_start: 10.0
+  t_end: 50.0
+  omega_theory: 0.3737

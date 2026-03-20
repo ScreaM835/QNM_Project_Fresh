@@ -123,6 +123,4 @@ Outputs are saved under `outputs/qnm/`.
 - `report/` — dissertation-style draft text you can extend
 - `outputs/` — generated output (created when you run scripts)
 
-## Citation
 
-If you use this repo in a dissertation or report, cite the target paper and the Project 32 brief.

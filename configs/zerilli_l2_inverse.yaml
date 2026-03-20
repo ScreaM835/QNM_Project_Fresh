@@ -1,0 +1,83 @@
+# Zerilli (even parity) l=2 — Inverse problem: learn M from noisy data
+#
+# The PINN simultaneously solves the Zerilli PDE and learns the black hole
+# mass M from noisy observations of the waveform.  The Zerilli potential
+# V(x; M) depends on M, so the PDE itself changes as M is optimised.
+
+experiment:
+  name: zerilli_l2_inverse
+
+physics:
+  M: 1.0          # true value (used to generate FD data; NOT given to PINN)
+  l: 2
+  potential: zerilli
+  pde_sign: standard
+
+domain:
+  xmin: -50.0
+  xmax: 150.0
+  tmin: 0.0
+  tmax: 50.0
+
+initial_data:
+  A: 1.0
+  x0: 4.0
+  sigma: 5.0
+  velocity_profile: outgoing
+
+fd:
+  dx: 0.2
+  dt: 0.1
+  scheme: rk4_mol
+
+pinn:
+  seed: 1234
+  dtype: float64
+
+  Nr: 32000
+  Ni: 800
+  Nb: 400
+
+  hidden_layers: [80, 40, 20, 10]
+  activation: tanh
+  output_transform: tanh_bound
+
+  # loss weights: [r, r_x, r_t, ic, iv, bl, br]
+  # note: data obs weight is set separately in inverse.lambda_data
+  lambda: [100.0, 100.0, 100.0, 1.0, 100.0, 1.0, 1.0]
+
+  tau_est: 0.0
+
+  adaptive_sampling:
+    enabled: true
+    method: greedy
+    period: 1000
+    num_candidates: 100000
+    greedy_fraction: 0.3
+    eval_batch_size: 5000
+
+  adam:
+    lr: 1.0e-3
+    iters: 10000
+    resample_period: 100
+
+  lbfgs:
+    iters: 15000
+    resample_period: 100
+
+inverse:
+  enabled: true
+  M_init: 0.8           # initial guess (20% off from true M=1.0)
+  noise_level: 0.01     # 1% Gaussian noise on observations
+  n_obs: 500            # number of observation points
+  obs_t_min: 0.0
+  obs_t_max: 50.0
+  lambda_data: 10.0     # weight for data-fitting loss
+
+evaluation:
+  xq: 10.0
+
+qnm:
+  t_start: 10.0
+  t_end: 50.0
+  omega_theory: 0.3737
