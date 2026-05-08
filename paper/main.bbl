@@ -1,0 +1,234 @@
+\begin{thebibliography}{37}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Baydin et~al.(2018)Baydin, Pearlmutter, Radul, and
+  Siskind]{Baydin2018ad}
+Atilim~Gunes Baydin, Barak~A. Pearlmutter, Alexey~Andreyevich Radul, and
+  Jeffrey~Mark Siskind.
+\newblock Automatic differentiation in machine learning: a survey.
+\newblock \emph{Journal of Machine Learning Research}, 18\penalty0
+  (153):\penalty0 1--43, 2018.
+
+\bibitem[Berti et~al.(2007)Berti, Cardoso, Gonzalez, and
+  Sperhake]{Berti2007prony}
+E.~Berti, V.~Cardoso, J.~A. Gonzalez, and U.~Sperhake.
+\newblock Mining information from binary black hole mergers: a comparison of
+  estimation methods for complex exponentials in noise.
+\newblock \emph{Phys. Rev. D}, 75:\penalty0 124017, 2007.
+
+\bibitem[Berti et~al.(2006)Berti, Cardoso, and Will]{Berti2007ringdown}
+Emanuele Berti, Vitor Cardoso, and Clifford~M. Will.
+\newblock On gravitational-wave spectroscopy of massive black holes with the
+  space interferometer {LISA}.
+\newblock \emph{Phys. Rev. D}, 73:\penalty0 064030, 2006.
+\newblock (cite-key suffix `2007' is historical; paper appeared in 2006).
+
+\bibitem[Berti et~al.(2009)Berti, Cardoso, and Starinets]{Berti2009review}
+Emanuele Berti, Vitor Cardoso, and Andrei~O. Starinets.
+\newblock Quasinormal modes of black holes and black branes.
+\newblock \emph{Class. Quantum Grav.}, 26:\penalty0 163001, 2009.
+
+\bibitem[Buonanno et~al.(2007)Buonanno, Cook, and
+  Pretorius]{Buonanno2007ringdown}
+Alessandra Buonanno, Gregory~B. Cook, and Frans Pretorius.
+\newblock Inspiral, merger and ring-down of equal-mass black-hole binaries.
+\newblock \emph{Phys. Rev. D}, 75:\penalty0 124018, 2007.
+
+\bibitem[Chandrasekhar and Detweiler(1975)]{Chandrasekhar1975}
+S.~Chandrasekhar and S.~Detweiler.
+\newblock The quasi-normal modes of the {S}chwarzschild black hole.
+\newblock \emph{Proc. Roy. Soc. Lond. A}, 344:\penalty0 441, 1975.
+
+\bibitem[Cho et~al.(2010)Cho, Cornell, Doukas, and Naylor]{Cho2010aim}
+H.~T. Cho, A.~S. Cornell, J.~Doukas, and W.~Naylor.
+\newblock Black hole quasinormal modes using the asymptotic iteration method.
+\newblock \emph{Class. Quantum Grav.}, 27:\penalty0 155004, 2010.
+
+\bibitem[Cornell et~al.(2022)Cornell, Ncube, and Harmsen]{Cornell2022pinnqnm}
+Alan~S. Cornell, Anele Ncube, and Gerhard Harmsen.
+\newblock Determining quasinormal modes using physics informed neural networks.
+\newblock \emph{Phys. Rev. D}, 106:\penalty0 124047, 2022.
+
+\bibitem[Hua and Sarkar(1990)]{HuaSarkar1990}
+Y.~Hua and T.~K. Sarkar.
+\newblock Matrix pencil method for estimating parameters of exponentially
+  damped/undamped sinusoids in noise.
+\newblock \emph{IEEE Trans. Acoust. Speech Signal Process.}, 38:\penalty0
+  814--824, 1990.
+
+\bibitem[Isi and Farr(2021)]{Isi2021priors}
+Maximiliano Isi and Will~M. Farr.
+\newblock Analyzing black-hole ringdowns.
+\newblock \emph{arXiv:2107.05609 [gr-qc]}, 2021.
+
+\bibitem[Isi et~al.(2019)Isi, Giesler, Farr, Scheel, and
+  Teukolsky]{Isi2019tests}
+Maximiliano Isi, Matthew Giesler, Will~M. Farr, Mark~A. Scheel, and Saul~A.
+  Teukolsky.
+\newblock Testing the no-hair theorem with {GW150914}.
+\newblock \emph{Phys. Rev. Lett.}, 123:\penalty0 111102, 2019.
+
+\bibitem[Iyer and Will(1987)]{IyerWill1987}
+S.~Iyer and C.~M. Will.
+\newblock Black-hole normal modes: a {WKB} approach.
+\newblock \emph{Phys. Rev. D}, 35:\penalty0 3621--3631, 1987.
+
+\bibitem[Kingma and Ba(2015)]{Kingma2015adam}
+Diederik~P. Kingma and Jimmy Ba.
+\newblock {Adam}: A method for stochastic optimization.
+\newblock In \emph{International Conference on Learning Representations
+  (ICLR)}, 2015.
+
+\bibitem[Konoplya(2003)]{Konoplya2003wkb}
+R.~A. Konoplya.
+\newblock Quasinormal behaviour of the {D}-dimensional {Schwarzschild} black
+  hole and the higher order {WKB} approach.
+\newblock \emph{Phys. Rev. D}, 68:\penalty0 024018, 2003.
+
+\bibitem[Konoplya and Zhidenko(2011)]{KonoplyaZhidenko2011}
+R.~A. Konoplya and A.~Zhidenko.
+\newblock Quasinormal modes of black holes: from astrophysics to string theory.
+\newblock \emph{Rev. Mod. Phys.}, 83:\penalty0 793--836, 2011.
+
+\bibitem[Leaver(1985)]{Leaver1985}
+E.~W. Leaver.
+\newblock An analytic representation for the quasi-normal modes of {Kerr} black
+  holes.
+\newblock \emph{Proc. R. Soc. Lond. A}, 402:\penalty0 285--298, 1985.
+
+\bibitem[{LIGO Scientific Collaboration and Virgo
+  Collaboration}(2016)]{LIGO2016ringdown}
+{LIGO Scientific Collaboration and Virgo Collaboration}.
+\newblock Tests of general relativity with {GW150914}.
+\newblock \emph{Phys. Rev. Lett.}, 116:\penalty0 221101, 2016.
+
+\bibitem[Liu and Nocedal(1989)]{Liu1989lbfgs}
+Dong~C. Liu and Jorge Nocedal.
+\newblock On the limited memory {BFGS} method for large scale optimization.
+\newblock \emph{Math. Programming}, 45:\penalty0 503--528, 1989.
+
+\bibitem[Lu et~al.(2021)Lu, Meng, Mao, and Karniadakis]{Lu2021deepxde}
+Lu~Lu, Xuhui Meng, Zhiping Mao, and George~Em Karniadakis.
+\newblock {DeepXDE}: A deep learning library for solving differential
+  equations.
+\newblock \emph{SIAM Review}, 63\penalty0 (1):\penalty0 208--228, 2021.
+
+\bibitem[Luna et~al.(2023)Luna, Bustillo, Mart\'inez, Torres-Forn\'e, and
+  Font]{Luna2022teukolskypinn}
+Raimon Luna, Juan~Calder\'on Bustillo, Juan Jos\'e~Seoane Mart\'inez, Alejandro
+  Torres-Forn\'e, and Jos\'e~A. Font.
+\newblock Solving the teukolsky equation with physics-informed neural networks.
+\newblock \emph{Phys. Rev. D}, 107:\penalty0 064025, 2023.
+
+\bibitem[Luna et~al.(2024)Luna, Maselli, and Pani]{Luna2024qnm}
+Raimon Luna, Andrea Maselli, and Paolo Pani.
+\newblock Probing new physics with quasi-normal modes: a neural-network
+  approach.
+\newblock \emph{arXiv:2404.11583 [gr-qc]}, 2024.
+
+\bibitem[McClenny and Braga-Neto(2023)]{McClenny2023sapinn}
+Levi~D. McClenny and Ulisses Braga-Neto.
+\newblock Self-adaptive physics-informed neural networks.
+\newblock \emph{J. Comput. Phys.}, 474:\penalty0 111722, 2023.
+
+\bibitem[Moncrief(1975)]{Moncrief1974}
+V.~Moncrief.
+\newblock Gauge-invariant perturbations of {Reissner--Nordstr\"om} black holes.
+\newblock \emph{Phys. Rev. D}, 12:\penalty0 1526--1537, 1975.
+
+\bibitem[Nollert(1993)]{Nollert1993}
+H.-P. Nollert.
+\newblock Quasinormal modes of {Schwarzschild} black holes: the determination
+  of quasinormal frequencies with very large imaginary parts.
+\newblock \emph{Phys. Rev. D}, 47:\penalty0 5253--5258, 1993.
+
+\bibitem[{\"O}vg{\"u}n et~al.(2021){\"O}vg{\"u}n, Sakall{\i}, and
+  Mutuk]{Ovgun2021qnmnn}
+Ali {\"O}vg{\"u}n, {\.I}zzet Sakall{\i}, and Halil Mutuk.
+\newblock Quasinormal modes of ds and ads black holes: Feedforward neural
+  network method.
+\newblock \emph{Int. J. Geom. Methods Mod. Phys.}, 18:\penalty0 2150154, 2021.
+
+\bibitem[Patel et~al.(2024)Patel, Aykutalp, and Laguna]{Patel2024pinn}
+Nirmal Patel, Aycin Aykutalp, and Pablo Laguna.
+\newblock Calculating quasi-normal modes of {Schwarzschild} black holes with
+  physics informed neural networks.
+\newblock \emph{arXiv:2401.01440 [gr-qc]}, 2024.
+
+\bibitem[Raissi et~al.(2019)Raissi, Perdikaris, and Karniadakis]{Raissi2017}
+Maziar Raissi, Paris Perdikaris, and George~E. Karniadakis.
+\newblock Physics-informed neural networks: A deep learning framework for
+  solving forward and inverse problems involving nonlinear partial differential
+  equations.
+\newblock \emph{J. Comput. Phys.}, 378:\penalty0 686--707, 2019.
+
+\bibitem[Regge and Wheeler(1957)]{ReggeWheeler1957}
+T.~Regge and J.~A. Wheeler.
+\newblock Stability of a {Schwarzschild} singularity.
+\newblock \emph{Phys. Rev.}, 108:\penalty0 1063--1069, 1957.
+
+\bibitem[Roy and Kailath(1989)]{Roy1989esprit}
+Richard Roy and Thomas Kailath.
+\newblock {ESPRIT}---estimation of signal parameters via rotational invariance
+  techniques.
+\newblock \emph{IEEE Trans. Acoust. Speech Signal Process.}, 37\penalty0
+  (7):\penalty0 984--995, 1989.
+
+\bibitem[Sago et~al.(2003)Sago, Nakano, and Sasaki]{Sago2003}
+N.~Sago, H.~Nakano, and M.~Sasaki.
+\newblock Gauge problem in the gravitational self-force.~{I}. {Harmonic} gauge
+  approach in the {Schwarzschild} background.
+\newblock \emph{Phys. Rev. D}, 67:\penalty0 104017, 2003.
+\newblock Appendix~A reproduces the {Regge--Wheeler--Zerilli} field equations
+  Z\,(C6a-c) and Z\,(C7a-g) of \citet{Zerilli1970} with corrections.
+
+\bibitem[Schutz and Will(1985)]{SchutzWill1985}
+B.~F. Schutz and C.~M. Will.
+\newblock Black hole normal modes: a semianalytic approach.
+\newblock \emph{Astrophys. J. Lett.}, 291:\penalty0 L33--L36, 1985.
+
+\bibitem[Wang et~al.(2021)Wang, Teng, and Perdikaris]{Wang2021gradientpath}
+Sifan Wang, Yujun Teng, and Paris Perdikaris.
+\newblock Understanding and mitigating gradient flow pathologies in
+  physics-informed neural networks.
+\newblock \emph{SIAM J. Sci. Comput.}, 43\penalty0 (5):\penalty0 A3055--A3081,
+  2021.
+
+\bibitem[Wang et~al.(2022)Wang, Yu, and Perdikaris]{Wang2022ntk}
+Sifan Wang, Xinling Yu, and Paris Perdikaris.
+\newblock When and why {PINNs} fail to train: A neural tangent kernel
+  perspective.
+\newblock \emph{J. Comput. Phys.}, 449:\penalty0 110768, 2022.
+
+\bibitem[Wang et~al.(2024)Wang, Sankaran, and Perdikaris]{Wang2022causal}
+Sifan Wang, Shyam Sankaran, and Paris Perdikaris.
+\newblock Respecting causality is all you need for training physics-informed
+  neural networks.
+\newblock \emph{Comput. Methods Appl. Mech. Engrg.}, 421:\penalty0 116813,
+  2024.
+
+\bibitem[Wu et~al.(2023)Wu, Zhu, Tan, Kartha, and Lu]{Wu2023adaptive}
+Chenxi Wu, Min Zhu, Qinyang Tan, Yadhu Kartha, and Lu~Lu.
+\newblock A comprehensive study of non-adaptive and residual-based adaptive
+  sampling for physics-informed neural networks.
+\newblock \emph{Comput. Methods Appl. Mech. Engrg.}, 403:\penalty0 115671,
+  2023.
+
+\bibitem[Yu et~al.(2022)Yu, Lu, Meng, and Karniadakis]{Yu2022gpinn}
+Jeremy Yu, Lu~Lu, Xuhui Meng, and George~Em Karniadakis.
+\newblock Gradient-enhanced physics-informed neural networks for forward and
+  inverse {PDE} problems.
+\newblock \emph{Comput. Methods Appl. Mech. Engrg.}, 393:\penalty0 114823,
+  2022.
+
+\bibitem[Zerilli(1970)]{Zerilli1970}
+F.~J. Zerilli.
+\newblock Effective potential for even-parity {Regge--Wheeler} gravitational
+  perturbation equations.
+\newblock \emph{Phys. Rev. Lett.}, 24:\penalty0 737--738, 1970.
+
+\end{thebibliography}

@@ -1,0 +1,8 @@
+{
+  "mode": "soft_overlap",
+  "t_split": 25.0,
+  "overlap_width": 10.0,
+  "overlap_start": 20.0,
+  "overlap_end": 30.0,
+  "continuity_anchors": true
+}

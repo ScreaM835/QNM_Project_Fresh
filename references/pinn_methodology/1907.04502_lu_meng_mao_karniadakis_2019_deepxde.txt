@@ -1,0 +1,443 @@
+================================================================================
+TITLE:    DeepXDE: A deep learning library for solving differential equations
+AUTHORS:  Lu Lu, Xuhui Meng, Zhiping Mao, George Em Karniadakis
+          (Brown / PNNL)
+ARXIV:    arXiv:1907.04502 (2019; published SIAM Review 63(1):208-228, 2021)
+SOURCE:   https://ar5iv.labs.arxiv.org/html/1907.04502
+SAVED:    Local literature reference for QNM-PINN paper write-up.
+WHY HERE: The canonical reference for the DeepXDE library — which we use as
+          the backbone of our QNM-PINN implementation. Provides:
+          (i) the original RAR algorithm (Procedure 2: add m new points
+              with the largest residuals, repeat until mean residual <
+              threshold) — the precursor of RAR-G of Wu 2023;
+          (ii) the formal three-error decomposition E = E_opt + E_gen +
+               E_app (Section 2.4, Theorem 2.1 / Pinkus 1999) we cite when
+               discussing PINN error budget;
+          (iii) the "all frequencies learned simultaneously in PINNs"
+                observation (Fig 2) — relevant to our multi-scale Zerilli
+                treatment;
+          (iv) workflow Procedure 3 (geometry → PDE → BC/IC → data.PDE →
+                FNN → Model.compile → Model.train → Model.predict) that
+                literally matches our run_pinn.py / run_pinn_inverse_qnm
+                scripts;
+          (v) the L-BFGS-after-Adam recommendation we follow;
+          (vi) supports forward AND inverse (extra L_i loss term) with
+                trivial code change — basis for our inverse-QNM PINN
+                where we also infer ω, M.
+          Code: https://github.com/lululxvi/deepxde
+================================================================================
+
+ABSTRACT
+--------
+Overview of physics-informed neural networks (PINNs): embed a PDE into the NN
+loss using automatic differentiation. Algorithm is simple; applies to
+integro-differential, fractional, and stochastic PDEs. Inverse problems
+solved as easily as forward problems. Proposes a NEW residual-based adaptive
+refinement (RAR) method to improve training efficiency. Compares PINN to
+FEM. Presents the Python library DeepXDE (forward + inverse, complex
+geometry via constructive solid geometry; user code stays compact and
+mirrors the math). Demonstrated on five examples.
+
+KEYWORDS: education software · DeepXDE · differential equations · deep
+learning · PINNs · scientific machine learning
+AMS: 65-01, 65-04, 65L99, 65M99, 65N99
+
+
+1  INTRODUCTION
+==============================================================================
+Scientific Machine Learning (SciML) [4] uses NNs in place of traditional
+discretisation. Two classes of NN approaches:
+- Variational/energy form: deep Ritz [16,20], Galerkin [39].
+- Strong form (with AD): PINN [47] — handles general PDEs, image-free,
+  no need for variational principle.
+PINNs solve inverse problems with minimum code change [47,48,51,21,13];
+extended to IDEs, FDEs [42], SDEs [57,55,41,56].
+
+CONTRIBUTIONS:
+- DeepXDE library implementing PINN algorithms.
+- Designed as both education and research tool.
+- Supports complex domains via constructive solid geometry (CSG).
+- Time-dependent PDEs as easily as steady-state (treat IC as Dirichlet BC
+  on the spatio-temporal domain).
+- Callback functions for monitoring/modifying training (e.g. Fourier-spectrum
+  monitoring).
+- Compact code mirroring the mathematical formulation.
+- New RAR method (Section 2.8).
+
+
+2  ALGORITHM AND THEORY OF PINNs
+==============================================================================
+
+2.1 Deep neural networks
+------------------------
+Considered: feed-forward NN (FNN ≡ MLP) and residual NN (ResNet).
+L-layer FNN, N_ℓ neurons in layer ℓ. With activation σ:
+  N_0(x) = x;      hidden:  N_ℓ(x) = σ(W_ℓ N_{ℓ-1}(x) + b_ℓ);
+  output: N_L(x) = W_L N_{L-1}(x) + b_L.
+Common activations: sigmoid, tanh, ReLU.
+
+2.2 Automatic differentiation
+-----------------------------
+Four ways to compute derivatives: hand-coded analytical, finite difference,
+symbolic, automatic (AD). In DL, derivatives via backpropagation [49] —
+a specialised AD.
+AD = repeated chain rule via one forward + one backward pass. ALL partial
+derivatives computed in O(1) passes regardless of input dimension; FD needs
+d_in+1 forward passes. AD avoids truncation errors of FD and quadrature
+errors of variational forms.
+Higher-order derivatives via recursive AD (n times for n-th order). Better:
+Taylor-mode AD [8,9].
+AD differentiates the NN, NOT the data — so PINNs tolerate noisy data [42].
+
+2.3 PINNs for solving PDEs
+---------------------------
+PDE (eq 1):
+  f(x; ∂u/∂x_i; ∂²u/∂x_i ∂x_j; …; λ) = 0,  x ∈ Ω
+with B(u, x) = 0 on ∂Ω (Dirichlet/Neumann/Robin/periodic). Time = special
+component of x; IC = special Dirichlet on the spatio-temporal domain.
+
+PROCEDURE 1 (PINN algorithm):
+  Step 1: Construct NN û(x; θ) parameterised by θ.
+  Step 2: Specify training sets T_f (residual points in Ω) and T_b (on ∂Ω).
+  Step 3: Define loss as weighted L² norm of equation residual + BC residual.
+  Step 4: Minimise L(θ; T) via gradient-based optimiser.
+
+Loss (eq 2):
+  L(θ; T) = w_f L_f(θ; T_f) + w_b L_b(θ; T_b)
+  L_f = (1/|T_f|) Σ_{x∈T_f} ‖f(x; ∂û/∂x_i; …; λ)‖²
+  L_b = (1/|T_b|) Σ_{x∈T_b} ‖B(û, x)‖²
+
+Optimisers: gradient descent, Adam [29], L-BFGS [12].
+EXPERIENCE (KEY for our paper):
+- For SMOOTH PDE solutions, L-BFGS converges in fewer iterations than Adam
+  (uses 2nd-order info).
+- For STIFF solutions, L-BFGS often stuck in bad local minima.
+Standard recipe: Adam first, then switch to L-BFGS. Adaptive activation
+functions can help [24, 23].
+PINNs have NO uniqueness guarantee — non-convex optimisation. Tune
+hyperparameters; train from N (e.g. 10) random initialisations and pick
+the lowest-loss model [42, 51, 21].
+
+Three sampling strategies for residual points T:
+  1. Fix T at the start (grid or random).
+  2. Re-sample randomly each iteration (≡ mini-batch with infinite T).
+  3. Adaptive refinement (Section 2.8 RAR).
+
+Hard-constraint trick for simple BCs: use surrogate u_hat(x) = x(x-1)·N(x)
+to enforce u(0)=u(1)=0 automatically [30].
+
+NN learns from low to high frequency for function approximation [46, 54];
+but PINNs (with high-order derivative terms in the loss) learn ALL
+frequencies simultaneously — Fig 2 example: NN approximating
+f(x)=Σ_{k=1}^{5} sin(2kx)/(2k) learns low frequencies first, but PINN
+solving Poisson −f_xx = Σ 2k sin(2kx) learns all frequencies almost at
+once, often faster than function approximation.
+
+2.4 Approximation theory and error analysis
+-------------------------------------------
+THEOREM 2.1 (Pinkus [44]): Let m_i ∈ Z_+^d, m = max_i |m_i|, σ ∈ C^m(R)
+non-polynomial. Then the space of single-hidden-layer NNs M(σ) is dense
+in C^{m_1,…,m_s}(R^d) — for any f, compact K, ε>0, there exists g ∈ M(σ)
+with max_{x∈K} |D^k f(x) − D^k g(x)| < ε for all k ≤ some m_i.
+⇒ FNNs with enough neurons can simultaneously and uniformly approximate
+any function AND its partial derivatives.
+
+ERROR DECOMPOSITION (Bottou-Bousquet [11]):
+  E = ‖ũ_T − u‖ ≤ ‖ũ_T − u_T‖_{E_opt} + ‖u_T − u_F‖_{E_gen} + ‖u_F − u‖_{E_app}
+where:
+  u_F = best approx in family F;
+  u_T = global minimiser of L on training set T;
+  ũ_T = optimiser's actual output.
+- E_app: approximation error (function-class capacity).
+- E_gen: generalisation error (number/locations of residual points + capacity).
+- E_opt: optimisation error (optimiser, lr, iterations).
+Larger NN ⇒ smaller E_app but higher E_gen (bias-variance tradeoff).
+NO RIGOROUS PINN ERROR ESTIMATES YET; even quantifying these three errors
+in supervised learning is open [36, 35, 25].
+
+2.5 PINN vs FEM (Table 2)
+--------------------------
+                 PINN                        FEM
+  Basis        | Neural net (nonlinear)    | Piecewise polynomial (linear)
+  Parameters   | Weights & biases          | Point values
+  Train pts    | Scattered (mesh-free)     | Mesh points
+  PDE embed    | Loss function             | Algebraic system
+  Solver       | Gradient-based optimiser  | Linear solver
+  Errors       | E_app, E_gen, E_opt       | Approximation/quadrature
+  Error bounds | Not yet                   | Partially available [14, 26]
+PINN provides a nonlinear approximation to the function and its derivatives;
+FEM provides a linear approximation.
+
+2.6 PINNs for IDEs
+-------------------
+Use AD for integer-order derivatives; approximate integrals by classical
+quadrature (Gaussian). Adds a fourth error: discretisation error E_dis [42].
+Example: dy/dx + y(x) = ∫_0^x e^{t-x} y(t) dt
+⇒ approximate the integral by Gauss-Legendre with degree n, then PINN solves
+  dy/dx + y(x) ≈ Σ_i w_i e^{t_i(x) − x} y(t_i(x)).
+Same idea works for FDEs and SDEs.
+
+2.7 PINNs for inverse problems
+-------------------------------
+Unknown parameters λ in the PDE; have extra observations on T_i ⊂ Ω:
+  I(u, x) = 0 on T_i.
+Add an extra loss term:
+  L(θ, λ; T) = w_f L_f + w_b L_b + w_i L_i,
+  L_i(θ, λ; T_i) = (1/|T_i|) Σ ‖I(û, x)‖².
+Optimise θ AND λ jointly: (θ*, λ*) = argmin L.
+
+2.8 Residual-based Adaptive Refinement (RAR)
+---------------------------------------------
+Random T may be inefficient for solutions with steep gradients (Burgers).
+RAR adds residual points where the residual is largest (analogous to FEM
+adaptive refinement [2]).
+
+PROCEDURE 2 (RAR):
+  Step 1: Start with random T; train PINN for limited iterations.
+  Step 2: Estimate mean PDE residual E_r (eq 3) by Monte Carlo on a
+          random pool S = {x_1,…,x_|S|}:
+            E_r ≈ (1/|S|) Σ ‖f(x; …)‖
+  Step 3: STOP if E_r < E_0. Else add the m points with the LARGEST
+          residuals from S into T; go to Step 2.
+
+This is the original "RAR" — later renamed RAR-G (Greedy) by Wu et al. 2023.
+
+
+3  DeepXDE USAGE AND CUSTOMISATION
+==============================================================================
+
+3.1 Usage
+----------
+PROCEDURE 3:
+  Step 1: Specify domain (geometry module).
+  Step 2: Specify PDE (TensorFlow grammar).
+  Step 3: Specify BC and IC.
+  Step 4: Combine via data.PDE (steady) or data.TimePDE (time-dep).
+  Step 5: Construct NN via maps module.
+  Step 6: Define Model = (problem, network).
+  Step 7: Model.compile(optimiser, lr, loss_weights).
+  Step 8: Model.train(restore_path=…); use callbacks for monitoring.
+  Step 9: Model.predict(x).
+
+Built-in primitive geometries: interval, triangle, rectangle, polygon,
+disk, cuboid, sphere. Boolean ops on geometries (union |, difference -,
+intersection &) ⇒ constructive solid geometry (CSG); 2-D and 3-D.
+
+Built-in BCs: DirichletBC, NeumannBC, RobinBC, PeriodicBC, OperatorBC
+(general). IC.
+NNs: maps.FNN, maps.ResNet.
+Loss types, metrics, optimisers, lr schedules, initialisers, regularisers
+all configurable.
+
+DeepXDE also approximates functions from multi-fidelity data [40] and
+learns nonlinear operators (DeepONet) [34].
+
+3.2 Customisability
+-------------------
+3.2.1 Geometry: subclass Geometry; implement inside / on_boundary /
+      boundary_normal / periodic_point / random_points.
+3.2.2 Neural networks: subclass Map; implement inputs / outputs / targets
+      / build.
+3.2.3 Callbacks: ModelCheckpoint, OperatorPredictor, FirstDerivative,
+      MovieDumper. Subclass Callback and override on_epoch_begin /
+      on_epoch_end / etc.
+
+
+4  DEMONSTRATION EXAMPLES
+==============================================================================
+All examples: tanh activation, w_f = w_b = w_i = 1.
+Hyperparameters (Table 3, depth × width × optimiser × lr × iterations):
+  4.1 Poisson L-shape : 4 × 50 × Adam→L-BFGS × 0.001 × 50 000
+  4.2 Burgers (RAR)   : 3 × 20 × Adam→L-BFGS × 0.001 × 15 000
+  4.3 Lorenz inverse  : 3 × 40 × Adam        × 0.001 × 60 000
+  4.4 Diff-react inv  : 3 × 20 × Adam        × 0.001 × 80 000
+  4.5 Volterra IDE    : 4 × 20 × L-BFGS      ×   —   ×   —
+
+4.1 Poisson on L-shaped domain
+-------------------------------
+  −Δu = 1 on Ω = [-1,1]² \ [0,1]²;  u = 0 on ∂Ω.
+  1200 + 120 random points for T_f, T_b. Compared against spectral element
+  method (SEM) [27]. Good visual agreement.
+
+4.2 RAR for Burgers
+--------------------
+1-D Burgers:
+  u_t + u u_x = ν u_xx,  ν = 0.01/π, x∈[-1,1], t∈[0,1]
+  u(x,0) = -sin(πx), u(±1,t)=0.
+Initial 2500 random T_f; RAR with m=1, E_0 = 0.005 ⇒ +40 points adaptively.
+PINN+RAR captures the discontinuity much better than 2540 randomly sampled
+points (Fig 8A). FD with 200×100 grid achieves a good solution (blue);
+60×40 grid oscillates around the discontinuity. RAR-added points cluster
+near the sharp interface.
+
+2-D Burgers (coupled u, v) at Re = 5000:
+  u_t + u u_x + v u_y = (1/Re)(u_xx + u_yy)
+  v_t + u v_x + v v_y = (1/Re)(v_xx + v_yy)
+Exact solution available [3]. 200 initial T_f + 10 RAR points (= 210 total)
+beats 210 uniformly random T_f.
+
+4.3 Lorenz inverse
+-------------------
+  dx/dt = ρ(y - x);  dy/dt = x(σ - z) - y;  dz/dt = xy - βz
+True (ρ, σ, β) = (10, 15, 8/3); IC = (-8, 7, 27); observe at certain times
+on [0, 3] (RK45). 400 random T_f + 25 equispaced T_i.
+Recovered: (ρ, σ, β) = (10.002, 14.999, 2.668).
+
+4.4 Diff-reaction inverse (porous media)
+-----------------------------------------
+  ∂C_A/∂t = D ∂²C_A/∂x² − k_f C_A C_B²
+  ∂C_B/∂t = D ∂²C_B/∂x² − 2 k_f C_A C_B²
+True D = 2e-3, k_f = 0.1. 40 000 observations. Recovered D = 1.98e-3,
+k_f = 0.0971.
+
+4.5 Volterra IDE
+-----------------
+  dy/dx + y(x) = ∫_0^x e^{t-x} y(t) dt;  y(0) = 1.
+Exact: y(x) = e^{-x} cosh x. Gauss-Legendre quadrature degree 20.
+12 equispaced residual points. Rel L² error 2e-3.
+
+
+5  CONCLUDING REMARKS
+==============================================================================
+PINNs are mesh-free (AD), tolerate noisy data, easily extend to IDEs,
+inverse problems. RAR improves training efficiency.
+DeepXDE: compact PINN library mirroring the math.
+
+LIMITATIONS:
+- Slower than FEM for forward problems (mitigatable via offline training
+  [58, 53] or time-parallel methods).
+- Architecture search currently empirical; meta-learning [59, 17] could
+  automate.
+- Strong-form is easy via AD; weak/variational alternatives possible
+  but require quadrature grids.
+- Future: composite networks (CNN + PINN sharing parameters) for mixed
+  data (images + scattered measurements) — geophysics, biomedicine.
+
+
+REFERENCES (full)
+==============================================================================
+[1]  Abadi M. et al., "TensorFlow: a system for large-scale machine
+     learning," USENIX OSDI, 2016, pp. 265-283.
+[2]  Ainsworth M., Oden J.T., "A posteriori error estimation in finite
+     element analysis," Wiley, vol. 37, 2011.
+[3]  Baeza A., Mulet P., "Adaptive mesh refinement techniques for high-order
+     shock capturing schemes…," IJNMF 52:455-471, 2006.
+[4]  Baker N. et al., "Workshop report on basic research needs for SciML,"
+     US DOE Office of Science, 2019.
+[5]  Baydin A.G., Pearlmutter B.A., Radul A.A., Siskind J.M., "Automatic
+     differentiation in machine learning: a survey," JMLR 18, 2017.
+[6]  Beck C., E W., Jentzen A., "ML approximation algorithms for high-D
+     fully nonlinear PDEs and second-order BSDEs," J. Nonlinear Sci., 2017.
+[7]  Berg J., Nyström K., "A unified deep ANN approach to PDEs in complex
+     geometries," Neurocomputing 317:28-41, 2018.
+[8]  Betancourt M., "A geometric theory of higher-order automatic
+     differentiation," arXiv:1812.11592, 2018.
+[9]  Bettencourt J., Johnson M.J., Duvenaud D., "Taylor-mode AD for higher-
+     order derivatives in JAX," 2019.
+[10] Blum A., Rivest R.L., "Training a 3-node NN is NP-complete," NIPS,
+     1989, pp. 494-501.
+[11] Bottou L., Bousquet O., "The tradeoffs of large-scale learning,"
+     NIPS, 2008, pp. 161-168.
+[12] Byrd R.H., Lu P., Nocedal J., Zhu C., "A limited-memory algorithm
+     for bound-constrained optimisation," SIAM JSC 16:1190-1208, 1995.
+[13] Chen Y., Lu L., Karniadakis G.E., Dal Negro L., "PINNs for inverse
+     problems in nano-optics and metamaterials," arXiv:1912.01085, 2019.
+[14] Ciarlet P.G., "The finite element method for elliptic problems,"
+     SIAM vol. 40, 2002.
+[15] Dissanayake M., Phan-Thien N., "NN-based approximations for solving
+     PDEs," Comm. Numer. Methods Eng. 10:195-201, 1994.
+[16] E W., Yu B., "The deep Ritz method," CMS 6:1-12, 2018.
+[17] Finn C., Abbeel P., Levine S., "MAML: model-agnostic meta-learning
+     for fast adaptation of deep networks," ICML, 2017.
+[18] Grohs P., Hornung F., Jentzen A., Von Wurstemberger P., "A proof
+     that ANNs overcome the curse of dimensionality in numerical
+     approximation of Black-Scholes PDEs," arXiv:1809.02362, 2018.
+[19] Han J., Jentzen A., E W., "Solving high-D PDEs using deep learning,"
+     PNAS 115:8505-8510, 2018.
+[20] He J., Li L., Xu J., Zheng C., "ReLU DNNs and linear finite elements,"
+     arXiv:1807.03973, 2018.
+[21] He Q., Brajas-Solano D., Tartakovsky G., Tartakovsky A.M., "PINNs
+     for multiphysics data assimilation with subsurface transport,"
+     arXiv:1912.02968, 2019.
+[22] Hughes T.J., Cottrell J.A., Bazilevs Y., "Isogeometric analysis: CAD,
+     finite elements, NURBS…," CMAME 194:4135-4195, 2005.
+[23] Jagtap A.D., Kawaguchi K., Karniadakis G.E., "Locally adaptive
+     activation functions with slope recovery term…," arXiv:1909.12228,
+     2019.
+[24] Jagtap A.D., Kawaguchi K., Karniadakis G.E., "Adaptive activation
+     functions accelerate convergence in deep & PINNs," JCP 404:109136,
+     2020.
+[25] Jin P., Lu L., Tang Y., Karniadakis G.E., "Quantifying generalisation
+     error in deep learning…," arXiv:1905.11427, 2019.
+[26] Johnson C., "Numerical solution of PDEs by FEM," Courier, 2012.
+[27] Karniadakis G.E., Sherwin S.J., "Spectral/hp element methods for CFD,"
+     OUP, 2nd ed., 2013.
+[28] Khoo Y., Lu J., Ying L., "Solving parametric PDE problems with ANNs,"
+     arXiv:1707.03351, 2017.
+[29] Kingma D.P., Ba J., "Adam: a method for stochastic optimisation,"
+     ICLR, 2015.
+[30] Lagaris I.E., Likas A., Fotiadis D.I., "ANN for solving ODEs/PDEs,"
+     IEEE TNN 9:987-1000, 1998.
+[31] Lagaris I.E., Likas A.C., Papageorgiou D.G., "NN methods for boundary
+     value problems with irregular boundaries," IEEE TNN 11:1041-1049,
+     2000.
+[32] LeCun Y., Bengio Y., Hinton G., "Deep learning," Nature 521:436, 2015.
+[33] Long Z., Lu Y., Ma X., Dong B., "PDE-net: learning PDEs from data,"
+     ICML, 2018, pp. 3214-3222.
+[34] Lu L., Jin P., Karniadakis G.E., "DeepONet: learning nonlinear
+     operators…," arXiv:1910.03193, 2019.
+[35] Lu L., Shin Y., Su Y., Karniadakis G.E., "Dying ReLU and
+     initialisation," arXiv:1903.06733, 2019.
+[36] Lu L., Su Y., Karniadakis G.E., "Collapse of deep and narrow NNs,"
+     arXiv:1808.04947, 2018.
+[37] Mao Z., Jagtap A.D., Karniadakis G.E., "PINNs for high-speed flows,"
+     CMAME 360:112789, 2020.
+[38] Margossian C.C., "A review of automatic differentiation…," WIDM 9,
+     2019.
+[39] Meade A.J., Fernandez A.A., "The numerical solution of linear ODEs
+     by FFNNs," Math. & Comp. Modelling 19:1-25, 1994.
+[40] Meng X., Karniadakis G.E., "A composite NN that learns from
+     multi-fidelity data," arXiv:1903.00104, 2019.
+[41] Nabian M.A., Meidani H., "A DNN surrogate for high-D random PDEs,"
+     arXiv:1806.02957, 2018.
+[42] Pang G., Lu L., Karniadakis G.E., "fPINNs: fractional PINNs," SIAM
+     JSC 41:A2603-A2626, 2019.
+[43] Paszke A. et al., "Automatic differentiation in PyTorch," 2017.
+[44] Pinkus A., "Approximation theory of the MLP model in neural networks,"
+     Acta Numerica 8:143-195, 1999.
+[45] Poggio T., Mhaskar H., Rosasco L., Miranda B., Liao Q., "Why and when
+     can deep — but not shallow — networks avoid the curse of
+     dimensionality," IJAC 14:503-519, 2017.
+[46] Rahaman N. et al., "On the spectral bias of NNs," ICML, 2019.
+[47] Raissi M., Perdikaris P., Karniadakis G.E., "PINNs," JCP 378:686-707,
+     2019.
+[48] Raissi M., Yazdani A., Karniadakis G.E., "Hidden fluid mechanics,"
+     Science, 2020.
+[49] Rumelhart D.E., Hinton G.E., Williams R.J., "Learning representations
+     by back-propagating errors," Nature 323:533-536, 1986.
+[50] Sirignano J., Spiliopoulos K., "DGM: a DL algorithm for solving PDEs,"
+     JCP 375:1339-1364, 2018.
+[51] Tartakovsky A.M., Marrero C.O., Perdikaris P., Tartakovsky G.D.,
+     Barajas-Solano D., "Learning parameters and constitutive
+     relationships with physics-informed DNNs," arXiv:1808.03398, 2018.
+[52] van Milligen B.P., Tribaldos V., Jiménez J., "NN differential equation
+     and plasma equilibrium solver," PRL 75:3594, 1995.
+[53] Winovich N., Ramani K., Lin G., "ConvPDE-UQ: CNNs with quantified
+     uncertainty for heterogeneous elliptic PDEs," JCP 394:263-279, 2019.
+[54] Xu Z.-Q.J., Zhang Y., Luo T., Xiao Y., Ma Z., "Frequency principle:
+     Fourier analysis sheds light on DNNs," arXiv:1901.06523, 2019.
+[55] Yang L., Zhang D., Karniadakis G.E., "Physics-informed GANs for
+     SDEs," arXiv:1811.02033, 2018.
+[56] Zhang D., Guo L., Karniadakis G.E., "Learning in modal space: solving
+     time-dependent stochastic PDEs using PINNs," arXiv:1905.01205, 2019.
+[57] Zhang D., Lu L., Guo L., Karniadakis G.E., "Quantifying total
+     uncertainty in PINNs…," JCP 397:108850, 2019.
+[58] Zhu Y., Zabaras N., Koutsourelakis P.-S., Perdikaris P.,
+     "Physics-constrained deep learning for high-D surrogate modelling
+     and UQ without labelled data," arXiv:1901.06314, 2019.
+[59] Zoph B., Le Q.V., "Neural architecture search with reinforcement
+     learning," arXiv:1611.01578, 2016.
+
+================================================================================
+END OF FILE
+================================================================================

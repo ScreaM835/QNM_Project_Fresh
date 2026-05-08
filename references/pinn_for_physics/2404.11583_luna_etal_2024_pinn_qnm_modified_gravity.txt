@@ -1,0 +1,779 @@
+================================================================================
+TITLE:    Quasinormal Modes in Modified Gravity using Physics-Informed
+          Neural Networks
+AUTHORS:  Raimon Luna, Daniela D. Doneva, José A. Font, Jr-Hua Lien,
+          Stoytcho S. Yazadjiev
+ARXIV:    2404.11583
+SOURCE:   https://ar5iv.labs.arxiv.org/html/2404.11583
+SAVED:    via fetch_webpage (ar5iv HTML rendering, math rendered as Unicode)
+WHY HERE: Direct methodological precedent for PINN QNM solver on numerical
+          (non-analytic) backgrounds. Demonstrates: (i) frequency-domain
+          ansatz with Ω as nn.Parameter trained alongside weights/biases,
+          (ii) hard-enforced normalization g(1)=1 via skip transform,
+          (iii) chain training across one-parameter family of solutions,
+          (iv) accuracy diagnostic via final training loss vs. error.
+          Direct stylistic template for our paper.
+================================================================================
+
+# Quasinormal Modes in Modified Gravity using Physics-Informed Neural Networks
+
+###### Abstract
+
+In this paper, we apply a novel approach based on physics-informed neural
+networks to the computation of quasinormal modes of black hole solutions in
+modified gravity. In particular, we focus on the case of Einstein-scalar-
+Gauss-Bonnet theory, with several choices of the coupling function between the
+scalar field and the Gauss-Bonnet invariant. This type of calculation
+introduces a number of challenges with respect to the case of General
+Relativity, mainly due to the extra complexity of the perturbation equations
+and to the fact that the background solution is known only numerically. The
+solution of these perturbation equations typically requires sophisticated
+numerical techniques that are not easy to develop in computational codes. We
+show that physics-informed neural networks have an accuracy which is comparable
+to traditional numerical methods in the case of numerical backgrounds, while
+being very simple to implement. Additionally, the use of GPU parallelization
+is straightforward thanks to the use of standard machine learning environments.
+
+## I. Introduction
+
+Black hole characteristic ringing has been long considered one of the ultimate
+tests of the laws of gravity at extreme curvature [1, 2, 3]. Detecting at least
+two quasinormal mode (QNM) frequencies can already put severe constraints on
+any deviation from general relativity (GR) [4, 5] or the other way around — it
+can provide an undoubted signature of a failure of Einstein's theory. Moreover,
+with the direct detection of gravitational waves by the Advanced LIGO and
+Advanced Virgo detectors [6, 7] from compact binary coalescences [8, 9, 10, 11]
+and with the gradual upgrades of their sensitivities, observing high-precision
+post-merger black hole ringing becomes realistic [12, 13, 14, 15, 16, 17, 18,
+19]. This is especially true for the next generation of gravitational-wave
+detectors such as LISA, the Einstein Telescope [20], and the Cosmic Explorer
+[21].
+
+There are a number of challenges in properly interpreting the gravitational
+wave signal emitted during such characteristic ringing. This includes for
+example the fact that the post-merger signal is not a clear one and it will be
+contaminated with the nonlinear part of the actual merger of two black holes
+[22, 23] igniting nonlinear modes in the spectrum [24, 25, 26]. Overtones or
+higher harmonics can also play an important role [27, 28, 29]. Last but not
+least, one needs a precise theoretical calculation of the black hole QNM
+spectrum not only in GR but also in plausible modifications of this theory.
+This is a difficult task on its own despite the fact that we are dealing with
+linear perturbation equations. In many cases of realistic beyond-Kerr black
+holes, simple analytical, or quasi-analytical approaches such as WKB [30, 31],
+are not accurate enough to compute the spectrum. Instead, the resulting
+differential equations governing the QNM frequencies are typically integrated
+numerically which is very involved since the equations are stiff [32, 33].
+Subtle adjustments of the numerical codes are required and the solution is
+typically done case by case [34]. The picture worsens if we want to extend
+these results to the case of rapid rotation since in most of the realistic
+theories beyond GR separation of variables is not possible and one ends up
+with a system of partial differential equations instead.
+
+To address the aforementioned obstacles, several well-designed approximations
+have been developed. These typically include an expansion in the coupling
+parameter for the beyond-GR theory, assuming that the GR corrections are small,
+and an expansion in terms of the rotational parameter [35, 36, 37, 38, 39, 40,
+41, 42]. Sophisticated new methods for calculating the QNM frequencies using
+spectral decomposition are also being developed [43, 44, 45], showing promising
+potential but still posing a number of obstacles when dealing with beyond-GR
+theories. These approaches typically require important adjustments and the
+efforts behind each methodology/code development can be substantial. For
+example, the choice of a spectral basis can be quite critical for controlling
+the accuracy of spectral methods [43, 44, 45]. Moreover, to avoid the
+contamination of the numerical solution with an ingoing wave component when
+performing direct numerical integration of the perturbations equations,
+advanced techniques such as complex scaling are typically applied that, however,
+require the adjustment of auxiliary parameters [46, 47, 48]. In view of these
+difficulties it would be desirable to have a more general and straightforward
+approach for QNM computation, even at the expense of some loss of accuracy,
+especially if it entailed less workforce.
+
+In this paper we explore the capabilities for QNM computation in beyond-GR
+theories of a relatively new such method based on machine learning and
+artificial neural networks (NNs). Neural networks have been used for the
+solution of ordinary and partial differential equations (PDEs) since the early
+1990s (see [49, 50, 51, 52, 53, 54, 55, 56, 57] and references therein). In
+particular, a class of NNs known as Physics-Informed Neural Networks (PINNs)
+[58, 59] have recently become a promising alternative to traditional numerical
+methods for solving PDEs. By capturing the behaviour of physical systems
+described by their underlying PDEs, PINNs are now regarded as a competitive,
+straightforward approach for solving PDEs and have been applied to many
+different areas of mathematics and physics (e.g. [60, 61, 62, 63]).
+
+The working principle of PINNs relies on the ability of NNs to approximate any
+function by solving an optimization problem for the values of their weights
+and biases [64]. As the functions involved in the definition of the NN are
+typically smooth, the gradients of the loss function can be efficiently
+computed by the chain rule by an algorithm known as backpropagation.
+Furthermore, in the particular case of PINNs, backpropagation is used to
+extract the derivatives of the interpolated function analytically.
+
+An additional advantage of PINNs is their ability to run on one or several
+graphics processing units (GPUs) without any significant modification of the
+code. As GPU computing is rapidly gaining importance, a large part of
+scientific computing hardware infrastructure is transitioning from the more
+traditional central processing units (CPUs) to clusters of GPUs. However, the
+adaptation of scientific numerical algorithms to the new devices typically
+needs a significant amount of work and time, even more so if parallelization
+is required. As PINNs can be implemented on standard machine learning
+environments such as PyTorch [65], they can be transferred to run on a GPU by
+changing only a few lines of code. All the adaptation and communication to the
+different type of hardware is handled in the background by the environment.
+
+PINNs have already been applied to the computation of black hole QNMs, both in
+the case of Schwarzschild [66, 67, 68, 69] and Kerr black holes [70, 71]. It
+has been shown that its accuracy in calculating the quasinormal mode
+frequencies is good enough even for the next generation of gravitational wave
+detectors. So far, all previous applications of PINNs to QNMs have been
+performed on black hole solutions in GR, where the background metric is known
+analytically and the perturbation equations are relatively simple. In the
+present paper we build on our previous work [70] and go a step further by
+developing a PINN that calculates for the first time the QNMs of black holes
+beyond GR. The obstacles we had to overcome are related to the significantly
+more complicated perturbation equations compared to GR and also to the fact
+that the background black hole solution that is perturbed is known only
+numerically.
+
+The modified gravity theory under consideration will be the Einstein-scalar-
+Gauss-Bonnet (EsGB) gravity. This choice is motivated by the fact that black
+hole perturbations and QNMs have been extensively studied in the literature
+for this theory — both in the static limit when solving the complete
+perturbation equations [33, 72, 73, 74, 45] or in the slow rotating
+approximation [39, 40]. Particularly interesting for our studies is the case
+of axial perturbations of scalarized black holes considered in [73] where the
+perturbation equation was derived in a very concise form. This allows us to
+borrow the methodology from previous QNM studies using PINNs [70] to better
+estimate the potential of using neural networks for calculating QNMs beyond GR.
+
+The paper is structured as follows: In Section II we introduce the
+perturbation equations for EsGB gravity and the procedure that we use to adapt
+them to the PINN. We describe the PINN itself and the way it operates on the
+numerical background data in Section III. We also perform in this section a
+series of tests to properly measure the accuracy of the method. Finally, in
+Section IV we present the quasinormal mode results for families of black hole
+solutions constructed on a variety of models. Our conclusions are outlined in
+Section V.
+
+## II. Setup
+
+### II.1 Gauss-Bonnet Gravity
+
+This paper considers solutions of EsGB theories, which are described by the
+action
+
+    S = (1/16π) ∫ d⁴x √(-g) [R - 2 ∇_μ φ ∇^μ φ + λ² f(φ) R²_GB]              (1)
+
+where the scalar field φ couples via the coupling function f(φ) to the
+Gauss-Bonnet invariant R²_GB, which is defined as
+
+    R²_GB = R² - 4 R_μν R^μν + R_μναβ R^μναβ                                  (2)
+
+Variation of Eq. (1) with respect to the metric g_μν and the scalar φ,
+respectively, leads to the equations of motion
+
+    R_μν - (1/2) R g_μν + Γ_μν = 2 ∇_μ φ ∇_ν φ - g_μν ∇_α φ ∇^α φ,
+    ∇_α ∇^α φ = -(λ²/4) df/dφ R²_GB.                                         (3)
+
+with the tensors Γ_μν and Ψ_μ being defined respectively as
+
+    Γ_μν = -R(∇_μ Ψ_ν + ∇_ν Ψ_μ) - 4 g_μν R^αβ ∇_α Ψ_β + 4 R_μα ∇^α Ψ_ν
+           + 4 R_να ∇^α Ψ_μ + 4 R_μανβ ∇^α Ψ^β
+           - 4 ∇_α Ψ^α (R_μν - (1/2) R g_μν),
+    Ψ_μ = (λ²/4) df/dφ ∇_μ φ.                                                (4)
+
+### II.2 Scalar field coupling
+
+We will consider two coupling functions f(φ), namely
+
+    f₂(φ) = (1/2β)(1 - e^(-β φ²)),                                           (5)
+    f₄(φ) = (1/4β)(1 - e^(-β φ⁴)).                                           (6)
+
+Even though they look similar, f₂(φ) and f₄(φ) have very distinct
+phenomenology. The exponential form is taken for numerical convenience. What
+matters most for the characteristic features of the spectrum of solutions is
+the leading-order expansion of the coupling for small scalar fields. Thus, in
+the limit φ → 0 we have f₂(φ) ∼ φ² and f₄(φ) ∼ φ⁴. Following this, it is
+clear that for both couplings
+
+    ∂f_{2,4}/∂φ |_{φ=0} = 0.                                                 (7)
+
+Therefore, based on the field equations (3) one can conclude that GR (with
+φ = 0) is always a solution. In the case of f₂(φ) one also has that
+
+    ∂²f₂/∂φ² |_{φ=0} > 0,                                                    (8)
+
+that eventually renders the Schwarzschild black hole unstable for small enough
+masses (or equivalently large dimensional coupling λ) and gives rise to
+linearly stable scalarized black hole solutions [75]. For the second coupling
+the picture changes since
+
+    ∂²f₄/∂φ² |_{φ=0} = 0.                                                    (9)
+
+In that case, the Schwarzschild black hole is always linearly stable but in
+addition, linearly stable scalarized black holes can exist as well being
+thermodynamically preferred over GR for a wide range of the parameters [76].
+A transition between the two can happen through a large nonlinear
+perturbation. Thus, we call this case nonlinear scalarization.
+
+In the QNM calculation reported in this work we will employ both couplings,
+with f₂(φ) being our test case for estimating the error of the PINN method
+based on previous results [73], while the QNM calculation for f₄ are original
+results calculated for the first time in the present paper.
+
+### II.3 Black hole static solutions
+
+The background static black hole solutions of (3) are spherically symmetric
+assuming the following ansatz for the metric
+
+    ds² = -e^(2μ₀(r)) dt² + e^(2ν₀(r)) dr² + r²(dθ² + sin²θ dφ²).            (10)
+
+Therefore, the solutions will be entirely described by the radial profiles of
+μ₀(r), ν₀(r) and φ₀(r). The subscript (·)₀ from now on will denote the
+background unperturbed quantities.
+
+When the metric ansatz (10) is plugged in the field equations (3), one can
+easily derive the dimensionally reduced field equations. The boundary
+conditions are the natural ones — regularity at the black hole horizon and
+asymptotic flatness at infinity. Since the background solutions are not the
+focus on the present paper we refer the reader to [77] for further details.
+The black holes are calculated numerically using the code developed in [77,
+76]. The so-obtained solutions are then transferred to the PINN code to
+compute the appropriate coefficients in the linear perturbation equations.
+
+### II.4 Axial Perturbation Equations
+
+Axial perturbations of spherical EsGB black holes [73] are described by the
+(linear) equation
+
+    ∂²Ψ/∂r̃*² + [ (1/2 S₀) ∂²S₀/∂r̃*² - (3/4 S₀²)(∂S₀/∂r̃*)²
+              - (e^σ₀ / r S₀) ∂S₀/∂r̃*  + (r ∂σ₀/∂r - 2) e^(2σ₀)/r²
+              - (ℓ-1)(ℓ+2) e^(2μ₀) S₀ / (r² W₀) ] Ψ
+    = (S₀/P₀) ∂²Ψ/∂t²,                                                       (11)
+
+where the background auxiliary functions σ₀, P₀, W₀ and S₀ are defined as
+
+    σ₀(r) = μ₀ - ν₀,
+    P₀(r) = 1 - 4 λ² (∂f/∂r)(∂μ₀/∂r) e^(-2ν₀),
+    W₀(r) = 1 - 4 λ² (∂f/∂r) e^(-2ν₀) / r,
+    S₀(r) = 1 - 4 λ² (∂²f/∂r² - (∂f/∂r)(∂ν₀/∂r)) e^(-2ν₀).                   (12)
+
+We should note that the perturbation equation (11) is a wave-like equation
+for Ψ only when S₀/P₀ > 0. In case this ratio turns negative, Eq. (11) changes
+character from hyperbolic to elliptic. In this regime, the quasinormal modes
+are not well defined and we will exclude such background black hole solutions
+from our analysis below.
+
+In the form of (11), the perturbation equation involves two radial coordinates
+simultaneously, namely the Schwarzschild-like coordinate r and the Regge-
+Wheeler coordinate r̃*. Both coordinates are related to each other by
+
+    ∂/∂r̃* = e^σ₀ ∂/∂r.                                                      (13)
+
+Rewriting all derivatives in terms of r, as well as taking a Fourier mode in
+the form Ψ(r,t) = e^(-iωt) ψ(r), leads to the equation
+
+    ∂²ψ/∂r² + (∂σ₀/∂r) ∂ψ/∂r
+    + (1/2 S₀)[ ∂²S₀/∂r² - (3/2 S₀)(∂S₀/∂r)² + (∂σ₀/∂r - 2/r) ∂S₀/∂r
+                + (r ∂σ₀/∂r - 2) 2 S₀/r² - (ℓ-1)(ℓ+2) 2 S₀² e^(2ν₀)/(r² W₀)
+                + 2 ω² S₀² e^(-2σ₀)/P₀ ] ψ = 0.                              (14)
+
+The coordinate r extends from the singularity at r = 0 all the way to space-
+like infinity r → ∞, with an event horizon at r = r_H. The perturbation
+equations have to be solved on the black hole exterior, i.e., in the domain
+r ∈ [r_H, ∞). Working with computational domains of infinite extension is
+usually impractical for numerical techniques, so it is convenient to compactify
+the radial coordinate as
+
+    x = r_H / r,                                                             (15)
+
+which reduces the domain to x ∈ [0, 1]. In terms of the compactified radial
+coordinate x, Eq. (14) becomes
+
+    x⁴ ψ'' + (2x³ + x⁴ σ₀') ψ'
+    + (1/2 S₀)[ x⁴ S₀'' - (3 x⁴ / 2 S₀)(S₀')² + (4x³ + x⁴ σ₀') S₀'
+                - 2x²(2 + x σ₀') S₀ - (ℓ-1)(ℓ+2) 2 x² S₀² e^(2ν₀)/W₀
+                + 2 Ω² S₀² e^(-2σ₀)/P₀ ] ψ = 0,                              (16)
+
+where the primes denote derivatives with respect to x, and we have introduced
+the scale-invariant parameter
+
+    Ω = r_H ω                                                                (17)
+
+as the frequency normalized by the horizon radius, which will be very useful
+for the numerical treatment of the equations. Additionally, all functions
+that have to be treated numerically should not diverge and be as smooth as
+possible inside the computational domain. This is particularly important in
+the computation of QNM, as we are searching for regular solutions for the
+perturbation. For this reason, it is useful to consider the equations in the
+GR limit to analyse the analytic structure of the functions. Indeed, in the
+Schwarzschild case the functions μ₀(x) and ν₀(x) take the simple form
+μ_Schw(x) = -ν_Schw(x) = (1/2) log(1-x), which have a logarithmic singularity
+at x = 1. For this reason, it is fundamental to redefine
+
+    M₀(x) ≡ e^(2μ₀(x)),  N₀(x) ≡ e^(-2ν₀(x)),                                (18)
+
+so we can work in terms of the regular functions M_Schw(x) = N_Schw(x) = 1 - x.
+Imposing boundary conditions for a wave that is ingoing at the horizon and
+outgoing at spatial infinity, we get that ψ can be expressed in the form
+
+    ψ(x) = (1/x - 1)^(-iγΩ) (1/x)^(i(γ+δ)Ω) e^(i(1/x - 1)Ω) g(x),            (19)
+
+where g(x) is a regular function for x ∈ [0,1] and we defined the exponents
+γ and δ as
+
+    γ = - lim_{x→1}[ S₀/P₀ · (1/x²) · ∂x M₀ N₀ ] = S₀(r_H)/(2 κ r_H P₀(r_H)),
+    δ = lim_{x→0} (1 - M₀ N₀)/x = 2M/r_H.                                    (20)
+
+In the previous equations κ and M are the surface gravity and the mass of the
+black hole solution, respectively. Now, after the change of variable, the
+differential equation for ψ(x) becomes a second order differential equation
+for g(x) whose coefficients depend on the combination iΩ, as
+
+    (1 / 4 x² (x-1)³) Σ_{n=0}^{2} Σ_{m=0}^{2-n} A_{n,m} g^(n)(x) (iΩ)^m = 0. (21)
+
+Here g^(n)(x) is the n-th derivative of the function g(x). The real
+coefficients A_{n,m}(x) are
+[long expressions for A_{0,0}, A_{0,1}, A_{0,2}, A_{1,0}, A_{1,1}, A_{2,0}
+follow in the original; see ar5iv source]
+where we have defined the auxiliary function B(x) as
+
+    B(x) = x²(γ + δ) + x(1 - δ) - 1.                                         (23)
+
+The normalization factor of 4 x² (x-1)³ in (21) is motivated by the
+Schwarzschild limit, where it appears as a common multiplying factor in the
+A_{n,m}. Cancelling this factor out has been shown to make numerical
+approaches more stable [43]. It turns out that the necessity of dividing the
+entire equation by this normalizing factor remains even in EsGB solutions
+beyond Schwarzschild.
+
+The background functions P₀, W₀ and S₀ now become, in terms of the
+compactified variable x,
+
+    P₀ = 1 - 2 x⁴ (λ/r_H)² (M₀'/M₀) N₀ f',
+    W₀ = 1 + 4 x³ (λ/r_H)² N₀ f',
+    S₀ = 1 - 2 x³ (λ/r_H)² [ x N₀' f' + 2 N₀ (2 f' + x f'') ].               (24)
+
+Writing the perturbation equations in this form is especially convenient as
+the coefficients A_{n,m} can be computed numerically beforehand on any
+computational grid, with any differentiation technique, without the need of
+any machine learning training. This reduces drastically the time and
+computational cost of the method.
+
+### II.5 The Schwarzschild case
+
+In the particular case of Schwarzschild, we have the coupling λ_Schw = 0, the
+background functions S_Schw = W_Schw = P_Schw = 1 and the metric functions
+μ_Schw(r) = -ν_Schw(r) = (1/2) log(1 - r_H/r). It is easy to check that in
+this particular case Eq. (11) becomes the well-known Schrödinger-type equation
+
+    (∂²/∂r̃*² - ∂²/∂t² + V_l(r)) Ψ = 0,
+    V_l(r) = (1 - r_H/r)( -ℓ(ℓ+1)/r² + 3 r_H/r³ ).                           (25)
+
+On the other hand, we can check that from Eq. (14) we recover the Regge-Wheeler
+equation
+
+    r(r - r_H) ∂²ψ/∂r² + r_H ∂ψ/∂r
+    + [ ω² r³/(r - r_H) - ℓ(ℓ+1) + 3 r_H/r ] ψ = 0.                          (26)
+
+Finally, Eq. (21), evaluated for the Schwarzschild solution values of the
+background functions M_Schw = N_Schw = 1 - x becomes the compactified form
+
+    [ ℓ(ℓ+1) - 3x - 4ix Ω - 4(1+x) Ω² ] g(x)
+    + [ 3x² - 2x + (2 - 4x²) iΩ ] g'(x)
+    + (x-1) x² g''(x) = 0,                                                   (27)
+
+often used when solving for QNM numerically, for instance with spectral
+decomposition methods [43].
+
+## III. The PINN
+
+### III.1 Numerical Approach
+
+The computation of the numerical values of the QNM has two main parts:
+
+  • Extraction of background functions A_{n,m}(x)
+  • Training of the Physics-Informed Neural Network
+
+[FIGURE 1: Scheme of the PINN setup, showing both the background data
+reduction and the machine learning training to extract the QNM frequencies.]
+
+The first part comprises the process of reduction of the numerical background
+solutions and the computation of the coefficients A_{n,m} from (22). This part
+does not involve any machine learning technique, and can be performed without
+keeping track of the computation graphs or gradients. As mentioned before this
+speeds up the process drastically. In practice, the grid functions μ₀(r),
+ν₀(r) and φ₀(r) are interpolated by cubic splines in order to evaluate the
+coefficients A_{n,m} on a set of PINN collocation points x_i ∈ [0,1] ∀i.
+Splines also allow for the fast extraction of the derivatives that are needed
+in the expressions for A_{n,m}. These coefficients contain all the physical
+information on the background solution that will then be used by the machine
+learning model. In practice, we choose x_i to be a set of 1000 uniformly
+distributed points between x = ε and x = 1 - ε. The regulator ε = 10⁻²
+avoids numerical indeterminations due to the vanishing normalization factor
+in Eq. (21).
+
+The second part contains all the machine learning techniques inside the
+PyTorch [65] environment, and involves the actual physics-informed neural
+network which acts as a universal approximant of x → g(x). This network
+contains as trainable parameters its own weights and biases, as well as the
+complex value for the normalized frequency Ω. The network has an input layer
+with a single neuron, accepting x, and an output layer with two neurons,
+approximating the real and imaginary part of g(x). All numerical values
+inside the network are real, as the activation functions do not behave well
+with complex values. We use 3 hidden layers of 200 neurons each, with GELU
+activation functions between them. Moreover, we use a hard-enforced
+normalization condition to impose g(1) = 1, by the relation
+
+    g(x) = (e^(x-1) - 1) G(x) + 1,                                           (28)
+
+where G(x) is the complex output of the network. The process is explained in
+more detail in [70].
+
+The PINN-approximated function g(x), together with its derivatives obtained
+by automatic differentiation, are then combined with the A_{n,m}(x)
+coefficients in the perturbation equation. The loss function L is the complex
+magnitude of the right-hand side of (21), averaged over the set of PINN
+collocation points. This loss is then minimized by an Adam optimizer [78]
+with a learning rate of r_l = 10⁻³ over 1000 epochs, which updates the
+weights, biases and Ω of the PINN. With this process, the approximations of
+g(x) and Ω converge to the values of the dominant QNM of the system. The
+process is graphically represented in FIG. 1.
+
+The weights of the PINN are initialized on normally distributed values with
+zero mean and standard deviation of σ = 0.1, while biases are initialized to
+zero. The (normalized) frequency is initialized at Ω₀ = 0.7 - 0.1 i, as this
+is close to the fundamental Schwarzschild QNM for ℓ = 2. When computing QNM
+on a one-parameter family of black hole solutions of the same theory (usually
+parametrized by their horizon radius r_H), we initialize the network as
+explained above and start training the network on the largest r_H, which is
+typically simpler. We then proceed by computing the QNM of the remaining
+solutions by decreasing order in r_H. In each consecutive mode we take the
+results of the previous training as starting values for the trainable
+parameters, without initializing the network again. Several one-parameter
+families of solutions can be trained simultaneously on the same GPU. All
+combined QNM results in this paper (1873 quasinormal modes in total) were
+created in approximately 2 hours in a single Nvidia RTX 4090 24GB GPU.
+
+### III.2 Testing the PINN
+
+The accuracy and reliability of the PINN are measured in accordance with its
+results on previously known values of the fundamental axial QNM for ℓ = 2,
+both in GR and in EsGB theories. We also relate the value of the loss
+function at the end of the training process to the mode accuracy, which
+provides a very straightforward way to gauge the reliability of the numerical
+values obtained on previously unknown QNM.
+
+TABLE 1: Comparison between the modes in [73] and those computed by the PINN
+for scalarized black holes with coupling function f₂(φ₀) and β = 6.
+
+  r_H     Re ω r_H (orig)  Re ω r_H (PINN)  % err     loss
+  ----    --------------    ---------------  -----     -----
+  1.172   0.63661           0.63719          0.0909    0.0096
+  1.10    0.65956           0.65957          0.0016    0.0048
+  1.00    0.69767           0.69772          0.0083    0.0053
+  0.90    0.74966           0.74968          0.0027    0.0046
+  0.80    0.82837           0.82827          0.0123    0.0069
+  0.70    0.94138           0.94159          0.0224    0.0082
+  0.60    1.09520           1.09547          0.0244    0.0129
+  0.50    1.30678           1.30669          0.0069    0.0157
+  0.40    1.60881           1.60854          0.0170    0.0152
+  0.30    2.06030           2.06493          0.2247    0.0791
+  0.25    2.37548           2.49225          4.9157    0.2441
+  0.20    2.78651           4.25151         52.5745    0.7993
+
+  (Imaginary part column similar; full table in original.)
+
+The simplest test, both for the PINN and the numerical accuracy of the
+background solution, is to extract modes of the Schwarzschild solution with
+different horizon radii r_H. In this case the fundamental frequency for ℓ = 2
+is very well-known to be Ω_Schw = 0.747343 - 0.177925 i, so it is easy to
+compare. Notice that, in the particular case of the Schwarzschild solution,
+r_H = 2M. In FIG. 2 we show the percentual accuracy of the PINN on GR modes,
+for 596 values of r_H ranging from 0.01 to 1.198.
+
+[FIGURE 2: Neural network error for the GR modes, as a function of the mass
+M = r_H / 2.]
+
+Next, we compare the QNM extracted with the PINN to a selection of values
+from [73] calculated for scalarized black holes having the coupling f₂(φ₀)
+(see Eq. (5)) with β = 6. The results are summarized in Table 1. All the
+modes agree well below the percentual level, with the only exception of the
+solutions with r_H ≤ 0.25, where the accuracy falls dramatically. In this
+case, the error could also be caused by the proximity to the point of
+hyperbolicity loss in the equations of motion (3), as well as the possible
+decrease in the effective resolution of the background.
+
+It is interesting, however, to notice that the final loss achieved by the
+optimizer in the last two cases is significantly larger than in the more
+accurate modes. We can therefore use this loss, which is nothing else than a
+measure of the degree to which the perturbation equation is satisfied, as a
+proxy for the success of the fit. This relationship between the final loss
+and the accuracy of the QNM frequencies is depicted in a log-log scale in
+FIG. 3. Based on this plot, a final loss below 0.1 seems to indicate a
+reasonably accurate frequency.
+
+[FIGURE 3: Neural network loss vs accuracy of the reference modes in [73] for
+scalarized black holes with coupling function f₂(φ₀) and β = 6.]
+
+## IV. Results
+
+### IV.1 Quadratic Model
+
+[FIGURE 4: Final training loss as a function of mass for GR and f₂(φ₀)
+coupling function solutions. The vertical dashed line marks the point of
+hyperbolicity loss. The horizontal dashed line marks the threshold for the
+modes to be reliable.]
+
+The first theory we analyze corresponds to the case of a quadratic coupling
+function f₂(φ₀) given by Eq. (5) with β = 6. We focus on the fundamental
+axial QNM for ℓ = 2. In addition to the modes already compared in Table 1,
+the much larger collection of solutions in this section can be qualitatively
+compared to the plots in [73] as an additional check for the reliability of
+the PINNs as a QNM solver.
+
+The PINN has been trained on a family of 503 black hole solutions, with
+values of the horizon radius r_H ranging from 0.196 to 1.198, in order to
+produce values for the quasinormal ringing frequencies for each of them. The
+quality of the QNM values is estimated by the value of the loss after the
+training of the PINN on each of the modes, as shown in FIG. 4. As explained
+in Section III.2, we have chosen a value of 0.1 as the maximum loss that is
+admissible for a reliable mode value. For this reason, only the modes with a
+final training loss below 0.1 will be represented in FIG. 5 and 6. Comparison
+with the results of [73] confirms that the threshold 0.1 for the loss is
+adequate.
+
+[FIGURES 5 and 6: real/imaginary parts of QNM frequencies vs M/λ; mass-
+normalized frequencies vs Q_D/M for f₂(φ₀) coupling.]
+
+FIG. 5 shows the real and imaginary parts of the frequencies as a function of
+the black hole mass M. The frequencies are compared to the Schwarzschild
+modes, also computed by the PINN. When compared to the results of [73], the
+frequencies are remarkably accurate until approximately M ≈ 0.22 (which
+corresponds to r_H ≈ 0.27). Some specific values are listed in Table 1.
+Beyond this point, the QNM extracted by the PINN are no longer included in
+the plot as they start increasing rapidly and cannot be trusted. This is also
+confirmed by the PINN loss rapidly rising above the threshold of 0.1. As
+already mentioned, this could be caused by two reasons: On the one hand, by
+their proximity to the point r_S2, where the equations of motion are no
+longer hyperbolic. On the other hand, the ratio of the horizon size to the
+background solution resolution also becomes smaller.
+
+FIG. 6 relates the frequencies (multiplied by M) to the monopolar coefficient
+Q_D (also known as the scalar charge) of the scalar field profile. These
+plots are particularly useful to distinguish small inaccuracies on the
+computation, as the simple inverse dependence of ω with M is normalized away.
+Again, we observe that the modes agree well when compared to [73] until the
+very close proximity of the hyperbolicity loss point.
+
+### IV.2 Quartic Model
+
+In this case, we take the quartic coupling function f₄(φ₀) given by Eq. (6).
+Again, we focus on the fundamental axial QNM for ℓ = 2. In this case, the
+PINN has been trained on families of background solutions with β = 400, 1000
+and 10000 respectively, as summarized in TABLE 2.
+
+TABLE 2: Summary of black hole background solutions considered for the f₄(φ₀)
+models.
+
+  β       N_solutions  M_min   M_max
+  ----    -----------  -----   -----
+  400     319          0.158   0.792
+  1000    275          0.082   0.628
+  10000   180          0.016   0.350
+
+The particular choices of β are made such that we have a large enough
+hyperbolic part of the branch [74].
+
+[FIGURES 7, 8, 9: final loss for GR and f₄(φ₀); real and imaginary parts of
+QNM vs M/λ; mass-normalized parts vs Q_D/M.]
+
+FIG. 7 shows the final losses after the training of the PINN in each of the
+modes, also including GR as a reference. Again, we take 0.1 as the threshold
+for the solutions to be trustworthy, and as such only the ones below the
+threshold are represented in FIG. 8 and 9.
+
+We plot the frequencies of the three families of solutions as a function of
+the total mass M in FIG. 8, together with the Schwarzschild solutions as a
+reference. In this case, all models are hard to distinguish from each other,
+as the frequencies are very similar and the main variation is dominated by
+the inverse relation to M. The differences between models are much more clear
+when plotting the combination ωM, as shown in FIG. 9, as a function of the
+mass-normalized scalar charge Q_D/M.
+
+A natural question to ask is whether the obtained deviations from GR are
+actually measurable. The most promising source in this context is the post-
+merger ringing that will be observable with great accuracy (reaching signal-
+to-noise ratio over 100) by the next generation of gravitational-wave
+detectors Einstein Telescope, Cosmic Explorer, and LISA. Results based on
+the parameterized QNM test demonstrate that a change in the QNM frequency
+with respect to GR can be constrained as low as 0.1% for a non-rotating
+black hole [80]. However, the post-merger remnant black hole is theorized to
+be rapidly rotating, which would eventually worsen these estimates by roughly
+an order of magnitude. Nevertheless, as one can see in Fig. 9, for small
+black hole masses the difference between GR and scalarized black hole QNMs
+reaches up to ∼18% in the case with β = 10⁴. Even though this is certainly
+measurable according to the estimates in [80] for an idealized setup, the
+post-merger remnant offers a number of complications, such as rapid rotation,
+contamination by the nonlinear part of the merger, etc., that worsen the
+picture. Therefore, further studies are needed to analyze up to what extent
+the deviations reported in this work give a measurable deviation in the
+observed ringdown GWs.
+
+## V. Discussion
+
+In the present paper we have explored the power of physics informed neural
+networks (PINNs) to calculate quasinormal modes of black holes beyond general
+relativity. Previous similar studies in GR [70] have been here extended in
+two main directions. First, the complexity of the perturbation equations one
+has to solve is increased significantly, and new features appear such as
+hyperbolicity loss for small mass black holes. Second, the background
+solution is known only numerically. All this requires an increase in the
+complexity of the employed neural network and makes the convergence to the
+true QNM frequencies more subtle.
+
+The modified theory of gravity we have focused on is Einstein-scalar-Gauss-
+Bonnet (EsGB) gravity. This theory is well-motivated and offers rich black
+hole phenomenology beyond GR such as violation of the no-scalar hair theorems
+and black hole scalarization. Black hole perturbations have already been
+explored in the literature for different subclasses of this theory, helping
+us build intuition. Therefore, EsGB gravity is an ideal playground for
+applying the PINN approach and testing its power/accuracy.
+
+As a good more controllable starting point we have explored the axial
+perturbations of scalarized black holes within this theory where the
+perturbation equations for the metric and the scalar field reduce to a single
+master equation. The coupling between the scalar field and the Gauss-Bonnet
+invariant has been chosen to have either a quadratic or a quartic form. The
+former case corresponds to the standard black hole scalarization where the
+Schwarzschild black hole becomes unstable for large scalar field coupling
+strength giving rise to a linearly stable hairy black hole solution. The QNMs
+of such black holes have already been explored in the literature [73] and
+they were used for calibration of the developed PINN. Correspondingly, for
+the quartic coupling the Schwarzschild black hole is always linearly stable
+but can co-exist with hairy black holes which are also linearly stable and
+thermodynamically more favorable. The axial QNMs have not been examined
+before in the literature for this case.
+
+The PINN that we have used in this work to compute the QNM frequencies is a
+very simple feedforward fully connected neural network that is able to
+approximate the eigenfunctions of the perturbation equation and extract the
+QNM. The machine learning environment PyTorch makes the implementation of the
+network remarkably simple as it provides automatic differentiation
+capabilities, and allows the training to be easily accelerated in one or
+multiple GPUs. The weights, biases and frequency of a given mode can also be
+stored and used as a starting point for the training on neighboring
+background solutions, which makes the convergence even faster. Thanks to all
+these features, each mode can be accurately computed in about 15 seconds on
+a standard GPU, with the possibility of training different families of
+solutions simultaneously.
+
+We have validated the accuracy of the developed PINN against the already
+available results in [73], where we have checked that the error in the
+calculated QNM frequencies is less than 0.1% for most of the parameter range.
+This also includes black hole background models for which the effective
+potential of the perturbation equation has negative parts. Therefore, PINNs
+are powerful tools even for more complicated potential forms.
+
+The error of the calculated QNM frequencies with PINNs is somewhat more
+difficult to control compared to conventional numerical methods, as the
+computed results do not have a clearly defined convergence rate as the
+resolution is increased. Even more so, the relation between the network
+training loss and the QNM accuracy does not have a simple theoretical form.
+Nevertheless, after performing some experiments and comparison with known
+results, we have determined a rough criteria for an accuracy metric, namely
+that the loss at the end of the training should be smaller than 0.1. This
+condition breaks only as the black hole sequences approach the point where
+the hyperbolicity of the PDE is lost, i.e. the coefficient in front of the
+second order time derivative changes sign.
+
+After validating our methodology, we have presented results for a quartic
+coupling between the scalar field and the Gauss-Bonnet invariant. The black
+hole solutions in this case are characterized by a very interesting property —
+both the Schwarzschild black hole and the scalarized ones are linearly
+stable. In addition, the two branches of solutions can only meet at the zero
+mass point. Therefore, unlike the scalarized black holes with quadratic
+coupling above, there is no bifurcation point where the GR solutions merge
+with the scalarized ones. The calculated QNM frequencies in this case also
+show a smooth behavior with a final training loss consistently being under
+0.1 if we are sufficiently far away from the point of hyperbolicity loss.
+
+Overall, our results demonstrate the power of PINNs to calculate accurate
+QNMs for more complicated cases than pure Schwarzschild or even Kerr black
+holes. It will be interesting to further investigate if PINNs can perform
+equally well for even more involved systems of differential equations in
+beyond-GR theories. A natural extension of the work presented here is to
+calculate the polar QNMs of scalarized black holes where one ends up with a
+system of ordinary differential equations. Note that for black holes in EsGB
+gravity, the degeneracy between polar and axial QNMs is broken and instead,
+we have two families of distinct QNM frequencies. Those results will be
+reported elsewhere.
+
+## Acknowledgements
+
+We thank Alejandro Torres-Forné for very useful discussions, and José
+Blázquez-Salcedo for providing the data used in Table 1. RL acknowledges
+financial support provided by Generalitat Valenciana / Fons Social Europeu
+through APOSTD 2022 post-doctoral grant CIAPOS/2021/150. DD and SY
+acknowledge the support by the Bulgarian NSF Grant KP-06-H62/6. DD
+acknowledges financial support via an Emmy Noether Research Group funded by
+the German Research Foundation (DFG) under grant no. DO 1771/1-1. JAF is
+supported by the Spanish Agencia Estatal de Investigación (grant
+PID2021-125485NB-C21) funded by MCIN/AEI/10.13039/501100011033 and ERDF A
+way of making Europe, and the Generalitat Valenciana (grant CIPROM/2022/49).
+We also acknowledge further support by the European Horizon Europe staff
+exchange (SE) programme HORIZON-MSCA2021-SE-01 Grant No. NewFunFiCO-
+101086251. This work has used the following open-source packages: PyTorch
+[65], Pandas [81], NumPy [82], SciPy [83] and Matplotlib [84].
+
+## References
+
+(Selected key references for our paper; see ar5iv source for full list of 84
+entries.)
+
+[1] K. D. Kokkotas and B. G. Schmidt, Quasinormal modes of stars and black
+    holes, Living Rev. Rel. 2, 2 (1999), arXiv:gr-qc/9909058.
+[2] E. Berti, V. Cardoso, and A. O. Starinets, Quasinormal modes of black
+    holes and black branes, Class. Quant. Grav. 26, 163001 (2009),
+    arXiv:0905.2975 [gr-qc].
+[6] J. Aasi et al. (LIGO), Advanced LIGO, Class. Quant. Grav. 32, 074001
+    (2015), arXiv:1411.4547 [gr-qc].
+[8] B. P. Abbott et al. (LIGO/Virgo), Observation of Gravitational Waves
+    from a Binary Black Hole Merger, Phys. Rev. Lett. 116, 061102 (2016),
+    arXiv:1602.03837 [gr-qc].
+[26] M. Giesler, M. Isi, M. A. Scheel, and S. Teukolsky, Black Hole Ringdown:
+    The Importance of Overtones, Phys. Rev. X 9, 041060 (2019),
+    arXiv:1903.08284 [gr-qc].
+[27] R. Cotesta, G. Carullo, E. Berti, and V. Cardoso, Analysis of Ringdown
+    Overtones in GW150914, Phys. Rev. Lett. 129, 111102 (2022),
+    arXiv:2201.00822 [gr-qc].
+[30] S. Iyer and C. M. Will, Black Hole Normal Modes: A WKB Approach. 1.,
+    Phys. Rev. D 35, 3621 (1987).
+[58] M. Raissi, P. Perdikaris, and G. E. Karniadakis, Physics-informed neural
+    networks: A deep learning framework for solving forward and inverse
+    problems involving nonlinear partial differential equations, J. Comp.
+    Phys. 378, 686 (2019).
+[64] K. Hornik, M. Stinchcombe, and H. White, Multilayer feedforward networks
+    are universal approximators, Neural Networks 2, 359 (1989).
+[65] A. Paszke et al., PyTorch: An imperative style, high-performance deep
+    learning library, NeurIPS 32 (2019).
+[66] A. Övgün, I. Sakallı, and H. Mutuk, Quasinormal modes of dS and AdS
+    black holes: Feedforward neural network method, IJGMMP 18, 2150154
+    (2021), arXiv:1904.09509 [gr-qc].
+[67] A. M. Ncube, G. E. Harmsen, and A. S. Cornell, Investigating a New
+    Approach to QNM: PINNs, SAIP 65 (2021), arXiv:2108.05867 [gr-qc].
+[68] A. S. Cornell, A. Ncube, and G. Harmsen, Using PINNs to compute QNMs,
+    arXiv:2205.08284 [physics.comp-ph] (2022).
+[69] N. Patel, A. Aykutalp, and P. Laguna, Calculating Quasi-Normal Modes of
+    Schwarzschild Black Holes with PINNs, arXiv:2401.01440 [gr-qc] (2024).
+[70] R. Luna, J. Calderón Bustillo, J. J. S. Martínez, A. Torres-Forné, and
+    J. A. Font, Solving the Teukolsky equation with PINNs, Phys. Rev. D 107,
+    064025 (2023), arXiv:2212.06103 [gr-qc].
+[71] A. S. Cornell, S. R. Herbst, H. Noshad, and A. M. Ncube, Solving the
+    Regge-Wheeler and Teukolsky equations: supervised vs. unsupervised PINNs,
+    arXiv:2402.11343 [gr-qc] (2024).
+[73] J. L. Blázquez-Salcedo, D. D. Doneva, S. Kahlen, J. Kunz, P. Nedkova,
+    and S. S. Yazadjiev, Axial perturbations of the scalarized
+    Einstein-Gauss-Bonnet black holes, Phys. Rev. D 101, 104006 (2020),
+    arXiv:2003.02862 [gr-qc].
+[78] D. Kingma and J. Ba, Adam: A method for stochastic optimization,
+    ICLR (2014).

@@ -18,7 +18,8 @@ export PYTHONUNBUFFERED=1
 
 set -e
 
-WORKDIR=/home/ycc44/project32_qnm_pinn_repo_fd_refinement/project32_qnm_pinn
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+WORKDIR=$(cd "$SCRIPT_DIR/.." && pwd)
 CONFIG=${1:-configs/zerilli_l2_paper.yaml}
 EXP_NAME=$(grep -A0 '^\s*name:' "$WORKDIR/$CONFIG" | head -1 | sed 's/.*name:[[:space:]]*//')
 CKPT_DIR="$WORKDIR/outputs/pinn/$EXP_NAME/checkpoints"

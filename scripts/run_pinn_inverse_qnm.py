@@ -745,8 +745,11 @@ def main():
 
     # Ringdown fit overlay
     ax = axes[2, 1]
-    t_plot = np.linspace(float(ring_cfg["t_ring_min"]),
-                         float(cfg["domain"]["tmax"]), 500)
+    # Plot the analytic template across the full simulation domain so the
+    # reader can see template behaviour everywhere, not just inside the
+    # training window [t_ring_min, tmax]. The shaded band marks the window
+    # over which Eq.~(loss-ring) was actually applied during training.
+    t_plot = np.linspace(0.0, float(cfg["domain"]["tmax"]), 500)
     template_plot = (A_ring_final
                      * np.exp(-t_plot / tau_final)
                      * np.cos(omega_final * t_plot + phi0_final))
@@ -754,13 +757,20 @@ def main():
     ax.plot(t_fd, phi_fd[:, ix], "k-", linewidth=0.8, label="FD (truth)")
     ax.plot(t_plot, template_plot, "r--", linewidth=1.2,
             label=f"Template: A·e^(-t/τ)·cos(ωt+φ₀)")
-    ax.set_xlabel("t")
+    ax.axvspan(float(ring_cfg["t_ring_min"]),
+               float(cfg["domain"]["tmax"]),
+               color="orange", alpha=0.10,
+               label=f"training window [{float(ring_cfg['t_ring_min']):.0f}, "
+                     f"{float(cfg['domain']['tmax']):.0f}] M")
+    ax.set_xlabel("t / M")
     ax.set_ylabel("φ")
     ax.set_title(f"Ringdown template fit at x*={xq}")
     ax.legend(fontsize=8)
     ax.grid(True, alpha=0.3)
 
-    for ax in axes[-1]:
+    # Set x-labels only on the parameter-history panels (the template panel
+    # at axes[2,1] keeps its own "t / M" label set above).
+    for ax in (axes[0, 0], axes[0, 1], axes[1, 0], axes[1, 1], axes[2, 0]):
         ax.set_xlabel("Training step (logged)")
 
     fig.suptitle(f"Inverse+QNM Parameter Convergence (noise={noise_level:.1%})",

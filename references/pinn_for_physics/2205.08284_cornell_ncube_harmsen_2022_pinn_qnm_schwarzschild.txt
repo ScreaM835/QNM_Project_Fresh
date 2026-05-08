@@ -1,0 +1,412 @@
+================================================================================
+TITLE:    Using physics-informed neural networks to compute quasinormal modes
+AUTHORS:  Alan S. Cornell, Anele Ncube, Gerhard Harmsen
+          (Department of Physics, University of Johannesburg)
+ARXIV:    arXiv:2205.08284 (2022)
+SOURCE:   https://ar5iv.labs.arxiv.org/html/2205.08284
+SAVED:    Local literature reference for QNM-PINN paper write-up.
+WHY HERE: This is the closest analogue to our work in the literature — the
+          first paper to use PINNs to compute black hole QNMs. The
+          structure of our paper should largely follow this one. Key
+          ingredients to mirror:
+          * § II builds the perturbation equation in finite-domain
+            coordinate ξ = 1 − 2M/r (eqs 2.8–2.10) — same trick we use.
+          * § IV.2.2 walks through the DeepXDE inverse-problem PINN line
+            by line (their toy Pöschl–Teller); equations 4.13–4.16 give
+            the loss-function template we follow VERBATIM in
+            scripts/run_pinn_inverse_qnm_2mode.py (forward residual loss
+            ‖(1−y²)²ψ″ − 2y(1−y²)ψ′ + [ω² − ½(1−y²)]ψ‖² + Dirichlet BC
+            loss + observation loss).
+          * § IV.2.3 introduces the eigenvalue-solver mode (Jin et al.
+            2020) — UNSUPERVISED PINN with hard-constraint output
+            ψ̂(u)=(1−u)(1+u)·N(u), regularisers L_f=1/ψ̂² and
+            L_drive=exp(−Ê+c). This is the exact contrast we draw
+            against our supervised inverse-mode setup.
+          * § V Results: Schwarzschild ℓ=2 n=0 — same target system as
+            ours. Their reported deviations from Leaver values: REAL
+            ~0.009 %, IMAG ~−0.042 % using FNN [50,50] sine, lr 8e-3,
+            90 000 Adam epochs, 100 training points; our variant D
+            achieves 0.303 % / 0.335 % on (ω, M) jointly — must compare
+            on equal footing in the discussion.
+          * §§ V.1–V.3 establish the comparison-table format with
+            Leaver CFM and 6th-order WKB columns plus % deviations.
+          * § VI honest-limitations frame: PINNs ≪ WKB/AIM in speed; only
+            n=0 modes recovered; instability for asymptotically flat
+            R-N and (anti-)de Sitter cases. The frank, "cannot recommend
+            on overall performance" tone is the same one our paper takes
+            and is a useful template.
+          * Defines all standard background: WKB, CFM, AIM, Ferrari–
+            Mashhoon Pöschl–Teller approximation, Reissner-Nordström-de
+            Sitter, scalar/Dirac/EM/grav effective potentials.
+================================================================================
+
+ABSTRACT
+--------
+Investigates feasibility of computing QNMs of non-rotating 4-D black holes
+using PINNs. Uses an "eigenvalue solver" approach (a data-free PINN). PINN
+QNMs match the established CFM and 6th-order WKB to the same number of
+significant figures (deviations as low as (δω_Re, δω_Im) ≈ (<0.01%, <0.01%)).
+However in run-time PINNs fall short of WKB/CFM. CONCLUSION: the method is
+NOT currently recommended on overall performance grounds, but is a viable
+new angle.
+PACS: 04.20.-q, 07.05.Mh, 02.60.Cb.
+
+
+I. INTRODUCTION
+==============================================================================
+NN as universal function approximators (Hornik 1989). Recently rediscovered
+for SciML (Raissi 2019; Lu et al 2020; Nordström 2021). Advantage: trained
+once, generalises within the problem class; natively parallelisable.
+PINNs (Raissi 2019; Jin 2020) embed BCs in loss. QNMs of BHs are well-suited
+because:
+  - low-dimensional parameter space (BH parameters);
+  - well-defined BCs ⇒ act as regularisation, stabilise the NN.
+QNMs are gravitational-wave fingerprints (LIGO/Virgo: Isi 2019, Ghosh 2021).
+Existing methods: WKB, AIM, CFM (Iyer-Will 1987, Leaver 1985, Cho 2012); WKB
+becomes harder at higher orders. This paper: test PINNs as a NEW alternative.
+Paper structure: §II QNM equations; §III established methods; §IV PINN
+methodology; §V results; §VI conclusions.
+
+
+II. RADIAL PERTURBATION EQUATIONS OF BLACK HOLES
+==============================================================================
+
+II.1 Asymptotically flat Schwarzschild
+---------------------------------------
+Klein-Gordon (eq 2.1):  ∂_μ ∂^μ Φ + m² Φ = (1/√|g|) ∂_μ (√|g| g^{μν} ∂_ν Φ)
+                                          + m² Φ = 0.
+Schwarzschild metric (eq 2.2):
+  ds² = −f dt² + f^{−1} dr² + r²(dθ² + sin²θ dφ²),  f = 1 − 2M/r.
+Massless KG ⇒ separation of variables ⇒ in tortoise coord x (Regge-Wheeler):
+  d²ψ/dx² + {ω² − V(r)} ψ = 0          (eq 2.4)
+  V(r) = (1 − 2M/r)[ℓ(ℓ+1)/r² + 2M/r³] (scalar, eq 2.5)
+  f(r) = dr/dx = (1 − 2M/r)^{−1}        (eq 2.6)
+Tortoise maps r=2M ↦ x=−∞.
+QNM (non-Hermitian, complex ω) asymptotic BCs (eq 2.7):
+  ψ(x) → e^{−iωx}, x → −∞;     ψ(x) → e^{+iωx}, x → +∞.
+Map to ξ = 1 − 2M/r ∈ [0,1) and absorb BCs ⇒ eq 2.8:
+  χ″ = λ_0(ξ) χ′ + s_0(ξ) χ
+with (eqs 2.9-2.10):
+  λ_0(ξ) = [4Miω(2ξ²−4ξ+1) − (1−3ξ)(1−ξ)] / [ξ(1−ξ)²]
+  s_0(ξ) = [16M²ω²(ξ−2) − 8Miω(1−ξ) − ℓ(ℓ+1) + (1−s²)(1−ξ)] / [ξ(1−ξ)²]
+EM perturbations (Maxwell, eqs 2.11-2.13) ⇒ same eq 2.4 with
+  V(r) = ℓ(ℓ+1) f(r)/r².
+Gravitational perturbations: same eq 2.4 with different V(r) (Cardoso-Lemos
+2001; Dey-Chakrabarti 2019).
+
+II.2 Schwarzschild (anti-)de Sitter
+------------------------------------
+Metric (eq 2.14):  ds² = −(1 − r_s/r − Λ r²/3) dt² + (…)^{−1} dr² + r² dΩ².
+Same Schrödinger-like radial eq 2.4 but
+  V(r) = f(r)[ℓ(ℓ+1)/r² + (1 − s²)(2M/r³ − (4 − s²)Λ/6)]   (eq 2.15)
+with f(r) = 1 − 2M/r − Λ r²/3, and s = 0, 1/2, 1, 2 for scalar, Dirac, EM,
+grav.
+
+II.3 Near-extremal Schwarzschild & Reissner-Nordström-de Sitter
+-----------------------------------------------------------------
+RN-dS metric (eq 2.16):
+  ds² = −(1 − r_s/r + r_Q²/r² − Λ r²/3) dt² + (…)^{−1} dr² + r² dΩ²,
+  r_s = 2M, r_Q² = Q²/(4πε₀).
+Near-extremal limit (Cardoso-Lemos 2003): r_b ~ r_c ⇒ inverted Pöschl-Teller
+effective potential (eq 2.23):
+  V(x) = V₀ / cosh²(κ x),
+with V₀ = κ² ℓ(ℓ+1) (scalar, EM) or κ²(ℓ+2)(ℓ−1) (grav), κ = surface gravity.
+ANALYTIC QNMs (Ferrari-Mashhoon 1984; Cardoso-Lemos 2003; Molina 2003), eqs
+2.24-2.25:
+  ψ(x) = [ξ(ξ−1)]^{iω/2κ} · ₂F₁(1+β+iω/κ, −β+iω/κ; 1+iω/κ; ξ)
+  ω/κ = √(ℓ(ℓ+1) − 1/4) − i (n + 1/2),  n ∈ ℤ_{≥0}
+with ξ^{−1} = 1 + exp(−2κx), β = −1/2 + (1/4 − V₀/κ²)^{1/2}.
+Near-extremal RN-dS: same expressions.
+
+
+III. ESTABLISHED METHODS
+==============================================================================
+III.1 Ferrari-Mashhoon: invert potential ⇒ bound-state problem (eq 3.1-3.4).
+III.2 WKB: Schutz-Will 1985 — semi-analytic; popular for Schwarzschild.
+III.3 CFM (Leaver 1985, Nollert 1993): very accurate including high overtones;
+       used for Schwarzschild, Kerr, RN.
+III.4 AIM: Cho et al 2012 improved iteration — comparable to Leaver CFM.
+
+
+IV. PHYSICS-INFORMED NEURAL NETWORKS
+==============================================================================
+
+IV.1 Deep neural networks
+--------------------------
+Definition 4.1 (FNN): N₀(x)=x; N_ℓ(x)=σ(W_ℓ N_{ℓ−1}(x) + b_ℓ) for hidden;
+N_L(x)=σ(W_L N_{L−1}(x) + b_L) for output. Activations: tanh, sigmoid.
+Universal approximators of functions AND their derivatives (Hornik 1990,
+Hornik 1991, Pinkus 1999). SGD weight update (eqs 4.1-4.2):
+  w_{jk}^ℓ → w_{jk}^ℓ − (η/m) Σ_x ∂C_x/∂w_{jk}^ℓ
+  b_j^ℓ    → b_j^ℓ    − (η/m) Σ_x ∂C_x/∂b_j^ℓ.
+Adam used (Kingma-Ba 2017).
+
+IV.2 Physics-informed neural networks
+--------------------------------------
+Two components: (1) NN architecture (FNN); (2) loss embedding the PDE +
+BC/IC (mesh-less; AD-driven; advantage over FE/FD that need mesh refinement
+near steep gradients).
+
+PDE form (eq 4.3): f(x; ∂u/∂x_i; ∂²u/∂x_i ∂x_j; …; λ) = 0 on Ω.
+BC (eq 4.4): B(u, x) = 0 on ∂Ω.
+PINNs are unsupervised in forward + eigenvalue settings; supervised (with
+dataset T_o) in inverse settings.
+
+IV.2.1 PINN ALGORITHM:
+  1. Build NN û(x; θ).
+  2. Specify training set T (residual T_f, boundary T_b; for inverse +T_o).
+  3. Loss (eq 4.5):
+       L(θ; T) = w_f L_f(θ; T_f) + w_b L_b(θ; T_b) + w_r L_r(θ; T_r)
+     with (eqs 4.6-4.7):
+       L_f = (1/|T_f|) Σ ‖f(x; ∂û, ∂²û, …; λ̂)‖²₂
+       L_b = (1/|T_b|) Σ ‖B(û, x)‖²₂
+     and inverse extra (eq 4.8): L_r = (1/|T_r|) Σ ‖u(x) − û(x)‖²₂.
+  4. (θ*, û*, λ̂*) = argmin L (eq 4.9). Adam used.
+Remark 4.2: PINNs learn from their own predictions (loss includes the PDE,
+not labelled data); the NN is constrained to the domain Ω.
+
+IV.2.2 The DeepXDE package — TOY PROBLEM
+-----------------------------------------
+Inverted symmetric Pöschl-Teller V_PT(x) = 1/(2 cosh²(x)) (eq 4.10) plugged
+into eq 2.4. Exact QNMs (Cho-Ho 2007, eqs 4.11-4.12):
+  ψ_n(x) = (cosh x)^{(i+1)/2} χ_n(sinh x)
+  ω_n     = ±1/2 − i (n + 1/2)
+Coordinate change y = tanh(x): infinite ↦ (−1, 1). Eq 4.13:
+  (1 − y²)² ψ″(y) − 2y(1 − y²) ψ′(y) + [ω² − ½(1 − y²)] ψ(y) = 0.
+INVERSE PROBLEM in DeepXDE: ω is a tf.Variable, learnt with θ. Loss (eq 4.14):
+  L(θ; T) = w_f L_f + w_b L_b + w_o L_o
+with (eqs 4.15-4.16):
+  L_f = (1/|T_f|) Σ ‖(1−y²)² ψ̂″ − 2y(1−y²) ψ̂′ + [ω̂² − (1−y²)/2] ψ̂‖²₂
+  L_b = ½ Σ ‖ψ̂(y) − ψ_b(y)‖²₂  for y ∈ T_b = {−0.9, +0.9}
+  L_o = (1/|T_o|) Σ ‖ψ̂(y) − ψ(y)‖²₂   from 50 equispaced labelled points.
+Domain narrowed to (−0.9, 0.9) because ψ blows up at y=±1.
+DeepXDE building blocks used: dde.grad.jacobian, dde.grad.hessian,
+dde.geometry.Interval(-0.9, 0.9), dde.DirichletBC, tf.Variable for ω,
+dde.callback. Architecture: 1 input (y), 2 outputs (Re ψ̂, Im ψ̂), 3 hidden
+layers × 20 nodes, tanh activation; trained for 20 000 epochs.
+Note: tanh chosen because it is smooth and infinitely differentiable; Swish
+(x · sigmoid(βx), trainable β) is a recent alternative (Cheng-Zhang 2021;
+Salvatori 2022).
+
+IV.2.3 The eigenvalue solver (Jin et al. 2020)
+-----------------------------------------------
+Unsupervised PINN. Toy: bound-state Pöschl-Teller eq 4.17:
+  −½ ψ″(x) + V(x) ψ(x) = E ψ(x),  V(x) = −λ(λ+1)/2 sech²(x).
+Substitute u = tanh(x) ⇒ Legendre form (eq 4.19):
+  [(1−u²) ψ′(u)]′ + λ(λ+1) ψ(u) + (2E)/(1−u²) ψ(u) = 0.
+Exact: ψ = P_λ^μ(tanh x), E = −μ²/2, μ = 1, …, λ.
+Loss (eqs 4.20-4.23):
+  L(θ; T) = L_ODE + L_reg
+  L_ODE = (1/|T|) Σ_{u∈T} [((1−u²) ψ̂′)′ + λ(λ+1) ψ̂ + 2Ê/(1−u²) ψ̂]²
+  L_reg = w_f L_f + w_E L_E + w_d L_drive
+  L_f = (1/|T|) Σ 1/ψ̂²       (penalise ψ̂ → 0)
+  L_E = (1/|T|) Σ 1/Ê²        (penalise Ê → 0)
+  L_drive = (1/|T|) Σ exp(−Ê + c)  (scan eigenvalue space; c bumped during
+                                    training)
+HARD CONSTRAINT for BCs: ψ̂(u) = (1 − u)(1 + u) · N(u) ⇒ vanishing at u=±1
+exactly.
+Architecture: 2 inputs, 1 output, 2 hidden × 50 nodes, sine activation
+(empirically much faster convergence to eigenstates than sigmoid/ReLU).
+Implementation: PyTorch (torch.autograd, torch.linspace, Adam).
+Training: 100 points, 100 000 epochs, lr = 8e-3.
+Note: L_drive flips between eigenstates randomly ⇒ used for the toy
+demonstration only; OMITTED from the QNM computations (those converge to
+the most-energetic n=0 mode via L_f alone).
+
+
+V. RESULTS: QNM COMPUTATIONS WITH THE EIGENVALUE SOLVER
+==============================================================================
+
+V.1 Hyperparameter scan — Schwarzschild s=0, ℓ=2, n=0
+------------------------------------------------------
+Fixed: lr 8e-3, 2 hidden layers, sine activation.
+Varied: # training points, # epochs, # nodes/layer.
+Loss (eqs 5.1-5.3):
+  L = L_ODE + L_f
+  L_ODE = (1/|T|) Σ_{ξ∈T} [χ″ − λ_0(ξ) χ′ − s_0(ξ) χ]²
+  L_f   = (1/|T|) Σ_{ξ∈T} 1/χ̂².
+NN converges on n=0 because that mode has the largest |χ̂| (least-damped,
+longest-lived); higher overtones are damped faster (Isi 2019).
+Findings:
+  • Percentage deviations are FLAT across hyperparameter choices — Re ≈
+    0.009 %, Im ≈ −0.042 %, matching Leaver to 4 d.p.
+  • Training time grows with #epochs and slightly with #nodes.
+  • Recommendation: 100 000 epochs (vs 200 000) suffices.
+A small number of "red cells" — failed convergences to n=0 — exist but rare.
+
+V.2 Near-extremal non-rotating BH QNMs
+---------------------------------------
+Exact (eq 5.4): ω = √(ℓ(ℓ+1) − 1/4) − i (n + 1/2).
+Optional seed-loss term (eq 5.5):
+  L_seed(θ, ω̂; T) = (1/|T|) Σ [ω̂ − ω_seed]²
+to push the NN to the desired ℓ-dependent QNM (seed accurate to 2 d.p.).
+TABLE 1 (n=0, ℓ=1,…,3) compares Ferrari-Mashhoon exact value vs eigeNN
+with no seed (% dev ~0.001-0.002) and with seed; near-extremal eigenfunctions
+(fig 7) match the exact pure-outgoing-wave shape; ω vs epoch (fig 8)
+converges quickly regardless of ℓ.
+
+V.3 Asymptotically flat Schwarzschild — full results
+-----------------------------------------------------
+Fixed FNN: 2 hidden layers × 50 nodes, sine activation, Adam, 90 000 epochs,
+lr 8e-3, 100 random training points in ξ ∈ [0,1].
+Percentage deviation defined (eq 5.7):
+  %dev = ||Re/Im[ω_eigeNN/WKB]| − |Re/Im[ω_Leaver]|| / |Re/Im[ω_Leaver]| × 100.
+
+TABLE 2 — Scalar (s=0), n=0, ℓ ∈ {0,1,2}
+  ℓ=0: eigeNN dev (Re, Im) = (0.10 %, −0.01 %); WKB-6 = (−0.03 %, −3.89 %).
+  ℓ=1: eigeNN (0.02 %, −0.02 %);                WKB-6 (<0.01 %, 0.06 %).
+  ℓ=2: eigeNN (0.01 %, −0.04 %);                WKB-6 (—, −0.04 %).
+
+TABLE 3 — Dirac (s=1/2), n=0, ℓ ∈ {1,2,3}
+  ℓ=1: eigeNN (0.01 %, −0.09 %);  WKB-6 (—, −0.02 %).
+  ℓ=2: eigeNN (0.01 %,  0.03 %);  WKB-6 (—,  0.05 %).
+  ℓ=3: eigeNN (—, −0.02 %);       WKB-6 (—, −0.02 %).
+
+TABLE 4 — EM (s=1), n=0, ℓ ∈ {1,2,3}
+  ℓ=1: eigeNN (−0.01 %,  0.01 %); WKB-6 (−0.04 %, 0.15 %).
+  ℓ=2: eigeNN (—, —);             WKB-6 (—, 0.01 %).
+  ℓ=3: eigeNN (—, 0.01 %);        WKB-6 (—, 0.02 %).
+
+TABLE 5 — Gravitational (s=2), n=0, ℓ ∈ {2,3,4}
+  ℓ=2: eigeNN (0.01 %, −0.05 %); WKB-6 (−0.02 %, −0.12 %).
+  ℓ=3: eigeNN (0.01 %, —);        WKB-6 (—, —).
+  ℓ=4: eigeNN (—, 0.04 %);        WKB-6 (—, −0.03 %).
+
+TIMING: 90 000 epochs ≈ 12 minutes / training session; 6th-order WKB < 1
+minute for many QNMs.
+WITHOUT seed loss the NN fails to converge for ℓ=0,1,2 in the scalar case
+(only succeeds for ℓ ≥ 3). Reissner-Nordström and (anti-)de Sitter cases
+fail to converge under their setup (loss too non-convex).
+
+
+VI. DISCUSSION & CONCLUSION
+==============================================================================
+* Two PINN flavours implemented (DeepXDE inverse + PyTorch eigenvalue
+  solver). Eigenvalue solver used for QNMs.
+* Near-extremal (Pöschl-Teller analytic): NN reaches up-to-6-digit accuracy.
+* Asymptotically flat Schwarzschild s=0,1/2,1,2: PINN matches CFM and
+  6th-order WKB to 4 d.p. (the literature limit).
+* Limitation 1 (efficiency): PINNs are minutes per QNM vs seconds for
+  WKB/AIM. PINN parallelism could close the gap.
+* Limitation 2 (modes): only n=0 fundamental modes, because the L_f
+  regulariser steers to the most-energetic eigenstate. Future: scan via
+  L_drive (Jin et al. 2020).
+* Limitation 3 (instability): non-convex loss ⇒ R-N-dS, full A-dS fail.
+  Self-scalable activation functions (Gnanasambandam 2022) are a candidate
+  cure.
+* Stability/convergence theory of PINNs is still nascent (Shin 2020a/b).
+* CONCLUSION (echoing Raissi 2019): PINNs are NOT a replacement for CFM/WKB
+  but bring "implementation simplicity to accelerate the rate of testing
+  new ideas". Worth pursuing.
+
+Acknowledgements: Jan Nordström, Wesley Doorsamy. ASC supported in part by
+NRF; GEH by UJ; AMN by UJ GES 4IR.
+
+
+REFERENCES (full)
+==============================================================================
+[1]  K. Hornik, M. Stinchcombe, H. White, "Multilayer feedforward networks
+     are universal approximators," Neural Networks 2(5):359, 1989.
+[2]  S. Wu, M. J. Er, "Dynamic fuzzy NNs — a novel approach to function
+     approximation," IEEE TSMCB 30(2):358, 2000.
+[3]  M. A. Nielsen, "Neural networks and deep learning," Determination
+     Press, 2015.
+[4]  M. Raissi, P. Perdikaris, G. Karniadakis, "PINNs," J. Comp. Phys.
+     378:686, 2019.
+[5]  Y. Lu, J. Lu, "A universal approximation theorem of deep NNs for
+     expressing distributions," NeurIPS 2020, arXiv:2004.08867.
+[6]  J. Nordström, O. Ålund, "NN enhanced computations on coarse grids,"
+     J. Comp. Phys. 425:109821, 2021.
+[7]  H. Jin, M. Mattheakis, P. Protopapas, "Unsupervised NNs for quantum
+     eigenvalue problems," NeurIPS 2020 ML & Phys Sci, arXiv:2010.05075.
+[8]  K. D. Kokkotas, B. G. Schmidt, "QNMs of stars and BHs," Living Rev.
+     Relativ. 2:2, 1999.
+[9]  R. A. Konoplya, A. Zhidenko, "QNMs of BHs: from astrophysics to string
+     theory," Rev. Mod. Phys. 83:793, 2011.
+[10] E. Berti, V. Cardoso, A. O. Starinets, "QNMs of BHs and BHs branes,"
+     Class. Quant. Grav. 26:163001, 2009.
+[11] S. Iyer, C. M. Will, "BH normal modes: a WKB approach. I.," Phys. Rev.
+     D 35:3621, 1987.
+[12] E. W. Leaver, "An analytic representation for the QNMs of Kerr BHs,"
+     Proc. R. Soc. London A 402(1823):285, 1985.
+[13] H. T. Cho, A. S. Cornell, J. Doukas, T. R. Huang, W. Naylor, "A new
+     approach to BH QNMs: a review of the AIM," Adv. Math. Phys. 281705:42,
+     2012.
+[14] M. Isi, M. Giesler, W. M. Farr, M. A. Scheel, S. A. Teukolsky,
+     "Testing the no-hair theorem with GW150914," PRL 123:111102, 2019.
+[15] A. Ghosh, R. Brito, A. Buonanno, "Constraints on QNM frequencies with
+     LIGO-Virgo BBH observations," PRD 103:124041, 2021.
+[16] S. M. Carroll, J. Traschen, "Spacetime and geometry: an introduction
+     to GR," Phys. Today 58(1):52, 2005.
+[17] D. McMahon, "Quantum field theory demystified," McGraw-Hill, 2008.
+[18] S. Iyer, "BH normal modes: a WKB approach. II. Schwarzschild BHs,"
+     PRD 35:3632, 1987.
+[19] T. Regge, J. A. Wheeler, "Stability of a Schwarzschild singularity,"
+     Phys. Rev. 108:1063, 1957.
+[20] S. Dey, S. Chakrabarti, "EM and gravitational perturbations of the
+     Bardeen de Sitter BH," EPJ C 79(6):504, 2019.
+[21] V. Cardoso, J. P. S. Lemos, "QNMs of Schwarzschild AdS BHs: EM and
+     gravitational perturbations," PRD 64:084017, 2001.
+[22] C. Molina, "QNMs of D-dim spherical BHs with near extreme cosmological
+     constant," PRD 68:064007, 2003.
+[23] V. Cardoso, J. P. S. Lemos, "QNMs of the near extremal
+     Schwarzschild-de Sitter BH," PRD 67:084020, 2003.
+[24] V. Ferrari, B. Mashhoon, "New approach to the QNMs of a BH," PRD
+     30:295, 1984.
+[25] B. F. Schutz, C. M. Will, "BH normal modes: a semianalytic approach,"
+     ApJ 291:L33, 1985.
+[26] H.-P. Nollert, "QNMs of Schwarzschild BHs: very large imaginary parts,"
+     PRD 47:5253, 1993.
+[27] E. W. Leaver, "QNMs of Reissner-Nordström BHs," PRD 41:2986, 1990.
+[28] R. Konoplya, A. Zhidenko, A. Zinhailo, "Higher order WKB formula for
+     QNMs and grey-body factors," CQG 36:155002, 2019.
+[29] R. G. Daghigh, M. D. Green, J. C. Morey, G. Kunstatter, "Scalar
+     perturbations of a single-horizon regular BH," PRD 102:104040, 2020.
+[30] L. Lu, X. Meng, Z. Mao, G. E. Karniadakis, "DeepXDE: a deep learning
+     library for solving DEs," SIAM Rev. 63(1):208, 2021.
+[31] G. F. Montufar, R. Pascanu, K. Cho, Y. Bengio, "On the number of
+     linear regions of deep NNs," NeurIPS 27, 2014.
+[32] O. Ålund, G. Iaccarino, J. Nordström, "Learning to differentiate,"
+     J. Comp. Phys. 424:109873, 2021.
+[33] K. Hornik, M. Stinchcombe, H. White, "Universal approximation of an
+     unknown mapping and its derivatives using multilayer FFNNs," NN
+     3(5):551, 1990.
+[34] K. Hornik, "Approximation capabilities of multilayer FFNNs," NN
+     4(2):251, 1991.
+[35] A. Pinkus, "Approximation theory of the MLP model in NNs," Acta
+     Numerica 8:143, 1999.
+[36] D. P. Kingma, J. Ba, "Adam: a method for stochastic optimization,"
+     ICLR 2015, arXiv:1412.6980.
+[37] X. Chen, R. Chen, Q. Wan, R. Xu, J. Liu, "An improved data-free
+     surrogate model for solving PDEs using DNNs," Sci. Rep. 11:2045,
+     2021.
+[38] Karniadakis, Kevrekidis, Lu, Perdikaris, Wang, Yang, "Physics-informed
+     ML," Nature Rev. Phys. 3(6):1, 2021.
+[39] (footnote — terminology of "dependent variable" vs "solution").
+[40] H.-T. Cho, C.-L. Ho, "(Quasi)-exactly solvable QNMs," J. Phys. A
+     40:1325, 2007.
+[41] S. Cuomo, V. S. Di Cola, G. Rozza, M. Raissi, F. Piccialli,
+     "Scientific ML through PINNs: where we are and what's next," J. Sci.
+     Comp. 92:88, 2022.
+[42] R. Gnanasambandam, B. Shen, J. Chung, X. Yue, Z. Kong,
+     "Self-scalable tanh (Stan): faster convergence and better
+     generalisation in PINNs," 2022.
+[43] C. Cheng, G.-T. Zhang, "DL method based on PINN with ResNet block for
+     fluid flow problems," Water 13:4, 2021.
+[44] G. Pöschl, E. Teller, "Bemerkungen zur Quantenmechanik des
+     anharmonischen Oszillators," Z. Phys. 83(3-4):143, 1933.
+[45] M. Mattheakis, D. Sondak, A. S. Dogra, P. Protopapas, "Hamiltonian
+     NNs for solving equations of motion," PRE 105:065305, 2022.
+[46] R. A. Konoplya, "QN behavior of D-dim Schwarzschild BH and the higher
+     order WKB approach," PRD 68:024018, 2003.
+[47] P. Grohs, F. Hornung, A. Jentzen, P. von Wurstemberger, "A proof that
+     ANNs overcome the curse of dimensionality in the numerical
+     approximation of Black-Scholes PDEs," 2018.
+[48] Y. Shin, "On the convergence of PINNs for linear second-order
+     elliptic and parabolic PDEs," CCP 28(5):2042, 2020.
+[49] Y. Shin, Z. Zhang, G. E. Karniadakis, "Error estimates of residual
+     minimisation using NNs for linear PDEs," 2020.
+
+================================================================================
+END OF FILE
+================================================================================

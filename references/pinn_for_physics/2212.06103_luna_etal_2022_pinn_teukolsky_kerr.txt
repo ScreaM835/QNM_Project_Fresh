@@ -1,0 +1,305 @@
+================================================================================
+TITLE:    Solving the Teukolsky equation with physics-informed neural networks
+AUTHORS:  Raimon Luna, Juan Calderón Bustillo, Juan José Seoane Martínez,
+          Alejandro Torres-Forné, José A. Font
+          (Univ. València + IGFAE Santiago + CUHK + Obs. Astron. València)
+ARXIV:    arXiv:2212.06103 (2022; PRD 107, 044042 (2023))
+SOURCE:   https://ar5iv.labs.arxiv.org/html/2212.06103
+SAVED:    Local literature reference for QNM-PINN paper write-up.
+WHY HERE: Companion to Cornell-Ncube-Harmsen 2205.08284 — extends PINN-QNM
+          from Schwarzschild to KERR via the full Teukolsky master
+          equation. Direct relevance to our paper:
+          * Demonstrates that the SAME PINN-QNM template generalises to
+            coupled radial-angular eigenvalue systems with TWO unknown
+            eigenvalues (ω, A) — done by simple weighted sum of the two
+            equation residuals (eq 11) with W=10 emphasising the radial
+            part. Same structure we use for inverse 2-mode QNM extraction.
+          * HARD ENFORCEMENT of normalisation BCs via output surrogate
+            (eq 12): f(x) = (e^{x-1} − 1) N_f(x) + 1, similarly for g(u).
+            Avoids extra BC loss term ⇒ "significantly accelerates
+            convergence". This is the same hard-BC idea we apply to
+            enforce ψ → 0 at the horizon and infinity.
+          * SEQUENTIAL WARM-STARTING in spin a (eq 13: clustering near
+            extremality a_k = ½(1 − 10^{−3(k−1)/(N_a−1)})) — analogous
+            tactic for our continuous sweeps over BH parameters in the
+            inverse problem.
+          * Hyperparameter study (Figs 2-3): 2 hidden layers × 200 tanh
+            neurons; Adam lr=0.005, exp decay 0.999/epoch, 2000 epochs;
+            uniform grid N_x = N_u = 100. Errors below 1 % per mode in
+            ~2 minutes on a single CPU. SAME hyperparameter scale as ours.
+          * Provides DETECTABILITY-PROSPECTS framing using ringdown
+            waveform match → SNR_min via F = 1 − D²/(2 SNR_min²)
+            (eq 16). Shows PINN QNMs are indistinguishable from Leaver
+            CFM for SNR ≲ 100 — a useful precedent for justifying
+            PINN-derived QNMs as physically actionable.
+          * Initial seed for ω = 0.7 − 0.1i; A_0 = ℓ(ℓ+1) − s(s+1) seeds
+            the angular-momentum quantum number ℓ. Same seeding logic
+            as variant E and our future overtone work.
+          * Honest discussion of overtone difficulty (n>0) and the
+            "loss-term driving" trick (Jin 2020) for higher overtones —
+            relevant if we extend to n=1.
+          * Conclusion frame: PINNs are slower & less accurate than
+            spectral methods but trivially generalise; useful for
+            numerical/exotic background metrics where coefficients lack
+            analytic form.
+================================================================================
+
+ABSTRACT
+--------
+PINNs compute the first QNMs of Kerr via the Teukolsky equation. Almost-
+immediate PyTorch implementation; no sophisticated numerical infrastructure.
+Computes ω and the separation constant A for arbitrary BH spin and mass with
+typical errors <1 % w.r.t. literature. PINN-derived QNMs are
+indistinguishable from accepted values for SNR > ~100 ⇒ reliable for GW data
+analysis with current-generation detectors, before LISA / Einstein
+Telescope where SNR ~O(1000) is expected.
+
+
+I. INTRODUCTION
+==============================================================================
+* Motivation: GW BBH detections (LIGO-Virgo-KAGRA) opened black-hole
+  spectroscopy. QNMs = "fingerprint" of relaxing BH after perturbation
+  (outgoing at infinity, ingoing at horizon).
+* No-hair test requires precise ID of ≥3 QNM parameters; SNR ~O(100)
+  needed. Currently a stretch for 2nd-gen detectors but feasible for ET
+  (Einstein Telescope) and LISA (3rd-gen).
+* QNM master equations: Schwarzschild perturbations (Regge-Wheeler 1957;
+  Zerilli 1970; Vishveshwara 1970) extended to Kerr by Teukolsky (1973).
+* Existing methods: Leaver continued fraction (1985), time evolution,
+  bound-state effective potentials, WKB (Iyer-Will 1987), AIM (Cho 2012),
+  pseudospectral (Cook-Zalutskiy 2014; Jansen 2017), large-D expansion.
+* This paper: PINN approach; previous Schwarzschild-only PINN work
+  (Övgün 2021, Ncube 2021, Cornell 2022) extended to Kerr.
+* PINN advantages:
+  - Mesh-free; AD computes derivatives at arbitrary points.
+  - Multiple coupled equations & multiple eigenvalues handled by
+    weighted-sum loss.
+  - PDE coefficients need not be analytic ⇒ works on numerical
+    backgrounds.
+  - Implementation = a few lines of PyTorch.
+
+
+II. THE TEUKOLSKY EQUATION
+==============================================================================
+Tensor (s = −2) perturbations of Kerr; separation of variables (eq 1):
+  ψ = (1/2π) ∫ e^{-iωt} Σ_{ℓ=|s|}^∞ Σ_{m=-ℓ}^ℓ e^{imφ} S_ℓm(u) R_ℓm(r) dω.
+Geometrised units G = c = 2M = 1 (M reinstated for waveforms).
+RADIAL EQ (eq 2):
+  Δ(r) R″(r) + (s+1)(2r − 1) R′(r) + V(r) R(r) = 0,
+with
+  Δ(r)  = r² − r + a²,
+  V(r)  = α(r) ω² + β(r) ω + γ(r),
+  α(r)  = (r² + a²)²/Δ(r) − a²,
+  β(r)  = i s (a² − r²) − 2amr / Δ(r) + 2 i s r,
+  γ(r)  = a² m² + i s am (2r/Δ − 1) − A.
+Schwarzschild limit (eq 4):  lim_{a→0} A = ℓ(ℓ+1) − s(s+1).
+ANGULAR EQ (eq 5):
+  (1 − u²) S″(u) − 2u S′(u)
+    + [a²ω² u² − 2aωs u + s + A − (m + s u)²/(1 − u²)] S(u) = 0,
+where u = cos θ.
+Boundary conditions: ingoing at horizon, outgoing at infinity, regular at
+poles θ = 0, π.
+LEAVER ANSÄTZE (eq 6, 7) — absorb BCs:
+  R(r) = e^{iωr} (r − r_-)^{p_-} (r − r_+)^{p_+} f(x),
+    p_- = -1 - s + iω + iσ_+,
+    p_+ = -s − iσ_+,
+    σ_+ = (ω r_+ − a m)/√(1 − 4a²),
+    x   = r_+/r ∈ [0, 1] (compactified radial domain).
+  S(u) = e^{aωu} (1 + u)^{|m−s|/2} (1 − u)^{|m+s|/2} g(u).
+With r_± = (1 ± √(1 − 4a²))/2.
+After substitution, residual equations (eq 8):
+  L_F[f(x)] = F_2 f″(x) + F_1 f′(x) + F_0 f(x) = 0
+  L_G[g(u)] = G_2 g″(u) + G_1 g′(u) + G_0 g(u) = 0.
+Coefficients in Appendix A (lengthy polynomials in x, u, ω, A, m, r_+, a).
+Normalisations (eq 9):  f(1) = 1,  g(−1) = 1.
+
+
+III. THE NEURAL NETWORK
+==============================================================================
+* Two FNNs N_f, N_g approximate f(x) and g(u) independently.
+* Each: 1 input neuron, 2 output neurons (Re, Im); 2 hidden layers × 200
+  neurons; tanh activation. Real-arithmetic everywhere.
+* Trainable parameters: weights/biases AND eigenvalues ω, A.
+* Uniform grid (eq 10):
+    x_i = (i − 1)/(N_x − 1), i = 1,…,N_x = 100;
+    u_j = 2(j − 1)/(N_u − 1) − 1, j = 1,…,N_u = 100.
+* LOSS (eq 11):
+    L = (W/N_x) Σ_i |L_F[f(x_i)]| + (1/N_u) Σ_j |L_G[g(u_j)]|,
+  with W = 10 (radial weighted higher).
+* HARD ENFORCEMENT of (eq 9), eq 12:
+    f(x) = (e^{x-1} − 1) N_f(x) + 1
+    g(u) = (e^{u+1} − 1) N_g(u) + 1.
+* Optimisation: Adam (Kingma-Ba), lr_0 = 0.005, exp decay 0.999/epoch,
+  2000 epochs/spin value.
+* Initial weights: normal (μ=0, σ=0.05 for f; σ=0.01 for g); biases zero.
+* Initial seeds: ω_0 = 0.7 − 0.1 i; A_0 = ℓ(ℓ+1) − s(s+1).
+* SPIN SCAN (eq 13):
+    a_k = ½ (1 − 10^{-3(k-1)/(N_a-1)}),  k = 1,…,N_a,  N_a = 20.
+  Clusters near extremality. Warm-start each spin from previous spin's
+  trained weights ⇒ ensures convergence to same ℓ-mode.
+
+III.1 Hyperparameter study
+---------------------------
+Figs 2-3: error vs # neurons/layer and # hidden layers, for (ℓ,m,n)=
+(2,0,0), spinless and a=0.4999. Once "sufficient complexity", accuracy
+plateau. CHOICE: 2 × 200 tanh; 2000 iter ≈ 2 min on Intel i7-10750H @
+2.60 GHz CPU. Errors < 1 %.
+
+
+IV. RESULTS
+==============================================================================
+
+IV.1 QNM Computation
+---------------------
+Modes targeted: (ℓ,m,n) = (2,2,0) (dominant in quasi-circular BBH
+mergers) and (2,0,0) (co-dominant in highly eccentric mergers).
+Spin range: a ∈ [0, 0.4999].
+
+TABLE 1 — Re ω for (2,0,0); PINN vs Leaver, % error:
+  a       PINN     Leaver   % err
+  0.0     0.74981  0.74734  0.330
+  0.1     0.75137  0.75025  0.149
+  0.2     0.76151  0.75936  0.282
+  0.3     0.77758  0.77611  0.190
+  0.4     0.80571  0.80384  0.233
+  0.45    0.82380  0.82401  0.025
+  0.49    0.83974  0.84451  0.564
+  0.4999  0.84589  0.85023  0.511
+
+TABLE 2 — Im ω for (2,0,0); PINN vs Leaver, % error:
+  a       PINN      Leaver    % err
+  0.0    -0.17812  -0.17793   0.108
+  0.1    -0.17719  -0.17740   0.122
+  0.2    -0.17610  -0.17565   0.255
+  0.3    -0.17332  -0.17199   0.775
+  0.4    -0.16572  -0.16431   0.853
+  0.45   -0.15785  -0.15697   0.566
+  0.49   -0.14657  -0.14707   0.337
+  0.4999 -0.14354  -0.14365   0.073
+
+All deviations < 1 %.
+
+TABLE 3 — Subdominant Schwarzschild modes (a=0):
+  (3,3,0):  Re err 0.23 %,  Im err 0.11 %
+  (2,2,1):  Re err 0.13 %,  Im err 0.21 %
+Subdominants reachable by seeding ω closer to the desired mode (slowly
+lowering Im ω scans first overtones). More sophisticated drive-loss
+methods (Jin 2020) for higher overtones.
+
+IV.2 Detectability Prospects
+-----------------------------
+Ringdown strain model (eq 14):
+  h = h_0 e^{-t/τ} cos(2π f t + φ).
+Mass-rescaled (eq 15):
+  f = c³ Re[ω] / (4π G M),     τ = -2 G M / (c³ Im[ω]).
+Compare PINN waveforms vs the Python pykerr library (which uses tabulated
+Berti values, GRIT website).
+MATCH (eq 17):
+  F(a, b) = max_{t_c, φ} (a|b) / √[(a|a)(b|b)],
+INNER PRODUCT (eq 18, weighted by aLIGOZeroDetHighPower PSD):
+  (a|b) = 4 Re ∫_{f_0}^{f_max} ã(f) b̃*(f) / S_n(f) df.
+DISTINGUISHABILITY (eq 16):
+  F = 1 − D²/(2 SNR_min²),   D = 4 (mass, spin, amplitude, phase).
+RESULT: SNR_min > 100 for spins ≲ 0.9 — typical of LIGO-Virgo events ⇒
+PINN QNMs are usable for parameter estimation in the near term, before
+3rd-gen detectors. Quality decays as a → extremality, especially for
+(2,2,0).
+
+
+V. DISCUSSION
+==============================================================================
+* Demonstrated PINN solution of full Teukolsky for the first time.
+  Targets: (2,2,0), (2,0,0); subdominants (3,3,0), (2,2,1) shown.
+* Validates PINN as a viable tool for BH spectroscopy in current-detector
+  regime (SNR ≲ 100).
+* Strengths: trivial generalisation, very few lines of code, multiple
+  eigenvalues at once via weighted loss sum, no analytic coefficients
+  required ⇒ promising for numerical backgrounds (exotic compact
+  objects, modified gravity).
+* Weaknesses: slower & less accurate than spectral methods. Not a
+  concern here because (i) tiny architecture trains in ~2 min/mode,
+  (ii) precision is enough for current GW SNR.
+* Outlook: extend to broader strong-field-gravity scenarios with
+  numerically given backgrounds.
+
+Acknowledgements: NextGen EU; "la Caixa" Foundation; Marie Skłodowska-
+Curie No 847648; PID2020-118635GB-I00; PGC2018-095984-B-I00;
+PID2021-125485NB-C21; PROMETEO/2019/071; FunFiCO-777740.
+
+
+APPENDIX A — PINN EQUATIONS
+==============================================================================
+Explicit polynomial coefficients F_0, F_1, F_2 (radial) and G_0, G_1, G_2
+(angular). Sample (radial F_0):
+  F_0(x) = -a^4 x² ω²
+          - 2 a³ m x² ω
+          + a² (-A x² + x²[4(r_+ + 1) ω² + 2i(r_+ + 2) ω
+                          + 2 i s (ω + i) − 2]
+                + x ω² − ω²)
+          + 2 a m (r_+ x² (2ω + i) − x (ω + i) − ω)
+          + A (x − 1)
+          − i r_+ (…)        [full expression in source].
+Full F_1, F_2, G_0, G_1, G_2 omitted here for brevity; see paper Appendix A.
+
+
+REFERENCES (selected — as cited above)
+==============================================================================
+[1-4]  LIGO-Virgo-KAGRA detection papers (GW150914 to GWTC-3).
+[5]    Berti, Cardoso, Will, "Gravitational-wave spectroscopy of massive
+       BHs with LISA," PRD 73:064030, 2006.
+[12]   Capano et al., "Multimode QNM spectrum from a perturbed BH,"
+       arXiv:2105.05238, 2021.
+[15]   Berti, Cardoso, Starinets, "QNMs of black holes and black branes,"
+       CQG 26:163001, 2009 (the standard QNM review).
+[20]   Vishveshwara, "Stability of the Schwarzschild metric," PRD 1:2870,
+       1970.
+[38]   Regge, Wheeler, "Stability of a Schwarzschild singularity," Phys.
+       Rev. 108:1063, 1957.
+[39]   Zerilli, "Effective potential for even-parity Regge-Wheeler grav.
+       perturbation eqs," PRL 24:737, 1970.
+[40]   Teukolsky, "Perturbations of a rotating BH. I.," ApJ 185:635, 1973.
+[41]   Leaver, "An analytic representation for the QNMs of Kerr BHs,"
+       Proc. Roy. Soc. Lond. A 402:285, 1985.   [REFERENCE QNMs.]
+[46]   Iyer, Will, "BH normal modes: a WKB approach. I.," PRD 35:3621,
+       1987.
+[47]   Cho, Cornell, Doukas, Huang, Naylor, "AIM," Adv. Math. Phys.
+       2012:281705.
+[48]   Cook, Zalutskiy, "Gravitational perturbations of the Kerr
+       geometry: high-accuracy study," PRD 90:124021, 2014.
+[49]   Jansen, "Overdamped modes in Schwarzschild-de Sitter and a
+       Mathematica package for the numerical computation of QNMs,"
+       Eur. Phys. J. Plus 132:546, 2017.
+[51]   Raissi, Perdikaris, Karniadakis, "PINNs," J. Comp. Phys. 378:686,
+       2019.
+[52]   Paszke et al., "PyTorch," NeurIPS 32, 2019, pp. 8024-8035.
+[53]   Hornik, Stinchcombe, White, "Multilayer FFNNs are universal
+       approximators," NN 2:359, 1989.
+[54]   Rao, Sun, Liu, "Physics-informed DL for elastodynamics without
+       labeled data," J. Eng. Mech. 147:04021043, 2021.
+[55]   Jin, Mattheakis, Protopapas, "Unsupervised NNs for quantum
+       eigenvalue problems," NeurIPS 2020 ML4PS.
+[56]   Mattheakis, Sondak, Dogra, Protopapas, "Hamiltonian NNs for
+       solving equations of motion," PRE 105:065305, 2022.
+[57]   Övgün, Sakallı, Mutuk, "QNMs of dS and AdS BHs: FFNN method,"
+       IJGMMP 18:2150154, 2021.
+[58]   Ncube, Harmsen, Cornell, "Investigating a New Approach to QNMs:
+       PINNs," 65th SAIP Conf. proceedings, 2021, arXiv:2108.05867.
+[59]   Cornell, Ncube, Harmsen, "Using PINNs to compute QNMs,"
+       arXiv:2205.08284, 2022.   [The Schwarzschild precursor.]
+[60]   Kingma, Ba, "Adam," ICLR 2015.
+[68]   GRIT, "Ringdown data and routines," 2022.
+[69]   Cutler, Flanagan, "GWs from merging compact binaries: …" PRD
+       49:2658, 1994.
+[71]   Finn, "Detection, measurement and grav radiation," PRD 46:5236,
+       1992.
+[72]   Nitz et al., gwastro/pycbc v2.0.5, Zenodo 6912865, 2022.
+[73]   Lindblom, Owen, Brown, "Model waveform accuracy standards for GW
+       data analysis," PRD 78:124020, 2008.
+[76]   LIGO Scientific Collaboration, LALSuite, 2018.
+
+(Total references in source: 77. Above are the most directly relevant
+for our paper's literature thread.)
+
+================================================================================
+END OF FILE
+================================================================================

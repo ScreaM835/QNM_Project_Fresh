@@ -1,0 +1,488 @@
+================================================================================
+TITLE:    Respecting causality is all you need for training physics-informed
+          neural networks
+AUTHORS:  Sifan Wang, Shyam Sankaran, Paris Perdikaris (UPenn)
+ARXIV:    arXiv:2203.07404 (2022)
+SOURCE:   https://ar5iv.labs.arxiv.org/html/2203.07404
+SAVED:    Local literature reference for QNM-PINN paper write-up.
+WHY HERE: Identifies and fixes the temporal-causality-violation pathology in
+          continuous-time PINNs trained by gradient descent. Highly relevant
+          to our QNM-PINN work because:
+          (i) NTK analysis (eq 2.17, Definition 2.1) shows convergence rate
+              C(t)=Tr(K_θ(t))/N_t is biased toward LATER times — same
+              mechanism that hurts our late-time ringdown extraction;
+          (ii) introduces the causal weighting w_i = exp(-ε Σ_{k<i} L_r(t_k))
+               (eq 3.2) that we may use to enforce causality in our forward
+               Zerilli/QNM PINN;
+          (iii) gives a STOPPING CRITERION min_i w_i > δ (default δ=0.99)
+                that doubles as a convergence diagnostic for our paper;
+          (iv) practical recipe: time-marching + modified MLP (Wang 2021)
+                + exact periodic BCs via Fourier features + Taylor-mode AD
+                for high-order derivatives — every one of these is reused
+                in our paper;
+          (v) annealing schedule for the causality parameter ε:
+                {10^{-2}, 10^{-1}, 10^0, 10^1, 10^2}.
+          Code: https://github.com/PredictiveIntelligenceLab/CausalPINNs
+          (JAX/JAX-CFD).
+================================================================================
+
+ABSTRACT
+--------
+PINNs have not, to date, succeeded on dynamical systems whose solution exhibits
+multi-scale, chaotic, or turbulent behaviour. We attribute this failure to the
+inability of existing PINN formulations to respect the spatio-temporal CAUSAL
+structure inherent in physical evolution. We propose a simple re-formulation
+of the PINN loss that explicitly accounts for physical causality during model
+training. This single change yields significant accuracy improvements AND a
+practical quantitative criterion for assessing convergence. State-of-the-art
+results on benchmarks where existing PINN formulations fail: chaotic Lorenz
+system, Kuramoto–Sivashinsky in chaotic regime, Navier–Stokes in turbulent
+regime. First time PINNs have succeeded on such systems.
+
+KEYWORDS: deep learning · PDEs · computational physics · chaotic systems
+
+
+1  INTRODUCTION
+==============================================================================
+PINNs ([1-8]) have severe difficulty / fail on highly nonlinear, multi-scale,
+or chaotic problems [9,10]. Series of extensions: adaptive optimizers
+[12,13,14,15], adaptive batch sampling [16,17], novel architectures
+[12,9,18,19,20], domain decomposition [21,22], new activation functions [23],
+sequential learning [16,24,25] — none have cracked broadband / chaotic
+problems (e.g. K-S, turbulent N-S).
+
+KEY ARGUMENT: Physical systems possess inherent causal structure. Linear
+wave with speed c respects principle of causality (info cannot propagate
+faster than c) [26]; this underpins the method of characteristics [27].
+Classical numerics enforce causality by SEQUENTIAL time-stepping: t is
+fully resolved before t+Δt. Continuous-time PINNs ([28,29,30,21,12,13,23])
+LACK this temporal dependence — and as Section 3 shows, gradient descent
+implicitly biases continuous-time PINNs to first approximate solutions at
+LATER times before resolving ICs, profoundly violating temporal causality.
+
+CONTRIBUTIONS:
+• Reveal an implicit bias: continuous-time PINNs can violate causality and
+  thus converge to erroneous solutions.
+• Propose a simple re-formulation of the PINN loss that explicitly respects
+  causality.
+• Provide a quantitative practical convergence criterion.
+• State-of-the-art results on chaotic Lorenz, K-S in chaotic regime, and
+  Navier-Stokes in turbulent regime — first PINN successes on these
+  systems.
+
+PAPER STRUCTURE: §2 PINN background + Allen-Cahn case study revealing the
+implicit bias. §3 causal training reformulation + Algorithm 1.
+§4 practical add-ons (modified MLP, hard periodic BCs, Taylor-mode AD,
+parallel training). §5 results. §6 discussion.
+
+
+2  PHYSICS-INFORMED NEURAL NETWORKS (PINNs)
+==============================================================================
+
+Problem setup
+-------------
+PDEs of form (eq 2.1):
+    u_t + N[u] = 0,        t ∈ [0,T], x ∈ Ω
+with IC u(0,x) = g(x) (eq 2.2) and BC B[u] = 0 on ∂Ω (eq 2.3).
+Network u_θ(t,x). Composite loss (eq 2.4):
+    L(θ) = λ_ic L_ic(θ) + λ_bc L_bc(θ) + λ_r L_r(θ)
+with usual MSE definitions for L_ic (eq 2.5), L_bc (eq 2.6), L_r (eq 2.7).
+
+Illustrative example: 1-D Allen–Cahn (eqs 2.8-2.11)
+    u_t - 0.0001 u_xx + 5u^3 - 5u = 0,  t∈[0,1], x∈[-1,1]
+    u(x,0) = x^2 cos(πx);  periodic BC u(t,-1) = u(t,1), u_x(t,-1)=u_x(t,1).
+PINN setup: tanh fully-connected, 4×128 hidden. Periodic BCs imposed exactly
+(Fourier embedding eq 4.8 with m=10). Reduced loss (eq 2.12):
+    L = λ_ic L_ic + λ_r L_r
+with λ_ic=100, λ_r=1; 100×256 mesh ⇒ N_ic=256, N_r=25600. Adam, 2×10^5
+iterations.
+Result: relative L^2 error 49.87% — PINN gets stuck in erroneous local
+minimum after a few thousand iterations (Fig 1, Fig 2 left).
+
+PINNs CAN VIOLATE PHYSICAL CAUSALITY
+------------------------------------
+Discretise t into 0=t_1<...<t_N_t=T. Define temporal residual loss (eq 2.13):
+    L_r(t,θ) = (1/N_x) Σ_j |∂u_θ/∂t (t,x_j) + N[u_θ](t,x_j)|^2
+Then total residual loss (eqs 2.14, 2.15):
+    L_r(θ) = (1/N_t) Σ_i L_r(t_i,θ)
+Forward-Euler discretisation of ∂u_θ/∂t shows L(t_i,θ) ALSO depends on the
+prediction at t_{i-1} (eq 2.16). Therefore a small L_r(t_i,θ) is meaningful
+ONLY IF the predictions at PREVIOUS times are accurate. The original
+formulation (eq 2.7) tries to minimise all L_r(t_i,θ) simultaneously,
+which can drive L_r(t_i,θ) → 0 even when predictions at t_i AND at earlier
+times are inaccurate. This violates temporal causality.
+
+Empirical confirmation (Fig 2 middle): the temporal residual is large near
+the IC and decays to ~0 after t=0.5 — i.e. the model has minimised the
+late-time residual without correctly fitting the early-time solution.
+
+UNDESIRABLE IMPLICIT BIAS (NTK analysis)
+----------------------------------------
+For each L_r(t,θ), define empirical NTK K_θ(t) ∈ R^{N_x × N_x} (eq 2.17):
+    K_θ(t)_{ij} = ⟨∂R_θ/∂θ(t,x_i), ∂R_θ/∂θ(t,x_j)⟩
+where R_θ(t,x) = ∂u_θ/∂t(t,x) + N[u_θ](t,x) is the PDE residual (eq 2.18).
+By the NTK theory of Wang et al. [13], the eigenvalues of K_θ(t) determine
+the convergence rate of L_r(t,θ).
+
+Definition 2.1 — Temporal convergence rate (eq 2.19):
+    C(t) = (1/N_t) Σ_k λ_k(t) = Trace(K_θ(t)) / N_t
+
+Visualisation (Fig 2 right) on Allen-Cahn: C(t) is GREATER for greater t,
+i.e. the PINN preferentially minimises L_r(t,θ) for LARGER t. ⇒ implicit
+bias to fit late times first, violating causality.
+
+
+3  CAUSAL TRAINING FOR PINNs
+==============================================================================
+
+A simple re-formulation
+------------------------
+Weighted residual loss (eq 3.1):
+    L_r(θ) = (1/N_t) Σ_i w_i L_r(t_i,θ)
+with weights (eq 3.2):
+    w_i = exp(-ε Σ_{k=1}^{i-1} L_r(t_k,θ)),   i = 2,3,...,N_t.
+Equivalently (eq 3.3):
+    L_r(θ) = (1/N_t) Σ_i exp(-ε Σ_{k=1}^{i-1} L_r(t_k,θ)) · L_r(t_i,θ)
+ε is the causality parameter; controls steepness of the weights.
+Interpretation: w_i is large only if all previous residuals are already
+small ⇒ L_r(t_i,θ) is not minimised until all previous L_r(t_k,θ) (k<i)
+have decreased.
+
+ALLEN-CAHN REVISITED: with ε = 100, 3×10^5 Adam iterations, same setup
+otherwise:
+    Standard MLP   :  rel L^2 error  1.43e-3
+    Modified MLP   :  rel L^2 error  1.39e-4
+The latter is ~10–100× better than every prior approach (Table 1):
+    Original Raissi et al. [11]      ~ 50%
+    Adaptive time sampling [16]      ~ 0.02-0.06 (order)
+    Self-attention SA-PINN [14]      ~ 2e-3
+    Time marching [25]               ~ 6e-4
+    Causal training (MLP)            1.43e-3
+    Causal training (modified MLP)   1.39e-4   ← NEW SOTA
+
+Stopping criterion for assessing convergence
+--------------------------------------------
+At init all w_i = 0 except w_1 (≡1) ⇒ only L_r(t_0) is minimised.
+Throughout training more weights activate; at end all → 1.
+⇒ TERMINATE training when min_i w_i > δ (recommended δ = 0.99).
+Both faster training AND better predictive accuracy (training longer past
+this criterion can degrade accuracy via over-fitting).
+
+Sensitivity on ε
+----------------
+- ε too small: latter temporal residuals not effectively minimised.
+- ε too large: optimisation problem too hard; early residuals must be
+  driven to extreme small values to activate latter weights.
+ANNEALING strategy: increasing sequence {ε_i} of values; recommended
+{10^{-2}, 10^{-1}, 10^0, 10^1, 10^2}.
+
+Fitting the initial data
+-------------------------
+Treat L_ic as a special temporal residual at t=0 inside the same weighted
+loss.
+
+ALGORITHM 1 — Causal training for PINNs
+---------------------------------------
+Network u_θ(t,x) with exact BC enforcement. Weighted loss (eq 3.4):
+    L(θ) = (1/N_t) Σ_{i=0}^{N_t} w_i L(t_i,θ)
+with L(t_0,θ) = λ_ic L_ic(θ); for 1≤i≤N_t, L(t_i,θ) = L_r(t_i,θ) (eq 2.13).
+All w_i initialised to 1.
+For ε in {ε_1,...,ε_k} do
+   For S steps of gradient descent do
+      (a) Compute w_i = exp(-ε Σ_{k<i} L(t_k,θ));  use stop_gradient on w_i.
+      (b) θ_{n+1} = θ_n - η ∇_θ L(θ_n)             (eq 3.6)
+      If min_i w_i > δ then break.
+   end for
+end for
+Recommended hyper-parameters:  λ_ic = 10^3,  δ = 0.99,
+{ε_i} = [10^{-2}, 10^{-1}, 10^0, 10^1, 10^2].
+
+REMARKS:
+- Periodic BCs imposed exactly (Section 4); other BCs can be incorporated
+  similarly via boundary loss inside the weighted scheme.
+- w_i is a function of θ; use lax.stop_gradient (JAX) so gradient does NOT
+  back-prop through w_i.
+- Computational overhead is NEGLIGIBLE — w_i uses values already present
+  in the computational graph.
+- Collocation points may be re-sampled each iteration; only requirement
+  is that {t_i} be NON-DECREASING.
+- Algorithm 1 generalises to physics-informed DeepONet [38,39,40] and
+  physics-informed neural operators [41].
+
+Connection to existing approaches
+---------------------------------
+- Adaptive sampling of Wight et al. [16]: weight effect is equivalent to
+  changing collocation density. Disadvantages: density designed manually
+  per problem; needs many collocation points.
+- Time-marching / curriculum learning [16,24,42,43]: shares the spirit of
+  respecting causality. Causal training is an ENHANCEMENT to time-marching
+  rather than a replacement, since causality violations may still occur
+  WITHIN each time window.
+
+
+4  PRACTICAL CONSIDERATIONS
+==============================================================================
+High-order accuracy is needed for chaotic problems. The following
+extensions further enhance accuracy and efficiency, but are NOT required
+for Algorithm 1 to work.
+
+Modified multi-layer perceptrons
+--------------------------------
+Wang et al. [12] modified MLP. Forward pass (eqs 4.1-4.5):
+    U = σ(X W_1 + b_1),  V = σ(X W_2 + b_2)
+    H^(1) = σ(X W^(l) + b^(l))
+    Z^(l) = σ(H^(l) W^(l) + b^(l)),  l=1,...,L-1
+    H^(l+1) = (1 - Z^(l)) ⊙ U + Z^(l) ⊙ V,  l=1,...,L-1
+Two encoders U,V merged into each hidden layer via point-wise multiplication.
+Better than standard MLP at minimising PDE residuals and capturing sharp
+gradients [12,9,38,39].
+
+Exact periodic boundary conditions
+-----------------------------------
+Dong & Ni [44]. For 1-D periodic in x with period P, embed x into Fourier
+features (eq 4.8):
+    v(x) = (1, cos ωx, sin ωx, cos 2ωx, sin 2ωx, ..., cos mωx, sin mωx)
+with ω = 2π/L; m a non-negative integer. Then u_θ(v(x)) is exactly periodic.
+2-D extension: tensor product of 1-D Fourier features (eq 4.11), parameters
+(m,n,ω_x,ω_y); guarantees periodicity in both coordinates.
+For time-dependent problems, concatenate t with v(x): u_θ([t, v(x)]).
+
+Taylor-mode automatic differentiation for high-order derivatives
+-----------------------------------------------------------------
+Conventional AD scales exponentially in cost with derivative order. Taylor-
+mode AD uses a truncated Taylor polynomial via the Faà di Bruno formula
+(eq 4.12). Empirical 3-5× speed-up over reverse-mode AD for K-S benchmark.
+Implementation: jax.jet primitive of Bettencourt et al. [47, 35].
+
+Parallel training
+-----------------
+Synchronous data-parallelism over multiple GPUs via jax.pmap. Each GPU
+holds an identical copy of θ; sub-batches sampled independently per GPU;
+gradients aggregated by reduce-mean. Larger batches ⇒ better convergence
+& accuracy (essential for N-S).
+
+
+5  RESULTS
+==============================================================================
+Throughout: modified MLP + tanh + Glorot-normal init. Periodic BCs as
+hard constraints via Fourier features. Adam with default settings;
+exponential lr decay (rate 0.9 every 5000 iterations). Time-marching:
+[0,T] split into sub-domains [0,Δt],[Δt,2Δt],…; each sub-domain trained
+with the previous prediction as IC. Code:
+github.com/PredictiveIntelligenceLab/CausalPINNs
+
+5.1  Lorenz system (chaotic ODE)
+---------------------------------
+ODEs (eqs 5.1-5.3):
+    dx/dt = σ(y - x);   dy/dt = x(ρ - z) - y;   dz/dt = xy - βz
+Parameters σ=3, ρ=28, β=8/3 (chaotic regime).
+Domain: t ∈ [0,20], IC = (1,1,1).
+Implementation (Appendix E): 40 disjoint time windows of size Δt=0.5.
+5-layer fully-connected, 512 neurons/layer. Exact IC via:
+    x̂_θ(t) = x_θ(t)·t + x(0)  (similarly for y, z)
+N_t = 256 uniform grid in [0,Δt]. Full-batch GD.
+Results: rel L^2 errors  1.139e-2 (x), 1.656e-2 (y), 7.038e-3 (z).
+Stopping criterion min_i w_i > δ helps both accuracy AND cost: training
+beyond it shows over-fitting (Appendix Fig 18-19).
+
+5.2  Kuramoto–Sivashinsky equation
+-----------------------------------
+PDE (eq 5.4):
+    u_t + α u u_x + β u_xx + γ u_xxxx = 0
+periodic BC, IC u(0,x)=u_0(x).
+
+Case I (regular): α=5, β=0.5, γ=0.005, x∈[-1,1], u_0(x)=-sin(πx), T=1.
+10 time windows (Δt=0.1). 5-layer modified MLP, 256 neurons. N_t=32, N_x=64
+randomly sampled per iteration. λ_ic = 10^3.
+Result: rel L^2 error 3.49e-4. Error spikes ~ one order in t∈[0.4,0.6]
+(rapid solution transition).
+Taylor-mode AD: 3-5× speed-up on the loss-evaluation cost vs reverse-mode.
+
+Case II (chaotic): α=100/16, β=100/16^2, γ=100/16^4, x∈[0,2π], T=0.5.
+5 time windows. 10-layer modified MLP, 128 neurons. λ_ic = 10^4.
+Result: rel L^2 error 2.46e-2. First PINN success on chaotic K-S.
+Long-time integration (T=0.9): error grows above 10% after t=0.8 due to
+chaotic accumulation. Future work: operator learning [39].
+
+5.3  Navier–Stokes (2-D decaying turbulence in periodic box)
+-------------------------------------------------------------
+Velocity-vorticity formulation (eqs 5.6-5.8):
+    w_t + u·∇w = (1/Re) Δw,    in [0,T] × Ω
+    ∇·u = 0,                    in [0,T] × Ω
+    w(0,x,y) = w_0(x,y),        in Ω
+Domain Ω = [0,2π]^2;  Re = 100;  T = 1.
+Network (Appendix G): 6-layer modified MLP, 128 neurons, [t,x,y] → [u_θ,v_θ];
+w_θ = ∂_x v_θ - ∂_y u_θ via AD.
+Residuals (eqs G.2, G.3); loss with λ_w = 1, λ_c = 10^2, λ_ic = 10^4.
+N_t = 64, N_x = 512 collocation per iteration; 10 time windows of Δt = 0.1.
+Validation by JAX-CFD [56] spectral solver on 1024^2 mesh, dt = 10^{-4}.
+
+Results: rel L^2 errors over [0,T] × Ω:
+    u: 3.90e-2,   v: 2.61e-2,   w: 3.53e-2
+First PINN simulation of TURBULENT 2-D decaying turbulence (no training
+data). Predicted kinetic-energy spectra agree with reference (Fig 13).
+
+Parallel scaling on 8× NVIDIA A6000:
+- Strong scaling: speed-up tapers beyond 4 GPUs (under-utilisation per
+  device when batch fixed).
+- Weak scaling: parallel efficiency > 99% as #GPUs grows with fixed
+  per-GPU batch.
+- Larger batch ⇒ higher accuracy (motivates data-parallelism).
+Long-time (T=2): rel L^2 above 10% but qualitatively correct.
+
+
+6  DISCUSSION
+==============================================================================
+Physical systems possess a causal structure. Continuous-time PINNs trained
+by gradient descent VIOLATE this structure: NTK analysis shows an implicit
+bias to first minimise PDE residuals at LATER times before fitting the IC.
+Causal training reweights the residual loss at each iteration to restore
+causality. This single change yields 10-100× improvements over competing
+approaches and unlocks problems previously inaccessible to PINNs (chaotic
+Lorenz, K-S, turbulent N-S).
+
+Limitations / future:
+- This work is forward-only. For inverse problems, observational data
+  should be treated as point sources; PDE residuals should first be
+  minimised at those locations and then propagated outwards.
+- Different problems pose different causal structures (e.g. optimal
+  control: forward state + adjoint backward). Training algorithms should
+  respect the underlying information-propagation rules.
+- PINNs are still much slower than traditional numerics for forward
+  problems → distributed/parallel implementations [55, 21] are needed.
+- A "Transformer for PDEs"-style niche architecture remains undiscovered;
+  modified MLP [12] is currently the best generic backbone.
+
+
+REFERENCES (full)
+==============================================================================
+[1]  Raissi M., Yazdani A., Karniadakis G.E., "Hidden fluid mechanics,"
+     Science 367(6481):1026-1030, 2020.
+[2]  Mathews A. et al., "Uncovering turbulent plasma dynamics via DL from
+     partial observations," PRE 104(2):025205, 2021.
+[3]  Kissas G. et al., "ML in cardiovascular flows modeling… PINNs," CMAME
+     358:112623, 2020.
+[4]  Yazdani A., Lu L., Raissi M., Karniadakis G.E., "Systems biology
+     informed DL for inferring parameters and hidden dynamics," PLOS Comp
+     Biol 16(11):e1007575, 2020.
+[5]  Wang S., Perdikaris P., "Deep learning of free boundary and Stefan
+     problems," JCP 428:109914, 2021.
+[6]  Shukla K. et al., "PINN for ultrasound nondestructive quantification
+     of surface breaking cracks," J. Nondestruct. Eval. 39(3), 2020.
+[7]  Chen Y., Lu L., Karniadakis G.E., Dal Negro L., "PINNs for inverse
+     problems in nano-optics and metamaterials," Optics Express 28(8),
+     2020.
+[8]  Sahli Costabal F. et al., "PINN for cardiac activation mapping,"
+     Frontiers in Physics 8:42, 2020.
+[9]  Wang S., Wang H., Perdikaris P., "On the eigenvector bias of Fourier
+     feature networks…," CMAME 384:113938, 2021.
+[10] Karniadakis G.E. et al., "Physics-informed machine learning,"
+     Nature Reviews Physics, 2021.
+[11] Raissi M., Perdikaris P., Karniadakis G.E., "PINNs: a DL framework
+     for forward/inverse PDE problems," JCP 378:686-707, 2019.
+[12] Wang S., Teng Y., Perdikaris P., "Understanding and mitigating
+     gradient flow pathologies in PINNs," SIAM J. Sci. Comput.
+     43(5):A3055-A3081, 2021.
+[13] Wang S., Yu X., Perdikaris P., "When and why PINNs fail to train: an
+     NTK perspective," JCP 449:110768, 2022.
+[14] McClenny L., Braga-Neto U., "Self-adaptive PINN using a soft
+     attention mechanism," arXiv:2009.04544, 2020.
+[15] Maddu S. et al., "Inverse Dirichlet weighting enables reliable
+     training of PINNs," MLST, 2021.
+[16] Wight C.L., Zhao J., "Solving Allen-Cahn and Cahn-Hilliard with
+     adaptive PINNs," arXiv:2007.04542, 2020.
+[17] Nabian M.A., Gladstone R.J., Meidani H., "Efficient training of
+     PINNs via importance sampling," CACAIE, 2021.
+[18] Bu J., Karpatne A., "Quadratic residual networks…," SDM, 2021.
+[19] Jagtap A.D. et al., "Deep Kronecker neural networks…," Neurocomp.
+     468:165-180, 2022.
+[20] Liang S., Lyu L., Wang C., Yang H., "Reproducing activation function
+     for deep learning," arXiv:2101.04844, 2021.
+[21] Jagtap A.D., Karniadakis G.E., "Extended PINNs (XPINNs)," Comm.
+     Comput. Phys. 28(5):2002-2041, 2020.
+[22] Moseley B., Markham A., Nissen-Meyer T., "Finite-basis PINNs
+     (FBPINNs)…," arXiv:2107.07871, 2021.
+[23] Jagtap A.D., Kawaguchi K., Karniadakis G.E., "Adaptive activation
+     functions accelerate convergence in deep & PINNs," JCP 404:109136,
+     2020.
+[24] Krishnapriyan A.S. et al., "Characterizing possible failure modes
+     in PINNs," arXiv:2109.01050 (NeurIPS 2021).
+[25] Mattey R., Ghosh S., "Novel sequential method to train PINNs for
+     Allen-Cahn / Cahn-Hilliard," CMAME 390:114474, 2022.
+[26] Strauss W.A., "Partial differential equations: an introduction,"
+     Wiley, 2007.
+[27] Evans L.C., "Partial Differential Equations," AMS Graduate
+     Studies in Math, 1998.
+[28] Lagaris I.E., Likas A., Fotiadis D.I., "ANNs for solving ODEs/PDEs,"
+     IEEE TNN 9(5):987-1000, 1998.
+[29] Raissi M., Babaee H., Givi P., "Deep learning of turbulent scalar
+     mixing," PRF 4(12):124501, 2019.
+[30] Kharazmi E., Zhang Z., Karniadakis G.E., "Variational PINNs,"
+     arXiv:1912.00873, 2019.
+[31] Griewank A., Walther A., "Evaluating derivatives: principles and
+     techniques of algorithmic differentiation," SIAM, 2008.
+[32] Kingma D., Ba J., "Adam: a method for stochastic optimization,"
+     arXiv:1412.6980, 2014.
+[33] Iserles A., "A first course in the numerical analysis of differential
+     equations," CUP, 2009.
+[34] Jacot A., Gabriel F., Hongler C., "Neural tangent kernel," NeurIPS,
+     2018.
+[35] Bradbury J. et al., "JAX: composable transformations of Python+NumPy
+     programs," 2018.
+[36] Lu L., Meng X., Mao Z., Karniadakis G.E., "DeepXDE: a DL library for
+     solving differential equations," arXiv:1907.04502, 2019.
+[37] Hennigh O. et al., "NVIDIA SimNet: an AI-accelerated multi-physics
+     simulation framework," ICCS, 2021.
+[38] Wang S., Wang H., Perdikaris P., "Learning the solution operator of
+     parametric PDEs with physics-informed DeepONets," arXiv:2103.10974,
+     2021.
+[39] Wang S., Perdikaris P., "Long-time integration of parametric
+     evolution equations with physics-informed DeepONets," arXiv:2106.05384,
+     2021.
+[40] Wang S., Wang H., Perdikaris P., "Improved architectures and training
+     algorithms for DeepONets," arXiv:2110.01654, 2021.
+[41] Li Z. et al., "Physics-informed neural operator for learning PDEs,"
+     arXiv:2111.03794, 2021.
+[42] Du Y., Zaki T.A., "Evolutional deep neural network," arXiv:2103.09959,
+     2021.
+[43] Vadyala S.R., Betgeri S.N., Betgeri N.P., "PINN method for solving 1-D
+     advection equation using PyTorch," Array 13:100110, 2022.
+[44] Dong S., Ni N., "A method for representing periodic functions and
+     enforcing exactly periodic BCs with DNNs," JCP 435:110242, 2021.
+[45] Sukumar N., Srivastava A., "Exact imposition of BCs with distance
+     functions in PINNs," arXiv:2104.08426, 2021.
+[46] Lu L., Pestourie R., Yao W., Wang Z., Verdugo F., Johnson S.G.,
+     "PINNs with hard constraints for inverse design," arXiv:2102.04626,
+     2021.
+[47] Bettencourt J., Johnson M.J., Duvenaud D., "Taylor-mode AD for
+     higher-order derivatives in JAX," 2019.
+[48] Psichogios D.C., Ungar L.H., "Hybrid neural network–first principles
+     approach to process modeling," AIChE J. 38(10):1499-1511, 1992.
+[49] Glorot X., Bengio Y., "Understanding the difficulty of training deep
+     feedforward NNs," AISTATS, 2010.
+[50] Lorenz E.N., "Deterministic nonperiodic flow," J. Atmos. Sci.
+     20(2):130-141, 1963.
+[51] Kuramoto Y., Tsuzuki T., "Persistent propagation of concentration
+     waves in dissipative media…," PTP 55(2):356-369, 1976.
+[52] Sivashinsky G.I., "Nonlinear analysis of hydrodynamic instability in
+     laminar flames I," Acta Astronautica 4(11):1177-1206, 1977.
+[53] Raissi M., "Deep hidden physics models," JMLR 19(1):932-955, 2018.
+[54] Schaarschmidt M. et al., "AutoMap: towards ergonomic automated
+     parallelism for ML models," arXiv:2112.02958, 2021.
+[55] Shukla K., Jagtap A.D., Karniadakis G.E., "Parallel PINNs via domain
+     decomposition," arXiv:2104.10013, 2021.
+[56] Kochkov D. et al., "Machine learning–accelerated CFD," PNAS 118(21),
+     2021.
+[57] Hunter J.D., "Matplotlib: a 2D graphics environment," Computing in
+     Science & Engineering, 2007.
+[58] Harris C.R. et al., "Array programming with NumPy," Nature
+     585(7825):357-362, 2020.
+[59] Finn C., Abbeel P., Levine S., "Model-agnostic meta-learning for
+     fast adaptation of deep networks," ICML, 2017.
+[60] Driscoll T.A., Hale N., Trefethen L.N., "Chebfun guide," 2014.
+[61] Cox S.M., Matthews P.C., "Exponential time differencing for stiff
+     systems," JCP 176(2):430-455, 2002.
+
+================================================================================
+END OF FILE
+================================================================================

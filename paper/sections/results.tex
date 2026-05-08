@@ -1,0 +1,413 @@
+% =============================================================
+% Section 4: Results
+% =============================================================
+\section{Results}\label{sec:results}
+
+Section~\ref{sec:res-fwd} reports the forward PINN field
+accuracy against the FD reference and the five-method extraction
+of $(\omega,\tau)$ from $\Phi_\theta(\xq,t)$.
+Section~\ref{sec:res-inv} reports the six inverse PINN variants:
+mass recovery, the primary post-hoc QNM estimate, and the
+$A_{\mathrm{ring}}$--$\tau$ degeneracy of the template loss.
+
+Throughout this paper the \emph{forward PINN} refers to the
+network of Sec.~\ref{sec:fwd-pinn} that solves the Zerilli
+equation forward at fixed $M$ from PDE residual plus IC/BC
+losses, and the \emph{inverse PINN} refers to the joint
+PDE-plus-data network of Sec.~\ref{sec:inv-pinn} that
+simultaneously recovers $M$ and a single-mode template
+$(\omega_{\mathrm{learned}},\tau_{\mathrm{learned}},
+A_{\mathrm{ring}},\phi_0)$ from $\Nobs$ noisy field samples.
+
+% --------------------------------------------------------------
+\subsection{Forward PINN}
+\label{sec:res-fwd}
+
+The converged forward PINN matches the FD reference to high
+accuracy on the full simulation domain. With the architecture and
+training schedule of Sec.~\ref{sec:fwd-pinn} the field-accuracy
+metrics, evaluated on the FD grid
+$x \in [-50,150]\,M$, $t \in [0,50]\,M$, are
+\begin{equation}
+  \mathrm{RMSD} = 8.17\times 10^{-4}, \qquad
+  \mathrm{MAD}  = 4.99\times 10^{-4}, \qquad
+  \mathrm{RL2}  = 5.79\times 10^{-3},
+  \label{eq:fwd-metrics}
+\end{equation}
+where $\mathrm{RMSD}$ and $\mathrm{MAD}$ are the root-mean-square
+and mean-absolute differences $\Phi_\theta - \Phi_{\mathrm{FD}}$ in
+absolute units (peak $|\Phi| \approx 0.7$ on the domain), and
+$\mathrm{RL2}$ is their relative $L^2$ norm.
+This $\mathrm{RL2} = 0.58\%$ is a factor of $\sim\!50$ smaller
+than the $\mathrm{RL2} = 28.06\%$ of
+\citet[Table~2, Zerilli row]{Patel2024pinn} on the same problem,
+and the corresponding $\mathrm{MAD}$ improvement is
+$5.0\times 10^{-4}$ versus their $1.82\times 10^{-2}$, a factor
+of~$\sim\!36$. We attribute the improvement to the larger number
+of L-BFGS iterations and the greedy adaptive sampling of
+Sec.~\ref{sec:fwd-pinn}; see also the discussion in
+Sec.~\ref{sec:discussion}. The snapshot and
+error-heatmap visualisations are collected in
+Fig.~\ref{fig:fwd-field}, and the per-component loss histories
+underlying Eq.~\eqref{eq:fwd-metrics} are shown in
+Fig.~\ref{fig:fwd-loss}.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/snapshots.png}\\[0.6em]
+\includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/error_heatmap_zoomed.png}
+\caption{Forward PINN versus FD reference. Top: snapshots of
+$\Phi(x,t)$ at four times $t/M\in\{10,20,30,40\}$ overlaid for the
+PINN and the FD reference; the two curves are visually
+indistinguishable on this scale. Bottom: heatmap of
+$|\Phi_\theta - \Phi_{\mathrm{FD}}|$ on the QNM-relevant subdomain
+$x \in [-20,60]\,M$, $t \in [0,50]\,M$, with the colour scale
+saturating below $7\times 10^{-3}$.}
+\label{fig:fwd-field}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/loss.png}
+\caption{Forward PINN training history. Total loss
+$\mathcal{L}_{\mathrm{tot}}$ and the seven weighted components
+($\mathcal{L}_{\mathrm{r}}$, $\mathcal{L}_{\mathrm{rx}}$,
+$\mathcal{L}_{\mathrm{rt}}$, $\mathcal{L}_{\mathrm{ic}}$,
+$\mathcal{L}_{\mathrm{iv}}$, $\mathcal{L}_{\mathrm{bl}}$,
+$\mathcal{L}_{\mathrm{br}}$, weights as in
+Sec.~\ref{sec:fwd-pinn}) versus iteration on a log--log axis. The
+vertical marker at iteration $10{,}000$ separates the Adam phase
+from the L-BFGS phase. The PDE-residual term
+$\mathcal{L}_{\mathrm{r}}$ dominates throughout, with the IC and BC
+terms below it by one to two orders of magnitude.}
+\label{fig:fwd-loss}
+\end{figure}
+
+We apply the five extraction methods of Sec.~\ref{sec:qnm-methods}
+to the time series $\Phi_\theta(\xq=10\,M,t)$ from the converged
+forward PINN. The extracted ringdown, with its single-mode template
+overlay, is shown in Fig.~\ref{fig:fwd-ringdown}; the primary
+numbers from each method are collected in
+Table~\ref{tab:fwd-qnm}, and the plateau diagnostics that justify
+the M4 and M5 estimates are shown in Figs.~\ref{fig:fwd-plateau-m4} and~\ref{fig:fwd-plateau-m5}.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.85\textwidth]{../outputs/qnm/zerilli_l2_greedy_f03_lbfgs30k/pinn_ringdown.png}
+\caption{Forward PINN ringdown at $\xq = 10\,M$. The time series
+$\Phi_\theta(\xq,t)$ on $[0,50]\,M$, exhibiting the prompt burst
+followed by a clean exponentially-damped sinusoidal ringdown that
+the five extraction methods of Sec.~\ref{sec:qnm-methods} are
+applied to.}
+\label{fig:fwd-ringdown}
+\end{figure}
+
+\begin{table}[t]
+\centering
+\caption{Forward PINN QNM extraction. Reference values are the
+Leaver continued-fraction Schwarzschild $\ell = 2$ fundamental
+$M\omega_0 = 0.3737$, $\tau_0/M = 11.241$. ``Wide'' window
+denotes $[10,50]\,M$; M2 on plateau denotes M2 evaluated on the
+$[t_0^{\min},50]\,M$ window with $t_0^{\min}$ taken as the lower
+edge of the M4 plateau. M4 and M5 quote
+plateau-mean $\pm$ plateau standard deviation across the
+contiguous block of fit windows minimising the combined relative
+scatter (Algorithm~\ref{alg:m4} and Sec.~\ref{sec:plateau}).}
+\label{tab:fwd-qnm}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.05}
+\begin{tabular}{@{}lccccl@{}}
+\toprule
+Method & $M\omega$ & $\omega$ err & $\tau/M$ & $\tau$ err & Window or plateau \\
+\midrule
+M1 (FFT $+$ log-line)        & $0.3712$  & $0.68\%$  & $10.92$ & $2.83\%$ & $[10,\,50]\,M$ \\
+M2 (NLS, wide)               & $0.3794$  & $1.54\%$  & $11.464$ & $1.99\%$ & $[10,\,50]\,M$ \\
+M2 (NLS on M4 plateau)       & $0.3749$  & $0.31\%$  & $10.41$ & $7.38\%$ & $[14,\,50]\,M$ \\
+M3 (ESPRIT, $K=6$)           & $0.4829$  & $29.2\%$  & $7.84$  & $30.3\%$ & $[10,\,50]\,M$ \\
+M4 (1-D plateau)             & $0.37359{\pm}2{\times}10^{-4}$ & $\mathbf{0.029\%}$ & $10.94{\pm}0.02$ & $2.65\%$ & $t_0\in[14,21]M$, $\tend{=}50M$ \\
+M5 (2-D plateau)             & $0.3728{\pm}8{\times}10^{-4}$ & $0.23\%$ & $10.80{\pm}0.12$ & $3.91\%$ & $t_0\in[10,16.7]M$, $\tend\in[42,50]M$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.85\textwidth]{../outputs/qnm/zerilli_l2_greedy_f03_lbfgs30k/pinn_method4_stability.png}
+\caption{M4 plateau diagnostic for the forward PINN.
+$(\omega_0,\tau_0)$ as a function of the start time $t_0$ on
+$[10,25]\,M$ at fixed $\tend = 50\,M$, with the eight-window
+plateau block ($t_0\in[14,21]\,M$) shaded.}
+\label{fig:fwd-plateau-m4}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[height=0.78\textheight,keepaspectratio]{../outputs/qnm/zerilli_l2_greedy_f03_lbfgs30k/pinn_method5_2d_heatmap.png}
+\caption{M5 plateau diagnostic for the forward PINN. Heatmap of
+the absolute deviation of the M2 estimate from the plateau median
+on the $(t_0,\tend)$ grid (capped at $5\%$); the contiguous
+$5\times 3$ plateau rectangle is outlined in red. Top:
+$\omega_0$. Bottom: $\tau_0$. Annotations report the in-block
+relative scatter (the quantity the plateau rule minimises) and
+the bias of the plateau mean from the Leaver value.}
+\label{fig:fwd-plateau-m5}
+\end{figure}
+
+Three points stand out. First, the M4 plateau
+estimate of $\omega$ achieves $0.029\%$ accuracy, more than an
+order of magnitude tighter than any single-window method, and the
+plateau standard deviation $\sigma_\omega \sim 2\times 10^{-4}$ is
+comparable to the residual bias of the plateau mean against the
+Leaver value ($|0.37359 - 0.3737| \approx 1.1\times 10^{-4}$).
+Second, M2 on the M4 plateau window reduces the
+$\omega$ error of M2 on the wide window by a factor of five (from
+$1.54\%$ to $0.31\%$) but increases the $\tau$ error fourfold (from
+$1.99\%$ to $7.38\%$), motivating the asymmetric reporting
+convention of Sec.~\ref{sec:reporting}. Third, M3
+returns frequencies at machine-precision amplitudes ($|c_k| \sim
+10^{-23}$), reflecting the fact that the analytic ESPRIT problem
+is ill-conditioned on a $\Phi(\xq,t)$ whose dominant component is
+already a clean damped sinusoid; we quote M3 in
+Appendix~\ref{app:esprit} for completeness only. The M5 plateau in
+the $(t_0,\tend)$ plane spans the corner of the grid closest to
+the QNM regime, $t_0 \in [10,16.7]\,M$ and $\tend \in [42,50]\,M$,
+exactly as expected from Eq.~\eqref{eq:timescales}, since the
+plateau abuts the lower-$t_0$ edge once the prompt burst has
+passed ($t_0 \gtrsim t_{\mathrm{burst}}$) and extends to the
+upper-$\tend$ edge of the simulation domain since
+$\tend \ll t_{\mathrm{tail}}$ on $[0,50]\,M$.
+
+% --------------------------------------------------------------
+\subsection{Inverse PINN}
+\label{sec:res-inv}
+
+For each of the six variants of Table~\ref{tab:variants} we report
+the field-accuracy metrics on the trained $\Phi_\theta$, the
+recovered mass $M_{\mathrm{learned}}$, the primary single-mode
+QNM estimate $(\omega,\tau)$ obtained from the convention of
+Sec.~\ref{sec:reporting}, and the M4 plateau quality as a
+diagnostic. Numbers are summarised in
+Table~\ref{tab:inv-summary}. The training-time learned template
+parameters are tabulated separately in
+Table~\ref{tab:inv-learned}. The training-time convergence of the
+five learnable scalars for variant D, the best of the six
+variants, is shown in Fig.~\ref{fig:inv-conv}; the
+$A_{\mathrm{ring}}$--$\tau$ degeneracy visible in the parameter
+histories is described in the paragraph below, before mass
+recovery and M4 plateau quality.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_inverse_qnm_combo/param_convergence.png}
+\caption{Inverse PINN training-time parameter convergence for
+variant D, the best of the six variants. Five panels show the
+learnable scalars $M$, $\omega_{\mathrm{learned}}$,
+$\tau_{\mathrm{learned}}$, $A_{\mathrm{ring}}$, $\phi_0$ versus
+training iteration (logged-sample units, so the L-BFGS phase is
+compressed into the rightmost few samples). Truth values for
+$M$, $\omega_{\mathrm{learned}}$, $\tau_{\mathrm{learned}}$ are
+shown as red dashed horizontal lines; initial values as grey
+dotted lines. Bottom-right: the analytic single-mode template at
+the final learned scalars (red dashed) overlaid on the
+converged-network field $\Phi_\theta(\xq,t)$ and the FD truth
+(black); the orange band marks the training window
+$[\tring,\tend] = [18,50]\,M$. Out-of-window template divergence
+is the visual signature of the $A_{\mathrm{ring}}$--$\tau$
+degeneracy.}
+\label{fig:inv-conv}
+\end{figure}
+
+\begin{table}[!htbp]
+\centering
+\caption{Inverse PINN primary results. $M$ is the learned mass.
+$\omega$ is the M4 plateau mean and $\sigma_\omega$ its plateau
+population standard deviation across the contiguous eight-window
+block of lowest combined relative scatter (Algorithm~\ref{alg:m4});
+the start-time bounds of the plateau are
+$[t_0^{\min},t_0^{\max}]$ in units of $M$ at fixed $\tend = 50\,M$.
+$\tau$ is M2 on the wide window $[10,50]\,M$. RL2 is the relative
+$L^2$ field error of $\Phi_\theta$ against the noiseless FD
+reference. Variant labels follow Table~\ref{tab:variants}.}
+\label{tab:inv-summary}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lccccccc@{}}
+\toprule
+Variant & RL2 & $M$ err & $M\omega$ M4 & $\sigma_\omega$ & $\omega$ err & $\tau/M$ M2-wide & $\tau$ err \\
+\midrule
+baseline   & $3.5\%$ & $0.41\%$ & $0.379$ & $0.166$  & $1.5\%$$^{\dagger}$ & $11.83$ & $5.3\%$ \\
+A          & $2.9\%$ & $0.45\%$ & $0.370$ & $2{\times}10^{-4}$ & $0.89\%$ & $11.29$ & $\mathbf{0.43\%}$ \\
+B          & $6.9\%$ & $1.25\%$ & --- $^{\ddagger}$    & ---       & ---     & $8.63$  & $23.3\%$ \\
+C          & $3.6\%$ & $0.34\%$ & $0.561$ & $0.188$  & $50\%$$^{\dagger}$ & $11.82$ & $5.1\%$ \\
+\textbf{D} & $\mathbf{3.0\%}$ & $\mathbf{0.34\%}$ & $0.3748$ & $\mathbf{4{\times}10^{-5}}$ & $\mathbf{0.30\%}$ & $11.06$ & $1.6\%$ \\
+E          & $3.5\%$ & $1.44\%$ & $0.364$ & $4{\times}10^{-3}$ & $2.6\%$ & $11.10$ & $1.3\%$ \\
+\bottomrule
+\end{tabular}
+\\[0.4em]
+\footnotesize
+$\dagger$ Plateau standard deviation $\sigma_\omega/\omega \gtrsim
+30\%$ indicates that no genuine plateau forms; the entry is
+therefore a failed M4 result, not a tight estimate. \quad
+$\ddagger$ Two-mode NLS did not converge to a finite solution on
+any window; M4 returns NaN.
+\end{table}
+
+\begin{table}[!htbp]
+\centering
+\caption{Inverse PINN learned template parameters at the end of
+training for each
+variant. These are the values of the learnable scalars
+$(\omega,\tau,A_{\mathrm{ring}},\phi)$ inside the ringdown loss of
+Eq.~\eqref{eq:loss-ring} after $10{,}000$ Adam plus $15{,}000$
+L-BFGS iterations. They are reported as a diagnostic and are not
+the primary QNM estimates of Table~\ref{tab:inv-summary}; the
+reason is given in the
+$A_{\mathrm{ring}}$--$\tau$ paragraph below.}
+\label{tab:inv-learned}
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Variant & $\omega_{\mathrm{learned}}$ & $\tau_{\mathrm{learned}}/M$ &
+        $A_{\mathrm{ring}}$ & $\phi$ \\
+\midrule
+baseline   & $0.3820$ & $11.89$ & $1.92$ & $-0.99$ \\
+A          & $0.3704$ & $10.10$ & $2.59$ & $-0.72$ \\
+B          & $0.4050$ & $8.62$  & $2.97$ & $-1.38$ \\
+C          & $0.3822$ & $11.84$ & $1.92$ & $-0.99$ \\
+D          & $0.3748$ & $9.48$  & $2.93$ & $-0.85$ \\
+E (mode 0) & $0.3496$ & $9.22$  & $2.52$ & $+0.31$ \\
+E (mode 1) & $0.3810$ & $7.38$  & $3.24$ & $-1.90$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Figure~\ref{fig:inv-conv} shows the parameter histories of variant
+D on a logged-sample horizontal axis, so the L-BFGS phase
+($10{,}000\to 25{,}000$ raw iterations) is compressed into the
+rightmost few sample points and appears as the apparent step at
+the right edge of each panel. Four of the five learned parameters
+behave as expected: $M$ (top-left) overshoots to $\sim 1.15$
+during Adam, returns to $\sim 1.04$, and converges to its
+final value $1.003$ ($0.34\%$ from the true mass) under L-BFGS;
+$\omega_{\mathrm{learned}}$ (top-right) climbs from $0.30$ to
+$\sim 0.355$ during Adam, drifts down to $\sim 0.31$, and
+recovers to its final value $0.3748$ ($0.30\%$ from the Leaver
+value) under L-BFGS, and the apparent ``ends low'' behaviour is
+an artefact of the logged-sample axis rather than the data;
+$A_{\mathrm{ring}}$ (middle-right) rises from $0.5$ to a final
+value $2.93$, overshooting to $\sim 3.29$ during early L-BFGS
+before settling back; and $\phi$ (bottom-left) settles to
+$-0.85$. The exception is $\tau_{\mathrm{learned}}$
+(middle-left), which drifts from $\tau_{\mathrm{init}} = 8.0\,M$
+down to $\sim 7.3\,M$ during Adam, climbs to $9.48\,M$ via
+L-BFGS, and finishes $15.7\%$ below the Leaver value. This is
+the $A_{\mathrm{ring}}$--$\tau$ degeneracy of
+Eq.~\eqref{eq:loss-ring} introduced in Sec.~\ref{sec:inv-pinn};
+the bottom-right panel confirms it visually, since the template
+at the final learned scalars is visually indistinguishable from
+the FD truth at $\xq=10\,M$ on $t \gtrsim 18\,M$ even with
+$\tau_{\mathrm{learned}}$ off by $1.8\,M$. The network field
+$\Phi_\theta(\xq,t)$ is constrained by the PDE residual and the
+noisy data and exhibits the physical decay rate; the
+post-hoc M2 wide-window fit on $\Phi_\theta$ recovers
+$\tau = 11.06\,M$ ($1.6\%$ from the Leaver value) as listed in
+Table~\ref{tab:inv-summary}. The learned and post-hoc values of
+$\tau$ are tabulated side by side for all six variants in
+Table~\ref{tab:tau-degeneracy}.
+
+All six variants reduce the $20\%$ mass initialisation error
+$|M_{\mathrm{init}}-M_{\mathrm{true}}|/M_{\mathrm{true}} = 0.20$ to
+$\le 1.5\%$ within the allotted $25{,}000$ optimiser iterations. The single-mode-template
+variants (baseline, A, C, D) recover $M$ to within $0.5\%$;
+variants B and E are worse, with $1.25\%$ and $1.44\%$
+respectively. Variant B places weight $100$ on a template the
+optimiser cannot satisfy with a single damped sinusoid (the
+prompt burst is still present at $\tring = 10\,M$,
+Eq.~\eqref{eq:timescales}), so field and mass accuracy are
+sacrificed to template accuracy. In E the four additional learnable parameters of the
+overtone slow mass convergence, but the structural information
+added by the second mode improves the primary $\tau$ estimate
+substantially (1.3\% vs.\ 5.3\% for baseline; see below).
+
+We quote $\omega$ from the M4 plateau mean (Sec.~\ref{sec:reporting}).
+The plateau standard deviation $\sigma_\omega$ is also a useful
+diagnostic. For variants A, D
+and E the plateau is tight ($\sigma_\omega/\omega \le 1\%$) and
+$\omega$ is recovered to $0.3$--$2.6\%$. For baseline and C the
+plateau is wide ($\sigma_\omega/\omega \approx 0.44$ and $0.34$
+respectively), signalling that the two-mode NLS does not find a
+stable $(\omega_0,\tau_0)$ across $t_0$; the mean is not a
+trustworthy estimate, and the M2-wide value of $\omega$ would in
+fact be more accurate. For B the two-mode NLS does not converge to
+a finite minimum on any window in the scan, so M4 is undefined.
+$\sigma_\omega$ is therefore a quality diagnostic. A small
+$\sigma_\omega$ accepts the estimate, a large or undefined
+$\sigma_\omega$ rejects it (cf.\ Sec.~\ref{sec:plateau}).
+Variant D ranks first on the combination of $M$, $\omega$ and
+$\tau$. The single-factor changes A and
+C are individually beneficial (A improves $\tau$ and the M4
+plateau; C improves $M$); B is strictly worse than baseline on
+$\tau$ and M4 plateau quality at no benefit to $M$; E is
+competitive on the primary QNM numbers but pays a $\sim 1\%$
+penalty on $M$ and $\omega$ for the extra template freedom.
+Variant D combines the three single-factor improvements of A--C:
+it has the tightest plateau ($\sigma_\omega = 4\times 10^{-5}$)
+and the smallest $\omega$ error ($0.30\%$) of the six runs.
+
+Table~\ref{tab:tau-degeneracy} compares
+$\tau_{\mathrm{learned}}$ to the post-hoc M2 wide-window fit on
+$\Phi_\theta(\xq,t)$ for all six variants.
+
+\begin{table}[!htbp]
+\centering
+\caption{$A_{\mathrm{ring}}$--$\tau$ degeneracy diagnostic. The
+training-time learned $\tau_{\mathrm{learned}}$ is the value of the
+learnable scalar at the end of training. The post-hoc M2 wide-window
+$\tau_{\mathrm{M2}}^{\mathrm{wide}}$ is the M2 fit to
+$\Phi_\theta(\xq,t)$ over $[10,50]\,M$. Truth is
+$\tau_0/M = 11.241$ \citep{Leaver1985}. ``Bias gap'' is
+$|\tau_{\mathrm{learned}} - \tau_{\mathrm{M2}}^{\mathrm{wide}}|/M$.
+For variant E, $\tau_{\mathrm{learned}}$ refers to the fundamental
+template mode (mode 0).}
+\label{tab:tau-degeneracy}
+\small
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Variant & $\tau_{\mathrm{learned}}/M$ & $\tau_{\mathrm{M2}}^{\mathrm{wide}}/M$ & Bias gap \\
+\midrule
+baseline & $11.89$ & $11.83$ & $0.06$ \\
+A        & $10.10$ & $11.29$ & $1.19$ \\
+B        & $8.62$  & $8.63$  & $0.01$ \\
+C        & $11.84$ & $11.82$ & $0.02$ \\
+D        & $9.48$  & $11.06$ & $1.58$ \\
+E        & $9.22$  & $11.10$ & $1.88$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The pattern in Table~\ref{tab:tau-degeneracy} groups by
+$\lambda_{\mathrm{ring}}$. For baseline and C the learned and
+post-hoc $\tau$ agree to within $0.06\,M$, but \emph{both} are
+biased high by $\sim 0.6\,M$ relative to the Leaver value; the post-hoc M2 fit is constrained by the
+network's own field, which has been trained against the inverse
+template, so when the template is weak ($\lambda_{\mathrm{ring}} =
+1$) the network does not correct the template's late-time
+overshoot. For variant D, raising $\lambda_{\mathrm{ring}}$ to
+$100$ \emph{and} increasing $\tring$ to $18\,M$ shifts
+$\tau_{\mathrm{learned}}$ down to $9.48\,M$ along the
+degeneracy with $A_{\mathrm{ring}} = 2.93$, while the post-hoc M2
+fit to the converged $\Phi_\theta$ recovers $11.06\,M$. The
+network-level field $\Phi_\theta(\xq,t)$ has therefore learned the
+correct decay rate from the noisy data and the PDE, despite the
+template parameters drifting in the opposite direction; the
+post-hoc extraction recovers the field's own decay rate, not the
+template's. This separation of the trained network's field from
+the trained template parameters is the reason for the reporting
+convention of Sec.~\ref{sec:reporting}, and it is also the reason
+variant D wins on $\omega$. With the template at $\tring = 18\,M$
+the prompt-burst contamination of the M4 plateau scan is
+suppressed (cf.\ Eq.~\eqref{eq:timescales}), and the network's
+$\Phi_\theta(\xq,t)$ converges to a QNM-dominated waveform on
+which the M4 two-mode NLS finds a tight plateau, despite the
+drift of the template parameters themselves.

@@ -1,0 +1,440 @@
+================================================================================
+TITLE:    Self-Adaptive Physics-Informed Neural Networks using a Soft Attention
+          Mechanism (SA-PINN)
+AUTHORS:  Levi D. McClenny, Ulisses Braga-Neto
+          Department of Electrical and Computer Engineering, Texas A&M Univ.
+ARXIV:    arXiv:2009.04544 (v3, 2022; published in J. Comput. Phys. 2023, 474:111722)
+SOURCE:   https://ar5iv.labs.arxiv.org/html/2009.04544
+SAVED:    Local literature reference for QNM-PINN paper write-up.
+WHY HERE: Establishes per-collocation-point trainable adaptive weights via
+          gradient-ascent (min-max saddle-point training); contrasts with the
+          GLOBAL per-loss-term λ-weighting of Wang-Teng-Perdikaris (2001.04536)
+          and the NTK-eigenvalue weighting of Wang-Yu-Perdikaris (2007.14527).
+          Provides theoretical NTK justification for per-point soft-attention
+          masks and demonstrates 50-100x reductions in L2 error on stiff
+          benchmarks (Allen-Cahn, advection, Helmholtz, viscous Burgers, wave).
+          For our inverse-QNM PINN, this paper motivates the option of using
+          point-wise residual weights at sharp features (potential well peak,
+          tortoise-coordinate stretch near horizon) rather than a single global
+          weight per loss term.
+          Implementation released as open-source TensorDiffEq library.
+================================================================================
+
+ABSTRACT
+--------
+Physics-Informed Neural Networks (PINNs) have emerged recently as a promising
+application of deep neural networks to the numerical solution of nonlinear
+partial differential equations (PDEs). However, it has been recognized that
+adaptive procedures are needed to force the neural network to fit accurately
+the stubborn spots in the solution of "stiff" PDEs. In this paper, we propose
+a fundamentally new way to train PINNs adaptively, where the adaptation
+weights are fully trainable and applied to each training point individually,
+so the neural network learns autonomously which regions of the solution are
+difficult and is forced to focus on them. The self-adaptation weights specify
+a soft multiplicative attention mask, reminiscent of similar mechanisms used
+in computer vision. The basic idea behind these SA-PINNs is to make the
+weights increase as the corresponding losses increase, accomplished by
+training the network to simultaneously minimize the losses and maximize the
+weights. We show how to build a continuous map of self-adaptive weights using
+Gaussian Process regression, which allows the use of stochastic gradient
+descent in problems where conventional gradient descent is not enough to
+produce accurate solutions. Finally, we derive the Neural Tangent Kernel
+matrix for SA-PINNs and use it to obtain a heuristic understanding of the
+effect of the self-adaptive weights on the dynamics of training in the
+limiting case of infinitely-wide PINNs, suggesting that SA-PINNs work by
+producing a smooth equalization of the eigenvalues of the NTK matrix
+corresponding to the different loss terms. In numerical experiments with
+several linear and nonlinear benchmark problems, the SA-PINN outperformed
+other state-of-the-art PINN algorithms in L2 error, while using a smaller
+number of training epochs.
+
+
+1  BACKGROUND
+==============================================================================
+
+1.1  Physics-Informed Neural Networks
+-------------------------------------
+Initial-boundary value problem:
+    N_{x,t}[u(x,t)]  = f(x,t),  x ∈ Ω,  t ∈ (0,T]            (1)
+    B_{x,t}[u(x,t)]  = g(x,t),  x ∈ ∂Ω, t ∈ (0,T]            (2)
+    u(x,0)           = h(x),    x ∈ Ω̄                        (3)
+
+Approximate u(x,t) by deep network u(x,t;w). Total loss:
+    L(w) = L_s(w) + L_r(w) + L_b(w) + L_0(w)                  (4)
+with sample, residue, boundary, initial loss terms (eqs 5-8).
+
+1.2  Related Work — global weighting schemes
+--------------------------------------------
+Weighted loss:
+    L(w) = λ_s L_s(w) + λ_r L_r(w) + λ_b L_b(w) + λ_0 L_0(w)  (9)
+
+(a) NONADAPTIVE WEIGHTING [Wight & Zhao 2020]: pick large λ_0 = C ≫ 1.
+(b) LEARNING-RATE ANNEALING [Wang-Teng-Perdikaris 2001.04536]:
+    update λ from gradient statistics each epoch; λ acts as learning-rate
+    coefficient, NOT updated by backprop.
+(c) NTK WEIGHTING [Wang-Yu-Perdikaris 2007.14527]:
+    set weights from NTK eigenvalue evolution.
+(d) MINIMAX WEIGHTING [Liu & Wang 2021]:
+    saddle-point search via descent on w, ascent on λ — but λ still applies
+    to entire loss component.
+
+KEY DISTINCTION OF SA-PINN: weights apply to INDIVIDUAL training points, not
+entire loss components. Previous methods are special cases where all per-point
+weights for one loss component are tied together.
+
+
+2  SELF-ADAPTIVE PINN (SA-PINN)
+==============================================================================
+
+Loss with per-point trainable weights:
+    L(w, λ_r, λ_b, λ_0) = L_s(w) + L_r(w,λ_r) + L_b(w,λ_b) + L_0(w,λ_0)  (10)
+where
+    λ_r = (λ_{r,1},...,λ_{r,N_r}),  similarly λ_b, λ_0.
+
+Per-point losses:
+    L_r(w,λ_r) = (1/2) Σ_i m(λ_{r,i}) |N[u(x_{r,i},t_{r,i};w)] - f|^2     (11)
+    L_b(w,λ_b) = (1/2) Σ_i m(λ_{b,i}) |B[u(x_{b,i},t_{b,i};w)] - g|^2     (12)
+    L_0(w,λ_0) = (1/2) Σ_i m(λ_{0,i}) |u(x_{0,i},0;w) - h(x_{0,i})|^2     (13)
+
+m(λ) = SELF-ADAPTATION MASK FUNCTION on [0,∞), nonneg, differentiable,
+strictly increasing.
+
+OBJECTIVE (saddle point):
+    min_w  max_{λ_r, λ_b, λ_0}  L(w, λ_r, λ_b, λ_0)            (14)
+
+UPDATES (gradient descent on w, gradient ASCENT on λ):
+    w^{k+1}    = w^k    - η_k    ∇_w L(w^k, λ^k_*, ...)        (15)
+    λ_r^{k+1}  = λ_r^k  + ρ_r^k  ∇_{λ_r} L(w^k, λ^k_*, ...)    (16)
+    λ_b^{k+1}  = λ_b^k  + ρ_b^k  ∇_{λ_b} L(w^k, λ^k_*, ...)    (17)
+    λ_0^{k+1}  = λ_0^k  + ρ_0^k  ∇_{λ_0} L(w^k, λ^k_*, ...)    (18)
+
+Gradient w.r.t. λ_r:
+    ∇_{λ_r} L = (1/2)[ m'(λ_{r,1})|N[u_1]-f_1|^2, ...,
+                       m'(λ_{r,N_r})|N[u_{N_r}]-f_{N_r}|^2 ]^T (19)
+
+Since m'(λ) > 0, the gradients are nonneg ⇒ λ sequences are MONOTONICALLY
+INCREASING. Updates are larger where the unmasked loss is larger.
+
+ANY weight may be HELD FIXED: e.g. set λ_b ≡ 1 and only train λ_0, λ_r.
+Sensor-data loss L_s is unmasked (avoid overfitting noise).
+
+INITIALIZATION OF λ: typically random uniform; if prior knowledge says IC is
+hard (e.g., time-irreversible diffusion), initialize λ_0 larger.
+
+MASK FUNCTION SHAPES:
+    polynomial: m(λ) = c λ^q,  c, q > 0  (need ceiling to avoid overflow)
+    sigmoidal:  smooth or sharp logistic  (sharp ⇒ near-binary attention)
+Avoid excessively sharp sigmoid (vanishing-gradient problem).
+Figure 1 shows q=2, q=4, smooth logistic, sharp logistic.
+
+PENALTY-METHOD INTERPRETATION:
+SA-PINN training is FORMALLY EQUIVALENT to a penalty-method solution of
+the PDE-constrained optimization problem
+    min  (1/2) Σ_i |u(x_{s,i},t_{s,i};w) - y_{s,i}|^2          (22)
+    s.t. N[u(x_{r,i},t_{r,i};w)] = f(x_{r,i},t_{r,i})           (23)
+         B[u(x_{b,i},t_{b,i};w)] = g(...)                       (24)
+         u(x_{0,i},0;w)          = h(x_{0,i})                   (25)
+Penalty form min L(x) + c_k P(x), with c_k = m(λ^k) growing adaptively
+during training.
+
+IMPLEMENTATION:
+- TensorFlow 2.3, Adam (Kingma & Ba 2014), optionally followed by L-BFGS.
+- Self-adaptive weights are updated ONLY during Adam steps; held constant
+  during L-BFGS.
+- Sign of ∇_λ L is simply flipped to perform ascent in any standard framework.
+- Open-sourced as TensorDiffEq library [arXiv:2103.16034].
+
+
+3  NUMERICAL EXAMPLES
+==============================================================================
+
+Figure-of-merit: relative L2 error
+    L2_error = sqrt( Σ_i |u(x_i,t_i) - U(x_i,t_i)|^2  /
+                     Σ_i |U(x_i,t_i)|^2 )                       (30)
+All results averaged over 10 random restarts.
+
+3.1  Viscous Burgers (eqs 31-33)
+--------------------------------
+    u_t + u u_x - (0.01/π) u_xx = 0,  x ∈ [-1,1], t ∈ [0,1]
+    u(0,x) = -sin(πx),  u(t,±1) = 0
+
+Architecture: FCN, 8 hidden layers × 20 neurons, identical to Raissi PINN.
+Training: 10k Adam + 10k L-BFGS. N_0=100, N_b=200, N_r=10000.
+λ_init: U(0,1) for both IC and residue. ρ = 5e-3 for all λ-LRs.
+RESULT: L2 error = 4.803e-04 ± 1.01e-4
+        — smaller than Raissi 2019, in 1/5 of the training iterations.
+Trained weight map shows the learned attention concentrates near the SHOCK
+at x=0 (Figure 4).
+
+3.2  Helmholtz 2D (eqs 34-37)
+-----------------------------
+    u_xx + u_yy + k^2 u - q(x,y) = 0,  x,y ∈ [-1,1]
+    Dirichlet zero on all four boundaries.
+    q chosen so analytical sol is u(x,y) = sin(a_1 π x) sin(a_2 π y).
+    a_1=1, a_2=4 (matches Wang-Teng-Perdikaris benchmark).
+
+Architecture: [2,50,50,50,50,1].  Training: 10k Adam + 10k L-BFGS.
+N_b = 400 (100 per side); no IC.  Mesh 1001×1001 ⇒ 1,002,001 candidate
+points; N_r = 100,000 sampled.  λ_init: U(0,1); ρ = 5e-3.
+RESULT: L2 error = 3.2e-3 ± 2.2e-4
+        — improves on the learning-rate-annealing M1-M2 schemes of WTP, with
+        HALF the iterations (10k Adam vs WTP's 40k).
+Learned weights concentrate on non-flat regions, ignore flat regions
+(Figure 7).
+
+3.3  Allen-Cahn Reaction-Diffusion (eqs 38-41) — KEY STIFF BENCHMARK
+--------------------------------------------------------------------
+    u_t - 0.0001 u_xx + 5 u^3 - 5 u = 0,  x ∈ [-1,1], t ∈ [0,1]
+    u(x,0) = x^2 cos(πx)
+    PERIODIC BCs:  u(t,-1)=u(t,1),  u_x(t,-1)=u_x(t,1)
+
+For periodic BC the boundary loss is replaced by:
+    L_b(w,λ_b) = (1/N_b) Σ_i g(λ_{b,i})
+        ( |u(1,t_{b,i}) - u(-1,t_{b,i})|^2 +
+          |u_x(1,t_{b,i}) - u_x(-1,t_{b,i})|^2 )                (42)
+
+Architecture: [2,128,128,128,128,1] (matches Wight & Zhao 2020).
+N_r = 20000, N_0 = 100, N_b = 100 (200 paired periodic).
+Boundary weights HELD AT 1; only λ_0 and λ_r trained.
+λ_0 init U(0,100), λ_r init U(0,1).  Training: 65 ms/iter on V100.
+
+RESULT TABLE (10 random restarts, average L2 error):
+    SA-PINN:                          2.10% ± 1.21%
+    Time-adaptive [Wight-Zhao 2020]:  8.00% ± 0.56%
+    Nonadaptive (λ_0 = C = 100):     49.61% ± 2.50%
+    Baseline PINN:                   96.15% ± 6.45%
+
+The learned residue-weight map (Figure 9) is REMARKABLY STABLE across random
+restarts — a property of the PDE itself. Larger weights early in time match
+the time-irreversible diffusion-reaction nature of AC: the SA-PINN
+"discovers" that the early evolution is the most critical part of the
+solution, in contrast with the heuristic IC-overweighting of Wight-Zhao
+which had to be hard-coded.
+
+Loss curves (Figure 11): SA-PINN reduces L_0 dramatically (the AC
+bottleneck) and eventually achieves L_r two orders of magnitude lower than
+baseline; oscillatory residual-loss reflects competing min-max dynamics.
+
+3.4  Hyperparameter notes
+-------------------------
+- Effective recipe: LOWER neural-network LR (≈ 1e-5) + HIGHER λ-LR (1e-3
+  to 1e-1).
+- Constant LR for λ ascent in all reported experiments; LR scheduling could
+  improve.
+- Initialization of λ encodes prior knowledge (use larger λ_0 if IC is the
+  hard term).
+
+
+4  SA-PINN WITH STOCHASTIC GRADIENT DESCENT
+==============================================================================
+
+Standard SA-PINN cannot directly use small-batch SGD because each λ is
+attached to a fixed point. SOLUTION: build a CONTINUOUS λ(x,t) via
+GAUSSIAN-PROCESS REGRESSION over the trained discrete λ values; resample
+new collocation points each batch and predict their λ from the GP.
+
+BENCHMARK — 1D wave equation (eqs 43-46):
+    u_tt(x,t) - 4 u_xx(x,t) = 0,  x,t ∈ [0,1]
+    u(0,t) = u(1,t) = 0
+    u_t(x,0) = 0
+    u(x,0) = sin(πx) + (1/2) sin(4πx)
+Analytical sol: u = sin(πx)cos(2πt) + (1/2)sin(4πx)cos(8πt).        (47)
+
+Architecture: 5 layers × 500 neurons (matches Wang-Yu-Perdikaris NTK paper).
+N_r=300, N_0=100, N_b=100 (small to highlight SGD impact).
+NN-weight LR = 1e-5, 80,000 iters.
+λ_r LR = 0.01; λ on u_t-IC = 0.05; λ on other ICs/BCs = 0.25.
+Fixed-weight comparison: residue=1.0, u_t-IC=5.0, others=50.0
+(matches asymptotic SA values).
+SGD: resample ALL training points every 100 iterations.
+
+TABLE 1 (Wave PDE, mean ± std L2 error %, training time s, 10 runs):
+    Method            | no SGD          | with SGD
+    ------------------+-----------------+-----------------
+    Baseline          | (high; fails)   | (still fails)
+    Fixed weights     | (fails no SGD)  | improves
+    Self-adaptive     | (fails no SGD)  | 2.95% L2 error
+                                          (order of magnitude better than
+                                          fixed weights with SGD;
+                                          slightly larger than NTK-PINN).
+
+Figure 12 plots all 6 combinations vs exact solution.
+Figure 13: GP-interpolated λ(x,t) maps — λ peaks at IC turning points where
+curvature is maximum; λ also larger early in time.
+
+
+5  NTK ANALYSIS OF SA-PINN
+==============================================================================
+
+Setup: simplified PDE problem N_x[u(x)] = f(x), Ω; u(x) = g(x), Γ ⊆ ∂Ω.
+Define response and data vectors u_r(τ), u_b(τ), v_r, v_b (eqs 52-55).
+
+Loss at training time τ (eq 56):
+    L(w(τ), λ_r(τ), λ_b(τ)) = (1/2) Σ_{q=r,b} Σ_{j=1..N_q}
+                              m(λ_{q,j}(τ)) |u_{q,j}(τ) - v_{q,j}|^2
+
+Gradient flow (eq 57-58):
+    dw/dτ = - Σ_{q=r,b} J_q^T(τ) Γ_q(τ) (u_q(τ) - v_q)
+where Γ_q is diagonal with mask values m(λ_{q,1}),...,m(λ_{q,N_q}).
+
+Evolution of u_p (eq 59):
+    du_p/dτ = - Σ_{q=r,b} J_p(τ) J_q^T(τ) Γ_q(τ) (u_q(τ) - v_q)
+
+NTK kernel matrices:
+    K_{pq}(τ) = J_p(τ) J_q^T(τ),  with element  (60)
+    (K_{pq})_{ij}(τ) = ∇_w u_{p,i}(τ)^T · ∇_w u_{q,j}(τ)
+
+EMPIRICAL NTK FOR SA-PINN (eq 63):
+              | K_{rr}(τ) Γ_r(τ)   K_{rb}(τ) Γ_b(τ) |
+    K(τ)  =   |                                       |
+              | K_{br}(τ) Γ_r(τ)   K_{bb}(τ) Γ_b(τ) |
+
+Reduces to Wang-Yu-Perdikaris (NTK PINN) Lemma 3.1 when Γ=I.
+
+INFINITE-WIDTH LIMIT: assume K_{pq}(τ) ≈ K_{pq} const, Γ_p(τ) ≈ Γ_p const,
+and decoupled approximation:
+    du_p/dτ ≈ - K_{pp} Γ_p (u_p(τ) - v_p)                       (64)
+Decoupling justified by ||K_{rb} Γ_b|| ≪ ||K_{rr} Γ_r||.
+
+DIAGONALIZATION:
+K_{pp} symmetric PSD; K_{pp} Γ_p NOT symmetric BUT, since
+    K_{pp}^{-1/2} (K_{pp} Γ_p) K_{pp}^{1/2} = K_{pp}^{1/2} Γ_p K_{pp}^{1/2},
+which is a product of symmetric matrices, K_{pp} Γ_p is similar to a
+symmetric matrix and hence diagonalizable.
+
+EIGENVALUE BOUNDS (matrix theory):
+If γ_{p,1} ≥ ... ≥ γ_{p,N_p} are eigenvalues of K_{pp}, and μ_{p,1} ≥ ...
+≥ μ_{p,N_p} of K_{pp} Γ_p, and λ_{p,1} ≥ ... ≥ λ_{p,N_p} are sorted
+self-adaptive weights:
+    μ_{p,1} ≤ m(λ_1) γ_{p,1}                                   (66)
+    μ_{p,n} ≥ m(λ_n) γ_{p,n}                                   (67)
+
+ODE SOLUTION:
+    u_p(τ) = (I - exp(-K_{pp} Γ_p t)) v_p                      (68)
+    Q (u_p(τ) - v_p) = - exp(-M t) Q v_p                       (70)
+where Q is eigenvector matrix of K_{pp} Γ_p and M = diag(μ_{p,j}).
+⇒ Each error mode decays at rate exp(-μ_{p,i} τ).
+
+KEY INSIGHT: traditional global weighting (Γ_p = λ_p I) only SCALES NTK
+eigenvalues uniformly: μ_{p,i} = λ_p γ_{p,i}. The per-point self-adaptive
+weights NONLINEARLY transform the eigenvalue distribution — they can change
+its SHAPE (smooth equalization), not merely scale it. This is what enables
+better convergence than any global scheme.
+
+ADVECTION DEMO (eqs 71-74):
+    q_t + ū q_x = 0, x ∈ [0,L], t ∈ [0,T];  Dirichlet zero ends
+    u(x,0) = g(x) — discontinuous initial profile (LeVeque-style).
+Sol: q(x,t) = g(x - ū t).
+Network [2,400,400,400,400,1], 10k Adam, NN-LR 0.001, λ-LR 0.1, Glorot
+Normal init, 7 s on V100. Boundary weights fixed at 1.
+Baseline PINN: fails to capture solution structure.
+SA-PINN: ≈5% L2 error.
+
+NTK eigenvalue plots at τ = 1000, 5000, 10000 (Figure 16): SA-PINN
+EQUALIZES MAGNITUDES of NTK eigenvalues between K_{uu} (IC) and K_{rr}
+(residual), AND reshapes the eigenvalue distribution itself, not just
+scales it.
+
+
+6  CONCLUSION
+==============================================================================
+- SA-PINN: per-point trainable soft attention via min-max saddle training.
+- Formally equivalent to penalty-method PDE-constrained optimization with
+  monotonically increasing trainable penalty coefficients.
+- Outperforms baseline PINN, fixed weights, time-adaptive [Wight-Zhao],
+  learning-rate-annealing [Wang-Teng-Perdikaris], and NTK-weighting
+  [Wang-Yu-Perdikaris] on AC, Burgers, Helmholtz, wave, advection.
+- GP-interpolated λ-maps enable mini-batch SGD for SA-PINN.
+- NTK analysis shows the unique benefit: NONLINEAR reshaping of the
+  eigenvalue distribution, not mere scaling.
+- Open questions: PINN-tailored optimizers (Adam was designed for image
+  classification); deeper connection to PDE-constrained optimization theory.
+
+ACKNOWLEDGMENTS
+NSF D3EM DGE-1545403; US Army CCDC ARL.
+
+CODE
+TensorDiffEq: https://github.com/tensordiffeq/TensorDiffEq
+Companion paper: McClenny, Haile, Braga-Neto, "TensorDiffEq", arXiv:2103.16034.
+
+
+REFERENCES (full list)
+==============================================================================
+[1]  Baker N. et al., "Workshop report on basic research needs for
+     scientific machine learning," 2/2019.
+[2]  Raissi M., Perdikaris P., Karniadakis G.E., "Physics-informed neural
+     networks...," J. Comput. Phys., 378:686-707, 2019.
+[3]  Raissi M., "Forward-backward stochastic neural networks...,"
+     arXiv:1804.07010, 2018.
+[4]  Wight C.L., Zhao J., "Solving Allen-Cahn and Cahn-Hilliard equations
+     using the adaptive PINNs," arXiv:2007.04542, 2020.
+[5]  Wang S., Yu X., Perdikaris P., "When and why PINNs fail to train: a
+     neural tangent kernel perspective," arXiv:2007.14527, 2020.
+[6]  Dissanayake M.W.M.G., Phan-Thien N., "Neural-network-based
+     approximations for solving PDEs," Commun. Numer. Methods Eng., 1994.
+[7]  Abadi M. et al., "TensorFlow," OSDI 16, 2016.
+[8]  Revels J., Lubin M., Papamarkou T., "Forward-mode automatic
+     differentiation in Julia," arXiv:1607.07892, 2016.
+[9]  Baydin A.G., Pearlmutter B.A., Radul A.A., Siskind J.M., "Automatic
+     differentiation in machine learning: a survey," JMLR 18:5595-5637,
+     2017.
+[10] Paszke A. et al., "Automatic differentiation in PyTorch," 2017.
+[11] Burden R.L., Faires D.J., "Numerical analysis," 1985.
+[12] Wang S., Teng Y., Perdikaris P., "Understanding and mitigating
+     gradient pathologies in PINNs," arXiv:2001.04536, 2020.
+[13] Wang F. et al., "Residual attention network for image
+     classification," CVPR, pp 3156-3164, 2017.
+[14] Pang Y. et al., "Mask-guided attention network for occluded
+     pedestrian detection," ICCV, pp 4967-4975, 2019.
+[15] Shin Y., Darbon J., Karniadakis G.E., "On the convergence and
+     generalization of PINNs," arXiv:2004.01806, 2020.
+[16] Liu D., Wang Y., "A dual-dimer method for training physics-constrained
+     neural networks with minimax architecture," Neural Netw. 136:112-125,
+     2021.
+[17] "SoftAdapt: Techniques for adaptive loss weighting...,"
+     arXiv:1912.12355, 2019.
+[18] Miranda C.S., Von Zuben F.J., "Multi-objective optimization for
+     self-adjusting weighted gradient...," arXiv:1506.01113, 2015.
+[19] Xu H. et al., "AutoLoss: Learning discrete schedules for alternate
+     optimization," arXiv:1810.02442, 2018.
+[20] Emmerich M., Deutz A.H., "A tutorial on multiobjective optimization,"
+     Nat. Comput. 17(3):585-609, 2018.
+[21] Luenberger D.G., Ye Y., "Linear and Nonlinear Programming," Springer,
+     3rd ed., 2008.
+[22] Lillo W.E., Loh M.H., Hui S., Zak S.H., "On solving constrained
+     optimization problems with neural networks: A penalty method
+     approach," IEEE Trans. Neural Netw. 4(6):931-940, 1993.
+[23] Mladenov V.M., Maratos N., "Neural networks for solving constrained
+     optimization problems," Proc. CSCC'00, 2000.
+[24] Kingma D.P., Ba J., "Adam: A method for stochastic optimization,"
+     arXiv:1412.6980, 2014.
+[25] Liu D.C., Nocedal J., "On the limited memory BFGS method for large
+     scale optimization," Math. Program. 45(1-3):503-528, 1989.
+[26] McClenny L.D., Haile M.A., Braga-Neto U.M., "TensorDiffEq: scalable
+     multi-GPU forward and inverse solvers for PINNs,"
+     arXiv:2103.16034, 2021.
+[27] Moelans N., Blanpain B., Wollants P., "An introduction to phase-field
+     modeling of microstructure evolution," Calphad 32(2):268-294, 2008.
+[28] Shen J., Yang X., "Numerical approximations of Allen-Cahn and
+     Cahn-Hilliard equations," Discrete Contin. Dyn. Syst. A 28(4):1669,
+     2010.
+[29] Kunselman C., Attari V., McClenny L., Braga-Neto U., Arroyave R.,
+     "Semi-supervised learning approaches to class assignment in ambiguous
+     microstructures," Acta Mater. 188:49-62, 2020.
+[30] Robbins H., Monro S., "A stochastic approximation method," Ann. Math.
+     Stat., pp 400-407, 1951.
+[31] Ruder S., "An overview of gradient descent optimization algorithms,"
+     arXiv:1609.04747, 2016.
+[32] Keskar N.S. et al., "On large-batch training for deep learning:
+     Generalization gap and sharp minima," arXiv:1609.04836, 2016.
+[33] Saxe A.M., McClelland J.L., Ganguli S., "Exact solutions to the
+     nonlinear dynamics of learning in deep linear neural networks,"
+     arXiv:1312.6120, 2013.
+[34] Jacot A., Gabriel F., Hongler C., "Neural tangent kernel: convergence
+     and generalization in neural networks," NeurIPS 31, 2018.
+[35] LeVeque R.J. et al., "Finite volume methods for hyperbolic problems,"
+     Cambridge Univ. Press, vol 31, 2002.
+
+================================================================================
+END OF FILE
+================================================================================

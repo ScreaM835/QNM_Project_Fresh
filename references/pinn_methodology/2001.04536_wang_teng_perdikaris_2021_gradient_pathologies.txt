@@ -1,0 +1,465 @@
+================================================================================
+TITLE:    Understanding and mitigating gradient pathologies in physics-
+          informed neural networks
+AUTHORS:  Sifan Wang, Yujun Teng, Paris Perdikaris
+ARXIV:    2001.04536  (SIAM J. Sci. Comput., 43(5), A3055–A3081, 2021)
+SOURCE:   https://ar5iv.labs.arxiv.org/html/2001.04536
+SAVED:    via fetch_webpage (ar5iv HTML, math rendered as Unicode)
+WHY HERE: Canonical reference for adaptive loss balancing in PINNs. Defines:
+            (i) gradient pathology = |∇L_r| ≫ |∇L_b|, biases training to
+                ignore boundary/initial conditions.
+            (ii) stiffness analysis via σ_max(∇²L) of the loss Hessian
+                explaining instability of Adam at standard learning rates.
+            (iii) Algorithm 1 — learning-rate annealing:
+                 λ̂_i = max_θ |∇_θ L_r| / mean_θ |∇_θ L_i|
+                 λ_i ← α λ_i + (1−α) λ̂_i,    α ∈ [0.5, 0.9]
+            (iv) "improved fully-connected" (multiplicative gating /
+                attention-style) architecture (M3) with U,V transformer
+                projections and residual gating Z·U + (1−Z)·V.
+            Reports 50–100× accuracy improvement on Helmholtz, Klein-Gordon,
+            and lid-driven-cavity Navier-Stokes.
+            Cite for: motivation of any loss-weighting scheme we use; the
+            fundamental "boundary-loss-is-starved" failure mode that the
+            forward-PINN result must demonstrate it has avoided.
+            Code: https://github.com/PredictiveIntelligenceLab/GradientPathologiesPINNs
+================================================================================
+
+# Understanding and mitigating gradient pathologies in physics-informed neural networks
+
+Sifan Wang (Graduate Group in Applied Mathematics and Computational Science,
+UPenn), Yujun Teng (Mechanical Eng & Applied Mechanics, UPenn), Paris
+Perdikaris (Mechanical Eng & Applied Mechanics, UPenn).
+
+###### Abstract
+
+The widespread use of neural networks across different scientific domains
+often involves constraining them to satisfy certain symmetries, conservation
+laws, or other domain knowledge. Such constraints are often imposed as soft
+penalties during model training and effectively act as domain-specific
+regularizers of the empirical risk loss. Physics-informed neural networks is
+an example of this philosophy in which the outputs of deep neural networks
+are constrained to approximately satisfy a given set of partial differential
+equations. In this work we review recent advances in scientific machine
+learning with a specific focus on the effectiveness of physics-informed
+neural networks in predicting outcomes of physical systems and discovering
+hidden physics from noisy data. We will also identify and analyze a
+fundamental mode of failure of such approaches that is related to numerical
+stiffness leading to unbalanced back-propagated gradients during model
+training. To address this limitation we present a learning rate annealing
+algorithm that utilizes gradient statistics during model training to balance
+the interplay between different terms in composite loss functions. We also
+propose a novel neural network architecture that is more resilient to such
+gradient pathologies. Taken together, our developments provide new insights
+into the training of constrained neural networks and consistently improve
+the predictive accuracy of physics-informed neural networks by a factor of
+50-100× across a range of problems in computational physics. All code and
+data accompanying this manuscript are publicly available at
+https://github.com/PredictiveIntelligenceLab/GradientPathologiesPINNs
+
+###### Keywords
+
+Deep learning · Differential equations · Optimization · Stiff dynamics ·
+Computational physics
+
+## 1. Introduction
+
+Thanks to breakthrough results across a diverse range of scientific
+disciplines, deep learning is currently influencing the way we process data,
+recognize patterns, and build predictive models of complex systems. Many of
+these predictive tasks are currently being tackled using over-parameterized,
+black-box discriminative models such as deep neural networks, in which
+interpretability and robustness is often sacrificed in favor of flexibility
+in representation and scalability in computation. Such models have yielded
+remarkable results in data-rich domains, yet their effectiveness in the
+small data regime still remains questionable, motivating the question of
+how can one endow these powerful black-box function approximators with prior
+knowledge and appropriate inductive biases.
+
+Attempts to address this question are currently defining two distinct
+schools of thought. The first pertains to efforts focused on designing
+specialized neural network architectures that implicitly embed any prior
+knowledge and inductive biases associated with a given predictive task.
+Without a doubt, the most celebrated example in this category is
+convolutional neural networks which have revolutionized the field of
+computer vision by craftily respecting invariance along the groups of
+symmetries and distributed pattern representations found in natural images.
+Another example includes covariant neural networks, that are tailored to
+conform with the rotation and translation invariance present in many-body
+molecular systems. Despite their remarkable effectiveness, such approaches
+are currently limited to tasks that are characterized by relatively simple
+and well-defined symmetry groups, and often require craftsmanship and
+elaborate implementations.
+
+The second school of thought approaches the problem of endowing a neural
+net with prior knowledge from a different angle. Instead of designing
+specialized architectures that implicitly bake in this knowledge, current
+efforts aim to impose such constraints in a soft manner by appropriately
+penalizing the loss function of conventional neural network approximations
+denoted by f_θ(·) parametrized by a set of weights and biases θ. These
+penalty constraints lead to loss functions taking the general form
+
+    L(θ) := (1/N_u) Σ_{i=1}^{N_u} [u_i − f_θ(x_i)]²
+            + (1/λ) R[f_θ(x)],                                          (1)
+
+where the empirical risk loss over a given set of input-output pairs
+{x_i, u_i} is penalized by some appropriate functional R[f_θ(x)] designed
+to constrain the outputs of the neural network to satisfy a set of
+specified conditions, as controlled by the regularization parameter λ. A
+representative example of this approach is physics-informed neural networks
+(PINNs), in which the outputs of a neural network are constrained to
+approximately satisfy a system of partial differential equations (PDE) by
+using a regularization functional R[f_θ(x)] that typically corresponds to
+the residual or the variational energy of the PDE system under the neural
+network representation. This framework has enabled the solution of forward
+and inverse problems in computational physics by reviving the original
+ideas of Psichogios-Ungar (1992) and Lagaris et al. (1998) using modern
+software developments in reverse-mode differentiation in order to
+automatically compute any derivatives present in the PDE operator. Although
+such approaches appear seemingly straightforward and have yielded
+remarkable results across a range of problems, the effects of the
+regularization mechanism in equation (1) remain poorly understood, and in
+several cases can even lead to unstable and erroneous predictions.
+
+In this work, we use physics-informed neural networks as a test-bed for
+analyzing the performance of constrained neural networks trained using
+regularized loss functions in the form of equation (1). Our specific
+contributions can be summarized in the following points:
+
+  • Our analysis reveals a fundamental mode of failure in physics-informed
+    neural networks related to stiffness in the gradient flow dynamics.
+  • This leads to an unstable imbalance in the magnitude of the back-
+    propagated gradients during model training using gradient descent.
+  • We propose a simple solution based on an adaptive learning rate
+    annealing algorithm that aims to balance the interplay between data-fit
+    and regularization.
+  • We also propose a novel neural network architecture that has less
+    stiffness than the conventional fully-connected neural network.
+  • We systematically test the proposed ideas and demonstrate consistent
+    improvements in the predictive accuracy of physics-informed neural
+    networks by a factor of 50-100× across a range of problems in
+    computational physics.
+
+## 2. Methods
+
+### 2.1 A primer in physics-informed neural networks
+
+PINNs aim at inferring a continuous latent function u(x,t) that arises as
+the solution to a system of nonlinear PDEs of the general form
+
+    u_t + N_x[u] = 0,    x ∈ Ω,  t ∈ [0,T],
+    u(x, 0)     = h(x),    x ∈ Ω,                                       (2)
+    u(x, t)     = g(x,t),  t ∈ [0,T], x ∈ ∂Ω,
+
+where x and t denote space and time coordinates, N_x[·] is a nonlinear
+differential operator, Ω ⊂ ℝ^D, and ∂Ω is its boundary. We approximate
+u(x,t) by a deep neural network f_θ(x,t), and define the residual
+
+    r_θ(x,t) := ∂_t f_θ(x,t) + N_x[f_θ(x,t)],                           (3)
+
+where partial derivatives can be computed to machine precision via reverse
+mode differentiation. A good set of candidate parameters can be identified
+via gradient descent using a composite loss function of the general form
+
+    L(θ) := L_r(θ) + Σ_{i=1}^M λ_i L_i(θ),                              (4)
+
+where L_r(θ) is a residual loss term, and L_i(θ), i = 1,…,M correspond to
+data-fit terms (e.g., measurements, IC, BC). For a typical IBVP these
+losses take the specific form
+
+    L_r   = (1/N_r) Σ_{i=1}^{N_r} [r(x_r^i, t_r^i)]²,                   (5)
+    L_ub  = (1/N_b) Σ_{i=1}^{N_b} [u(x_b^i, t_b^i) − g_b^i]²,           (6)
+    L_u0  = (1/N_0) Σ_{i=1}^{N_0} [u(x_0^i, 0)   − h_0^i]²,             (7)
+
+where {x_0^i, h_0^i} is initial data, {(x_b^i, t_b^i), g_b^i} is boundary
+data, and {(x_r^i, t_r^i)} a set of collocation points randomly placed
+inside Ω.
+
+### 2.2 Gradient pathologies in physics-informed neural networks
+
+Despite a series of promising results, the original PINN formulation often
+has difficulties constructing an accurate approximation to u(x,t) for
+reasons that yet remain poorly understood. These pathologies can arise even
+in the simplest setting corresponding to solving classical linear elliptic
+equations. Consider the Helmholtz equation in two space dimensions
+
+    Δu(x,y) + k² u(x,y) = q(x,y),    (x,y) ∈ Ω := (−1,1)²,              (8)
+    u(x,y) = h(x,y),                  (x,y) ∈ ∂Ω,                       (9)
+
+with fabricated solution u(x,y) = sin(a₁ π x) sin(a₂ π y) and source
+
+    q(x,y) = −(a₁π)² sin(…) − (a₂π)² sin(…) + k² sin(…),                (10)
+
+with a₁ = 1, a₂ = 4. A PINN approximation is constructed by minimizing
+
+    L(θ) = L_r(θ) + L_ub(θ).                                            (11)
+
+Train a 4-layer dense, 50-neuron, tanh net for 40,000 Adam steps (lr=10⁻³,
+exponential decay). Result: poor boundary fit, relative L₂ error 15.7 %
+(15.7e-2 ≈ 1.81e-01 in Fig 1 caption).
+
+Tracking gradients of each term separately reveals (Fig 2): the gradients
+of L_ub are sharply concentrated near zero in every layer, whereas the
+gradients of L_r are large. Without enforced BCs the PDE has infinitely
+many solutions, so when ∇_θ L_ub vanishes the network drifts toward an
+arbitrary solution that satisfies the equation but ignores the boundary.
+
+### 2.3 Gradient analysis for physics-informed neural networks
+
+To make the mechanism precise, consider the 1-D Poisson problem
+Δu(x) = g(x) on [0,1] with Dirichlet BCs and exact solution u(x) = sin(Cx),
+g(x) = −C² sin(Cx). Suppose the trained PINN can be written as
+
+    f_θ(x) = u(x) ε_θ(x),    |ε_θ(x) − 1| ≤ ε,    ‖∂^k ε_θ/∂x^k‖_∞ < ε.
+
+Then (proof in Appendix 5.1):
+
+    ‖∇_θ L_ub(θ)‖_∞ ≤ 2 ε · ‖∇_θ ε_θ(x)‖_∞,                            (14)
+    ‖∇_θ L_r (θ)‖_∞ ≤ O(C⁴) · ε · ‖∇_θ ε_θ(x)‖_∞.                      (15)
+
+So if C is large, ∇_θ L_r dominates ∇_θ L_ub by a factor of order C⁴.
+Numerical experiments for C ∈ {1, 2, 4} (Fig 3) confirm this scaling.
+
+### 2.4 Stiffness in the gradient flow dynamics
+
+Continuous-time training is governed by the gradient flow
+
+    dθ/dt = −∇_θ L_r(θ) − Σ_{i=1}^M ∇_θ L_i(θ).                       (16)
+
+Gradient descent is forward-Euler discretization of (16); stability requires
+η < 2/σ_max(∇²_θ L(θ)). Monitoring σ_max(∇²_θ L) during training shows
+that as solution complexity (a₂) grows, σ_max grows by orders of magnitude
+(Fig 5), severely restricting the admissible learning rate.
+
+A second-order Taylor expansion gives
+
+    L(θ_{n+1}) − L(θ_n) = η ‖∇_θ L(θ_n)‖² · (−1 + ½ η Σ λ_i y_i²).      (30)
+
+If many eigenvalues λ_i of ∇²L are large, the loss can increase even when
+the gradient direction is correct. Empirically (Fig 4), eigenvalues of
+∇²L_r reach 10⁵ while those of ∇²L_ub stay small; L_r oscillates wildly,
+L_ub decreases monotonically. Conclusion: the de facto use of Adam may be a
+poor — or even unstable — choice for training PINNs.
+
+### 2.5 Learning-rate annealing for physics-informed neural networks
+
+Re-examine
+
+    L(θ) := L_r(θ) + Σ_{i=1}^M λ_i L_i(θ).                              (37)
+
+The constants λ_i effectively re-scale the per-term learning rate. Setting
+them by trial and error is impractical. Drawing motivation from Adam, the
+proposed annealing scheme tracks gradient statistics online.
+
+ALGORITHM 1 (Learning-rate annealing for PINNs)
+  Initialize λ_i = 1, i = 1, …, M.
+  For n = 1, …, S do
+    (a) Compute   λ̂_i = max_θ |∇_θ L_r(θ_n)| / mean_θ |∇_θ L_i(θ_n)|.   (40)
+    (b) Update    λ_i ← α λ_i + (1 − α) λ̂_i.                          (41)
+    (c) Step      θ_{n+1} = θ_n − η ( ∇_θ L_r(θ_n)
+                                       + Σ_i λ_i ∇_θ L_i(θ_n) ).       (42)
+  end for
+  α ∈ [0.5, 0.9] (paper uses α = 0.9). Updates may be performed every
+  iteration or every K (e.g. K = 10). Sensitivity to α is low.
+
+Applied to the Helmholtz problem with the same 4×50 dense net, the
+annealing scheme reduces the relative L₂ error from 1.81e-01 down to
+1.27e-02 (Fig 6) — more than an order of magnitude. The histograms (Fig 7)
+of ∇L_r and ∇L_ub no longer peak near zero. Fig 8 shows λ_ub converging to
+its steady-state value.
+
+### 2.6 An improved fully-connected neural architecture
+
+Inspired by attention mechanisms, the authors propose a modified
+fully-connected architecture with two transformer projections U, V and
+residual gating Z. Forward propagation:
+
+    U   = φ(X W₁  + b₁),
+    V   = φ(X W₂  + b₂),                                               (43)
+    H^(1)   = φ(X W_{z,1} + b_{z,1}),                                  (44)
+    Z^(k)   = φ(H^(k) W_{z,k} + b_{z,k}),    k = 1, …, L,              (45)
+    H^(k+1) = (1 − Z^(k)) ⊙ U + Z^(k) ⊙ V,    k = 1, …, L,             (46)
+    f_θ(X)  = H^(L+1) W + b.                                           (47)
+
+θ = {W₁, b₁, W₂, b₂, (W_{z,l}, b_{z,l})_{l=1..L}, W, b}.               (48)
+
+Each layer has M units; φ : ℝ^M → ℝ^M. The two transformer networks
+introduce element-wise multiplicative interactions between input features
+and residual connections through the gating tensors Z^(k).
+
+For the Helmholtz benchmark with this architecture + annealing (model M4),
+the relative L₂ error drops to 3.69e-03 — almost two orders of magnitude
+better than baseline. The leading Hessian eigenvalue σ_max(∇²L) is roughly
+3× smaller for the new architecture (Fig 11), suggesting the modified
+forward pass alone reduces gradient-flow stiffness.
+
+## 3. Results
+
+Four models studied:
+
+  M1  Original PINN (Raissi et al. 2019)
+  M2  M1 + learning-rate annealing (Algorithm 1)
+  M3  Improved fully-connected architecture, no annealing
+  M4  M3 + annealing  (combined scheme)
+
+Common settings: tanh activations, mini-batch 128, single precision, Adam
+default hyperparameters, Glorot init, no dropout/L1/L2. λ_i updated every
+10 Adam steps. All on Lenovo X1 Carbon, Intel i5 2.3 GHz, 8 GB RAM.
+
+### 3.1 Helmholtz equation
+
+Sweep over depth (3,5,7) × width (30,50,100), averaged over 10 random
+seeds. TABLE 2 — relative L₂ error:
+
+  Architecture                   M1        M2        M3        M4
+  30 / 3                         2.44e-01  5.39e-02  5.31e-02  1.07e-02
+  50 / 3                         1.06e-01  1.12e-02  2.46e-02  3.87e-03
+  100 / 3                        9.07e-02  4.84e-03  1.17e-02  2.71e-03
+  30 / 5                         2.47e-01  2.74e-02  4.12e-02  3.49e-03
+  50 / 5                         1.40e-01  7.43e-03  1.97e-02  2.54e-03
+  100 / 5                        1.15e-01  5.37e-03  1.08e-02  1.63e-03
+  30 / 7                         3.10e-01  2.67e-02  3.17e-02  3.59e-03
+  50 / 7                         1.98e-01  7.33e-03  2.37e-02  2.04e-03
+  100 / 7                        8.14e-02  4.52e-03  9.36e-03  1.49e-03
+
+M1 errors range 8–31 % and are highly architecture-sensitive. M4 errors
+range 0.12–0.25 % uniformly and improve monotonically with capacity.
+
+### 3.2 Klein-Gordon equation
+
+    u_tt + α u_xx + β u + γ u^k = f(x,t),   (x,t) ∈ Ω × [0,T],          (49)
+    u (x, 0) = g₁(x),     u_t(x, 0) = g₂(x),                            (50,51)
+    u(x, t) = h(x,t),     (x,t) ∈ ∂Ω × [0,T].                           (52)
+
+Choice: Ω = [0,1]², T = 1, α = −1, β = 0, γ = 1, k = 3 (cubic). Fabricated
+solution
+
+    u(x,t) = x cos(5 π t) + (x t)³,                                     (53)
+
+with consistent forcing and Dirichlet BCs. Composite loss
+
+    L(θ) = L_r(θ) + λ_ub L_ub(θ) + λ_u0 L_u0(θ).                       (54)
+
+For 5 hidden layers × 50 neurons, 40,000 Adam steps:
+
+TABLE 3 — Klein-Gordon comparison
+  Method            M1       M2       M3       M4
+  Relative error    1.79e-01 1.06e-02 1.97e-02 2.81e-03
+  Train time (s)    200      200      760      1040
+
+M1 fits the equation but ignores BCs/IC (Fig 14, max abs error ~0.2). M4
+absolute error caps at 0.004 (Fig 15) — two orders of magnitude better
+than M1.
+
+### 3.3 Lid-driven cavity (steady incompressible Navier–Stokes)
+
+    u·∇u + ∇p − (1/Re) Δu = 0  in Ω,                                   (55)
+    ∇·u = 0                    in Ω,                                   (56)
+    u = (1, 0)  on Γ₁ (top lid),                                       (57)
+    u = (0, 0)  on Γ₀ (other walls),                                   (58)
+
+Ω = (0,1)², Re = 100. Reference solution: 2nd-order finite-difference
+stream-function/vorticity solver on 128² grid (Appendix 5.2; ε = 1e-4
+steady-state criterion, time step δt = 1e3).
+
+#### 3.4 Velocity-pressure representation [x,y] ↦ [u, v, p]
+
+Residuals (59)–(61):
+
+    r_u = u u_x + v u_y + p_x − (1/Re)(u_xx + u_yy),
+    r_v = u v_x + v v_y + p_y − (1/Re)(v_xx + v_yy),
+    r_c = u_x + v_y.
+
+Loss L(θ) = L_ru + L_rv + L_rc + L_ub + L_vb (62)–(67). 5-layer × 50-neuron
+tanh, 40,000 Adam steps. ALL FOUR MODELS FAIL: relative L₂ errors 7.48–7.84e-01 (Fig 17). Diagnosis: the soft-enforced incompressibility constraint plus the imperfect BC fit lead to non-uniqueness of the latent
+pressure.
+
+#### 3.5 Stream-function-pressure representation [x,y] ↦ [ψ, p]
+
+(u,v) = (∂ψ/∂y, −∂ψ/∂x) so ∇·u ≡ 0 by construction. Need only momentum
+residuals (third derivatives of the network needed). Loss
+
+    L = L_ru + L_rv + L_ub + L_vb.                                     (70)
+
+Results (Fig 18):
+    M1   2.71e-01     M2   2.49e-01     M3   1.21e-01     M4   3.42e-02
+
+Take-away: choice of formulation can be at least as important as choice of
+optimizer/architecture; an incompressibility-preserving variable change
+(streamfunction) makes the problem solvable for PINNs at Re = 100.
+
+## 4. Summary and Discussion
+
+PINNs often struggle to accurately approximate the solution of PDEs. We
+identify and analyze a fundamental mode of failure related to stiff
+gradient flow dynamics that lead to unbalanced gradients during model
+training via back-propagation. We mitigate this shortcoming by proposing a
+learning-rate annealing algorithm that utilizes gradient statistics during
+model training to adaptively assign appropriate weights to different terms
+in a PINN loss function. The new algorithm aims to address the unbalanced-
+gradients pathology and effectively leads to noticeable improvements in
+predictive accuracy. This development is not limited to PINNs; it can be
+generalized to other tasks involving the interplay of multiple objective
+functions that may lead to unbalanced gradients (e.g., multi-task
+learning). Finally, we propose a novel neural network architecture that
+can enhance the accuracy and robustness of PINNs by decreasing the
+stiffness of gradient flow, indicating that specialized architectures can
+play a prominent role in the future success of PINN models. Taken together,
+our developments consistently improve PINN predictive accuracy by a factor
+of 50-100× across a range of problems in computational physics.
+
+Open questions raised: relation between PDE stiffness and gradient-flow
+stiffness; possibility of reducing stiffness via domain decomposition,
+alternative loss functions, or other architectures; design of more stable
+and effective optimizers (implicit, IMEX operator splitting, proximal); how
+stiffness affects approximation and generalization error of PINNs.
+
+## Acknowledgements
+
+US Department of Energy ASCR program (DE-SC0019116) and DARPA Physics of
+Artificial Intelligence program (HR00111890034).
+
+## Selected References
+
+[12] M. Raissi, P. Perdikaris, G. E. Karniadakis. Physics-informed neural
+     networks: A deep learning framework for solving forward and inverse
+     problems involving nonlinear partial differential equations. JCP 378,
+     686 (2019).
+[16] D. C. Psichogios, L. H. Ungar. A hybrid neural network-first principles
+     approach to process modeling. AIChE J. 38, 1499 (1992).
+[17] I. E. Lagaris, A. Likas, D. I. Fotiadis. Artificial neural networks for
+     solving ordinary and partial differential equations. IEEE TNN 9, 987
+     (1998).
+[18] A. G. Baydin et al. Automatic differentiation in machine learning: a
+     survey. JMLR 18, 153 (2018).
+[27] D. P. Kingma, J. Ba. Adam: A method for stochastic optimization.
+     arXiv:1412.6980 (2014).
+[28] X. Glorot, Y. Bengio. Understanding the difficulty of training deep
+     feedforward neural networks. AISTATS, 249 (2010).
+[31] L. Sagun, L. Bottou, Y. LeCun. Eigenvalues of the Hessian in deep
+     learning: Singularity and beyond. arXiv:1611.07476 (2016).
+[45] A. Vaswani et al. Attention is all you need. NeurIPS (2017).
+[52] Z. Chen, V. Badrinarayanan, C.-Y. Lee, A. Rabinovich. GradNorm:
+     Gradient normalization for adaptive loss balancing in deep multitask
+     networks. arXiv:1711.02257 (2017).
+[53] U. Ghia, K. N. Ghia, C. T. Shin. High-Re solutions for incompressible
+     flow using the Navier-Stokes equations and a multigrid method. JCP
+     48, 387 (1982).
+
+## Appendix 5.1 (sketch) — Bound for ∇_θ L_r vs ∇_θ L_ub on 1-D Poisson
+
+Writing f_θ(x) = u(x) ε_θ(x) with ‖ε_θ − 1‖_∞ ≤ ε and ‖∂^k ε_θ‖_∞ < ε,
+boundary-term gradients are O(ε) while the residual term, after integration
+by parts and substitution, picks up four powers of C from differentiating
+sin(Cx) four times, giving |∂L_r/∂θ| ≤ O(C⁴) · ε · ‖∂ε_θ/∂θ‖_∞. ∎
+
+## Appendix 5.2 — FD reference solver (lid-driven cavity)
+
+Stream-function-vorticity formulation:
+
+    ∂ω/∂t + (∂ψ/∂y) ω_x − (∂ψ/∂x) ω_y = ν Δω,
+    Δψ = −ω,
+    u = ∂ψ/∂y,  v = −∂ψ/∂x,  ω = v_x − u_y.
+
+Uniform 128×128 grid, 2nd-order central differences (eq. 84), Wood's
+boundary formula for vorticity (eq. 87), explicit Euler in time with δt =
+1e-3, convergence criterion 1e-4 on per-step velocity max-difference.

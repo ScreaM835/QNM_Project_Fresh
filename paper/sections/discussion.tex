@@ -1,0 +1,163 @@
+% =============================================================
+% Section 5: Discussion
+% =============================================================
+\section{Discussion}\label{sec:discussion}
+
+The forward PINN here matches the architecture, training schedule
+and physics setup of \citet{Patel2024pinn} to enable a direct
+field-accuracy comparison. Two changes
+account for the improvement from $\mathrm{RL2}=28.06\%$ in their
+Table~2 to $\mathrm{RL2}=0.58\%$ in our
+Eq.~\eqref{eq:fwd-metrics}: the doubled number of L-BFGS
+iterations ($30{,}000$ versus $15{,}000$), and the greedy adaptive
+resampling of Sec.~\ref{sec:fwd-pinn} (with resampling period
+$1{,}000$ iterations versus the $100$ of \citet{Patel2024pinn},
+so that each resampling event uses a residual field evaluated
+after more iterations). The frequency-domain Schwarzschild
+eigenvalue PINN of \citet{Cornell2022pinnqnm} reaches sub-permille
+accuracy on the same $\ell = 2$ fundamental mode by training
+$\omega$ as a complex parameter alongside the network weights, but
+that result is in the eigenvalue class and not directly comparable
+to our time-domain post-hoc fit. \citet{Luna2022teukolskypinn}
+enforce normalisation boundary conditions hard via an output
+transform on a time-domain Teukolsky PINN; we use soft enforcement
+through the loss, and a hard output-transform variant of the
+forward setup of Sec.~\ref{sec:fwd-pinn} is a natural follow-up.
+The inverse PINN of Sec.~\ref{sec:inv-pinn}, which jointly
+recovers the black-hole mass and a single-mode ringdown template
+from noisy field observations, has no precedent in the
+PINN-for-QNM literature. We isolate the
+$A_{\mathrm{ring}}$--$\tau$ degeneracy of the template loss
+(Sec.~\ref{sec:res-inv} and Table~\ref{tab:tau-degeneracy}),
+adopt a reporting convention (Sec.~\ref{sec:reporting}) that
+extracts $\tau$ from the converged network field rather than from
+the learned scalar, and replace the fixed-window QNM fit by the
+plateau-based estimators M4 and M5, whose
+in-window scatter also serves as a quality flag. The
+six-variant ablation of Table~\ref{tab:variants} isolates the
+effects of the ringdown weight $\lambda_{\mathrm{ring}}$, the
+ringdown lower bound $\tring$, and the addition of an overtone
+in the template.
+
+The analysis of Sec.~\ref{sec:res-inv} (Table~\ref{tab:tau-degeneracy})
+shows that the optimiser drifts along the amplitude--rate
+degeneracy of Eq.~\eqref{eq:loss-ring} during L-BFGS, leaving the
+learned
+$\tau$ ten to twenty percent below the Leaver value while the
+network field $\Phi_\theta(\xq,t)$ retains the physical decay
+rate; the reporting convention of Sec.~\ref{sec:reporting}
+therefore quotes the post-hoc M2 wide-window value of $\tau$ on
+$\Phi_\theta$, which recovers $\tau$ to within a few percent on
+the same runs. We expect the same convention to apply to any
+inverse PINN whose template loss admits a comparable
+amplitude--rate degeneracy.
+
+The M4 plateau standard deviation $\sigma_\omega$ is, by
+definition, the spread of $\omega$ across the plateau, which we
+take as an estimate of the window-systematic uncertainty inside
+the fit window. Across the six inverse variants it
+discriminates cleanly between configurations on which the
+two-mode NLS finds a stable minimum
+($\sigma_\omega/\omega \le 1\%$ for variants A, D, E) and
+configurations on which it does not
+($\sigma_\omega/\omega \approx 0.44$ for baseline and $0.34$ for C,
+undefined for B; see Table~\ref{tab:inv-summary}). A small
+$\sigma_\omega$ certifies the estimate; a large or undefined
+$\sigma_\omega$ rejects it.
+The 2-D plateau M5 generalises the same idea to the joint
+$(t_0,\tend)$ plane (Fig.~\ref{fig:fwd-plateau-m5}) and is needed
+when the upper edge of the simulation window approaches
+$t_{\mathrm{tail}}$, as in extensions to longer time domains.
+
+The forward PINN reaches $\omega$ accuracy $0.029\%$ on a
+noiseless setup; the best inverse variant reaches $0.30\%$ on the
+$1\%$-noise setup. The factor of ten gap is consistent with the
+information content of the two training setups. The forward problem
+is constrained by an exact analytic IC plus a known PDE on the full
+simulation domain, with no observational uncertainty; the inverse
+problem retains the PDE constraint but adds a data-fit term and a
+template-fit term, on $\Nobs = 500$ samples
+restricted to $\xq = 10\,M$ and corrupted at the percent level.
+A first-principles Cram\'er--Rao bound on $(M,\omega,\tau)$ given
+$N_{\mathrm{obs}}$, $\sigma_{\mathrm{noise}}$ and the ringdown
+SNR would settle the question of whether the residual
+$0.30\%$ is dominated by training systematics or by intrinsic
+information loss, and is a natural quantitative follow-up
+of this work.
+
+Translating variant D into observer units fixes the precision of
+the inverse pipeline relative to current detector capabilities.
+For a
+Schwarzschild remnant of mass $M = 65\,M_\odot$, comparable to the
+final-mass scale of GW150914 \citep{LIGO2016ringdown}, the
+fundamental $\ell{=}m{=}2$ frequency
+$f_{220} = M\omega_0 / (2\pi M_{\mathrm s})
+\approx 186\,\mathrm{Hz}$ and the damping time
+$\tau_0 \approx 3.60\,\mathrm{ms}$ follow from the Leaver values
+$M\omega_0 = 0.3737$ and $\tau_0/M = 11.241$ used throughout this
+paper, with $M_{\mathrm s} = M\,(GM_\odot/c^3)
+\approx 3.20\times 10^{-4}\,\mathrm{s}$. The $0.30\%$
+fractional uncertainty on $\omega$ achieved by variant D maps to
+$\sigma_{f_{220}} \approx 0.56\,\mathrm{Hz}$, and the $1.6\%$
+uncertainty on $\tau$ maps to
+$\sigma_{\tau_0} \approx 58\,\mu\mathrm{s}$. Both are at least an
+order of magnitude smaller than the statistical uncertainties on
+$(f_{220},\tau_{220})$ reported for GW150914-class events at
+ringdown signal-to-noise $\rho_{\mathrm{ring}} \sim 8$--$10$
+\citep{LIGO2016ringdown,Isi2019tests}, so on a single event the
+inverse-PINN precision floor is well below the data-statistical
+floor; the implication is that, at current sensitivities, the
+limiting uncertainty on a single-event spectroscopy test will
+remain the data noise rather than the network systematics. This balance is
+expected to invert at the per-mille statistical sensitivities
+forecast for next-generation detectors \citep{Berti2007ringdown},
+at which point the forward--inverse precision gap will become
+a quantitative limiting factor.
+
+Three of the limitations are scope choices, three are substantive.
+The scope choices are the fixed Schwarzschild background, the
+single-channel quadrupole wavefunction $\Phi(\xq,t)$, and the
+single noise realisation per variant. Each lifts to a known
+extension: Kerr by substituting the Teukolsky operator for the
+Zerilli operator, multi-channel by training one head per
+harmonic, and the statistical scope by running the inverse
+pipeline at $\ge 30$ noise seeds and reporting the seed-to-seed
+standard deviation alongside the plateau $\sigma_\omega$. The
+substantive limitations are the
+$A_{\mathrm{ring}}$--$\tau$ degeneracy itself, which the
+reporting convention works around but does not remove and which
+is a property of any single-mode template; the marginal benefit
+of the two-mode template (variant E), whose additional learnable
+parameters slightly improve $\tau$ but penalise $M$ and $\omega$,
+leaving the choice of $\lambda_{\mathrm{ring}}$ and the relative
+weighting of overtone modes without a quantitative criterion; and the
+ill-conditioning of ESPRIT (M3) on a $\Phi_\theta(\xq,t)$ whose
+dominant component is already a clean damped sinusoid, which
+prevents M3 from contributing to the primary numbers and which
+we report in Appendix~\ref{app:esprit} only.
+
+A natural next step is to recast the inverse problem as a
+Bayesian posterior over $(M,\omega,\tau)$ with the trained PINN
+as the forward operator, following \citet{Isi2021priors}: this
+would produce posterior credible
+intervals on the primary parameters that combine the
+network-systematic uncertainty (which the plateau diagnostic
+estimates) with the data-statistical uncertainty (which the
+deterministic point estimate does not). Combined with a
+Cram\'er--Rao baseline, such a posterior would close the loop
+between the deterministic plateau methodology developed here and
+the probabilistic framework that gravitational-wave
+ringdown analyses ultimately need. On the training-dynamics
+side, the static loss-weight vector
+$\boldsymbol{\lambda}=(100,100,100,1,100,1,1)$ inherited from
+\citet{Patel2024pinn} could be replaced by the learning-rate
+annealing of \citet{Wang2021gradientpath}, by the
+NTK-eigenvalue-based weighting of \citet{Wang2022ntk}, by the
+per-collocation-point soft-attention weights of
+\citet{McClenny2023sapinn}, or by the causal
+time-weighting of \citet{Wang2022causal}, the latter being
+particularly natural for the time-domain ringdown setting in
+which the network must resolve the early-time pulse before the
+late-time decay can be trusted; and the soft Sommerfeld boundary
+enforcement of Sec.~\ref{sec:fwd-pinn} could be replaced by the
+hard output-transform construction of \citet{Luna2022teukolskypinn}.

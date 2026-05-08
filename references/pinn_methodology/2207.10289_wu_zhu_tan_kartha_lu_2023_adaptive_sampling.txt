@@ -1,0 +1,406 @@
+================================================================================
+TITLE:    A Comprehensive Study of Non-adaptive and Residual-based Adaptive
+          Sampling for Physics-Informed Neural Networks
+AUTHORS:  Chenxi Wu, Min Zhu, Qinyang Tan, Yadhu Kartha, Lu Lu
+          (UPenn / USC / Georgia Tech)
+ARXIV:    arXiv:2207.10289 (2022; published in CMAME 2023, 403:115671)
+SOURCE:   https://ar5iv.labs.arxiv.org/html/2207.10289
+SAVED:    Local literature reference for QNM-PINN paper write-up.
+WHY HERE: The definitive comparative study (>6000 PINN runs) of residual-point
+          sampling strategies. Defines the modern RAR-G / RAD / RAR-D taxonomy
+          and gives concrete default hyperparameters (RAD k=1,c=1; RAR-D
+          k=2,c=0). Directly relevant to our QNM-PINN paper because:
+          (i) the 1D wave equation Section 3.5 is essentially the same
+              multi-scale benchmark we use (Zerilli ℓ=2 has multi-scale
+              radial behaviour);
+          (ii) Tables 2 and 3 establish the publication-grade numbers we
+              should compare against (uniform L²>50%, RAD L²<0.1% on the
+              wave eq.);
+          (iii) gives the exact PDF formula p(x) ∝ ε^k(x) / (E[ε^k]+c)
+                which we adopt as "RAD-style adaptive collocation" in our
+                inverse-QNM PINN refinement;
+          (iv) explicitly catalogues that point-wise weighting (e.g. SA-PINN)
+               is mathematically equivalent to RAD with weight = PDF.
+          Code: https://github.com/lu-group/pinn-sampling (DeepXDE-based).
+================================================================================
+
+ABSTRACT
+--------
+PINNs embed the PDE into the loss using auto-diff and evaluate this loss at a
+set of scattered residual points. The location and distribution of these
+residual points are highly important to PINN performance, but only a few
+simple sampling methods have been used. This paper systematically compares
+TWO categories: non-adaptive uniform sampling and adaptive nonuniform
+sampling.
+- Six uniform methods: equispaced grid, uniformly random, Latin-hypercube
+  (LHS), Halton, Hammersley, Sobol.
+- Resampling strategy for uniform sampling.
+- Two NEW residual-based adaptive methods proposed:
+    RAD  (residual-based adaptive distribution)
+    RAR-D (residual-based adaptive refinement with distribution)
+TOTAL = 10 sampling methods compared on 4 forward + 2 inverse problems
+(>6000 simulations). Findings:
+- RAD and RAR-D significantly improve accuracy with FEWER residual points.
+- Result usable as a practical guideline.
+
+KEYWORDS: PDEs · PINNs · Residual point distribution · Non-adaptive uniform
+sampling · Uniform sampling with resampling · Residual-based adaptive
+sampling
+
+
+1  INTRODUCTION
+==============================================================================
+PINNs (Raissi et al. [1]) embed PDEs in NN loss via auto-diff. Mesh-free,
+flexible, supports forward + inverse + observed-data integration. Many
+extensions: meta-loss [11], gPINNs [12], adaptive weights [13,14,15],
+point-wise weights [16,17,8,18], domain decomposition [19,20,21], time
+marching [22-26], hard BC enforcement [27,28,8].
+
+ROOT IDEA OF THIS PAPER: PDE loss is evaluated at residual points T_f. Their
+location/distribution matters as much as mesh points in FEM, but most prior
+PINN work used only equispaced grids or uniformly random. This paper is a
+systematic comparison.
+
+1.1 Related work / contributions:
+- Review uniform: Grid, Random, LHS [29,30], Sobol [31], Halton [32],
+  Hammersley [33].
+- First systematic test of resampling strategy (period N).
+- Adaptive sampling history: Lu et al. [3] proposed RAR (here RAR-G, 2019);
+  Nabian et al. [37] proposed PDF resampling p ∝ ε (April 2021).
+- This paper proposes the unifying RAD and RAR-D with hyperparameters k, c.
+- During preparation, [38-44] appeared with related ideas — all are special
+  cases of RAD/RAR-D. Compared in Section 2.4.
+
+
+2  METHODS
+==============================================================================
+
+2.1 PINNs in solving forward and inverse PDEs
+PDE: f(x; ∂u, ∂²u, …; λ) = 0 on Ω, BCs B(u,x)=0 on ∂Ω; IC = special Dirichlet.
+Network u_hat(x;θ). Loss:
+    L(θ;T) = w_f L_f(θ;T_f) + w_b L_b(θ;T_b)              (1)
+    L_f = (1/|T_f|) Σ_{x∈T_f} |f(x; ∂u_hat,…; λ)|²
+    L_b = (1/|T_b|) Σ_{x∈T_b} |B(u_hat,x)|²
+For inverse: add data-misfit term L_i = (1/|T_i|)Σ|u_hat - u|² with weight w_i,
+train θ and λ jointly. In this paper BCs are imposed exactly via architecture,
+so the only loss term is L_f for forward problems.
+Inverse weights used here: w_f = w_i = 1 (diff-react), w_f = 1, w_i = 1000 (KdV).
+
+2.2 Uniformly-distributed non-adaptive sampling
+2.2.1 FIXED residual points (six methods, Fig. 1):
+  1. Grid (equispaced)
+  2. Random (PCG-64)
+  3. LHS (stratified Monte Carlo)
+  4. Halton (low-discrepancy, base-prime reversal)
+  5. Hammersley (Halton with first dimension equispaced)
+  6. Sobol (base-2 digital low-discrepancy)
+2.2.2 Random-R: Random sampling with resampling every N iterations.
+  N is a critical hyperparameter ("resampling period").
+
+2.3 Nonuniform adaptive sampling
+
+2.3.1 RAR-G (Residual-based Adaptive Refinement with Greed) — Lu et al. [3]
+  Algorithm 1:
+    1. Initial T sampled uniformly; train PINN.
+    2. repeat:
+         Sample dense pool S_0 uniformly.
+         Compute residuals on S_0.
+         S ← top-m residuals; T ← T ∪ S.
+         Train PINN.
+       until iter/point budget reached.
+  GREEDY — only adds top-m residual points.
+
+2.3.2 RAD (Residual-based Adaptive Distribution) — NEW
+  PDF for resampling (eq 2):
+       p(x) ∝ ε^k(x) / (E[ε^k(x)] + c)
+  with k ≥ 0, c ≥ 0; ε(x) = |f(x; u_hat(x))|.
+  Special cases:
+    k = 0  ⇒  uniform distribution (Random-R recovered).
+    c → ∞ ⇒  uniform distribution (Random-R recovered).
+    c = 0, k = 1 ⇒ Nabian et al. [37] (April 2021).
+  Algorithm 2:
+    1. Initial T uniform; train PINN.
+    2. repeat:
+         T ← new sample drawn from p(x) (eq 2).
+         Train PINN.
+       until iter limit.
+  Brute-force draw (low-D): dense pool S_0 → compute p(x) → normalise to
+  PMF p_tilde(x) → sample subset.
+  Higher-dim alternatives: inverse transform, MCMC, GAN.
+  Default: k=1, c=1.
+
+2.3.3 RAR-D (Residual-based Adaptive Refinement with Distribution) — NEW
+  Hybrid of RAR-G and RAD: REFINEMENT (T grows over time) + sampling from
+  PDF (eq 2). Recovers RAR-G as k → ∞.
+  Algorithm 3:
+    1. Initial T uniform; train PINN.
+    2. repeat:
+         S ← m points sampled from PDF (eq 2).
+         T ← T ∪ S.
+         Train PINN.
+       until budget.
+  Default: k=2, c=0.
+
+2.4 Comparison with related work
+Special cases of RAD / RAR-D found in literature:
+  Lu et al. [3] (2019, RAR/RAR-G): RAR-D with k → ∞.
+  Nabian et al. [37] (April 2021): RAD with k=1, c=0.
+  Gao et al. [40] (Dec 2021): RAD with c=0.
+  Tang et al. [41] (Dec 2021, DAS): RAD/RAR-D with k=2, c=0.
+  Zeng et al. [43] (Apr 2022): subdomain RAR-G.
+  Peng et al. [42] (May 2022, RANG): RAR-G with node-generation [47]; 2D only.
+  Zapf et al. [38] (May 2022): RAR-G with point removal.
+  Hanna et al. [44] (May 2022): RAR-D with p ∝ max{log(ε/ε_0),0}.
+  Daw et al. [39] (Jul 2022): point removal + uniform refill.
+
+POINT-WISE WEIGHTING ↔ ADAPTIVE SAMPLING (KEY EQUIVALENCE):
+For uniformly-sampled residual points,
+  L_f ≈ E_U[ε²(x)]
+With point-wise weight w(x):
+  L_f ≈ E_U[w(x) ε²(x)]
+With RAD distribution p(x):
+  L_f ≈ E_p[ε²(x)]
+If we choose w(x) ∝ p(x), the two losses are equal.
+⇒ SA-PINN [16,17,8,18] is mathematically equivalent to a particular RAD.
+
+
+3  RESULTS — 4 forward + 2 inverse problems, >6000 simulations
+==============================================================================
+
+Common setup: tanh activations; multiple runs per case (≥10);
+geometric mean ± std reported.
+
+Table 1 (Hyperparameters; depth × width × optimizer):
+  3.2 Diffusion          : 4 × 32  / Adam
+  3.3 Burgers'           : 4 × 64  / Adam + L-BFGS
+  3.4 Allen-Cahn         : 4 × 64  / Adam + L-BFGS
+  3.5 Wave (multi-scale) : 6 × 100 / Adam + L-BFGS
+  3.6 Diff-React (inv)   : 4 × 20  / Adam
+  3.7 KdV (inverse)      : 4 × 100 / Adam
+Adam lr = 0.001.
+
+Code: github.com/lu-group/pinn-sampling (DeepXDE).
+
+3.1  SUMMARY (Tables 2 & 3, headline numbers)
+Table 2 — Forward problems, L² relative error of PINN solution:
+  N_residual:        Diffusion(30)  Burgers'(2000)  Allen-Cahn(1000)  Wave(2000)
+  Grid               0.66 ±0.06%    13.7 ±2.37%     93.4 ±6.98%       81.3 ±13.7%
+  Random             0.74 ±0.17%    13.3 ±8.35%     22.2 ±16.9%       68.4 ±20.1%
+  LHS                0.48 ±0.24%    13.5 ±9.05%     26.6 ±15.8%       75.9 ±33.1%
+  Halton             0.24 ±0.17%    4.51 ±3.93%     0.29 ±0.14%       60.2 ±10.0%
+  Hammersley         0.17 ±0.07%    3.02 ±2.98%     0.14 ±0.14%       58.9 ±8.52%
+  Sobol              0.19 ±0.07%    3.38 ±3.21%     0.35 ±0.24%       57.5 ±14.7%
+  Random-R           0.12 ±0.06%    1.69 ±1.67%     0.55 ±0.34%       0.72 ±0.90%
+  RAR-G [3]          0.20 ±0.07%    0.12 ±0.04%     0.53 ±0.19%       0.81 ±0.11%
+  RAD                0.11 ±0.07%    0.02 ±0.00%     0.08 ±0.06%       0.09 ±0.04%   ← BEST
+  RAR-D              0.14 ±0.11%    0.03 ±0.01%     0.09 ±0.03%       0.29 ±0.04%
+
+Table 3 — Inverse problems (Diff-React with N_r=15; KdV with N_r=600):
+  Method     u(x)         k(x)         u(x,t) [KdV]  λ_1          λ_2
+  Grid       0.36 ±0.12%  8.58 ±2.14%  24.4 ±11.1%   53.7 ±30.7%  42.0 ±22.3%
+  Random     0.35 ±0.17%  5.77 ±2.05%  8.86 ±2.80%   16.4 ±7.33%  16.8 ±7.40%
+  LHS        0.36 ±0.14%  7.00 ±2.62%  10.9 ±2.60%   22.0 ±6.68%  ...
+  (RAD wins on both inverse problems with smallest L² and smallest std)
+
+KEY FINDINGS (verbatim spirit):
+- RAD has consistently performed BEST on all 6 problems.
+- For complicated solutions (Burgers, multi-scale wave), RAD and RAR-D
+  beat uniform sampling by 2-3 ORDERS OF MAGNITUDE.
+- For smooth problems (diffusion, diff-react), uniform methods (Hammersley,
+  Random-R) are already competitive.
+- Random-R reliably beats Random (just resampling helps).
+- Among fixed-uniform methods, low-discrepancy (Halton/Hammersley/Sobol)
+  beat Random/LHS, which beat Grid.
+
+3.2 Diffusion equation: u_t = u_xx + e^{-t}(-sin πx + π² sin πx),
+analytic u = sin(πx) e^{-t}.
+- Adam 15k iter; N_r in [10,80].
+- Solution is smooth; all methods <1% with 30 points.
+- Random-R optimal period ≈ 200; RAD/RAR-D ≈ Random-R here.
+
+3.3 Burgers' equation: u_t + u u_x = ν u_xx, ν = 0.01/π. Sharp front near x=0
+at t=1.
+- 4×64 net; Adam 15k + L-BFGS 15k iter; N_r ∈ [1000,10000].
+- Hammersley best uniform (4.51% with 2000 pts). All Random-class >13%.
+- Random-R 1.69%; RAD k=1,c=1 0.02%; RAR-D k=2,c=0 0.03%.
+- Adaptive sampling beats uniform by 2 orders of magnitude.
+
+3.4 Allen-Cahn: u_t = D u_xx + 5(u - u³), D=0.001. Sharp interfaces.
+- 4×64 net.
+- Hammersley 0.14% (best uniform).
+- RAD 0.08%; RAR-D 0.09%.
+- Confirms: optimal (k,c) = (1,1) for RAD and (2,0) for RAR-D STABLE
+  across number of residual points.
+
+3.5 WAVE EQUATION (KEY BENCHMARK — same as Wang-NTK §7.3 and McClenny SA-PINN):
+    u_tt - 4 u_xx = 0, x∈[0,1], t∈[0,1]
+    BC: u(0,t)=u(1,t)=0
+    IC: u(x,0)=sin(πx)+½ sin(4πx); u_t(x,0)=0
+    Analytic: u = sin(πx)cos(2πt) + ½ sin(4πx)cos(8πt) (multi-scale)
+- Net 6×100 (deeper than Burgers). Adam 15k + L-BFGS 1k iter.
+- N_r ∈ [1000, 10000].
+- ALL UNIFORM METHODS FAIL (>50%). Hammersley converges fastest.
+- Random-R behaviour vs N_r: medium N_r (~4000) helps, but small (1000)
+  or large (10000) N_r kills the advantage.
+- N_r = 2000:
+    Random-R    0.72%
+    RAR-G       0.81%
+    RAR-D k=2,c=0  0.29%
+    RAD k=1,c=1   0.09%   ← BEST
+- Recommendation: RAD when N_r small (it's more expensive per-step);
+  RAR-D when N_r large (cheaper, comparable accuracy).
+- Adding new points: best to add 10 per refinement step (across both
+  RAR-D and RAR-G).
+
+3.6 Diffusion-reaction (INVERSE):
+    λ d²u/dx² - k(x) u = sin(2πx), λ = 0.01.
+    True k(x) = 0.1 + exp(-(x-0.5)²/(2·0.15²))
+- Infer k(x) from 8 uniform observations of u.
+- 4×20 net; Adam 50k iter; w_f=w_i=1.
+- N_r = 15 fixed:
+    Hammersley/Halton (identical in 1D) best uniform.
+    RAD k=1,c=1: 0.17% / 2.76% (u / k); BEST.
+    Random-R competitive (≈ same).
+    RAR-G/RAR-D actually worse than Random here (smooth solution; greedy
+    refinement misled).
+
+3.7 KdV (INVERSE):
+    u_t + λ_1 u u_x + λ_2 u_xxx = 0, x∈[-1,1], t∈[0,1].
+    True λ_1=1, λ_2=0.0025. IC u(x,0)=cos(πx); periodic BCs.
+    Observe u(x,0.2) and u(x,0.8) at 64 uniform points each.
+- 4×100 net; Adam 100k iter; w_f=1, w_i=1000.
+- N_r = 600 fixed (Table 3):
+    Hammersley ~5% (best uniform).
+    Random-R 2nd-best (~1%).
+    RAD <1% with smallest std → BEST in robustness AND accuracy.
+    RAR-D ~3% (cheaper, viable alternative).
+
+
+4  CONCLUSIONS / PRACTICAL GUIDELINE
+==============================================================================
+PRACTICAL GUIDELINE for choosing a sampling method:
+
+• DEFAULT: RAD with k=1, c=1. Tune (k,c) to balance large-residual vs
+  small-residual locations.
+
+• When budget-limited: RAR-D with k=2, c=0. Cheaper than RAD because the
+  number of residual points grows over training (rather than full
+  resampling each time).
+
+• When adaptive sampling is unavailable (e.g., hard-constrained PINN with
+  Lagrangian, or hardware constraints): use Random-R. Period of resampling
+  matters — neither too small nor too large; a few hundred iterations
+  works well.
+
+• When residual points must be FIXED: prefer a low-discrepancy sequence
+  (Hammersley first choice) over Grid / Random / LHS.
+
+OPEN DIRECTIONS:
+- Brute-force PDF sampling unfeasible in high-D ⇒ use GAN or MCMC.
+- The RAD PDF p ∝ ε^k/(E[ε^k]+c) may not be optimal — meta-learning a
+  better PDF (à la Psaros et al. [11]) is a promising direction.
+
+
+REFERENCES (full)
+==============================================================================
+[1]  Raissi M., Perdikaris P., Karniadakis G.E., "PINNs: a deep learning
+     framework for forward/inverse PDE problems," JCP 378:686-707, 2019.
+[2]  Raissi M., Yazdani A., Karniadakis G.E., "Hidden fluid mechanics,"
+     Science 367(6481):1026-1030, 2020.
+[3]  Lu L., Meng X., Mao Z., Karniadakis G.E., "DeepXDE: a DL library
+     for solving differential equations," SIAM Review 63(1):208-228, 2021.
+[4]  Karniadakis G.E. et al., "Physics-informed machine learning,"
+     Nature Reviews Physics 3(6):422-440, 2021.
+[5]  Chen Y., Lu L., Karniadakis G.E., Dal Negro L., "PINNs for inverse
+     problems in nano-optics and metamaterials," Optics Express 28(8):11618,
+     2020.
+[6]  Yazdani A., Lu L., Raissi M., Karniadakis G.E., "Systems biology
+     informed DL for inferring parameters and hidden dynamics," PLOS Comp
+     Biol 16(11), 2020.
+[7]  Daneker M. et al., "Systems biology: identifiability analysis...,"
+     arXiv:2202.01723, 2022.
+[8]  Lu L. et al., "PINNs with hard constraints for inverse design," SIAM
+     J. Sci. Comput. 43(6), 2021.
+[9]  Pang G., Lu L., Karniadakis G.E., "fPINNs," SIAM J. Sci. Comput.
+     41(4), 2019.
+[10] Zhang D. et al., "Quantifying total uncertainty in PINNs for
+     forward/inverse stochastic problems," JCP 397:108850, 2019.
+[11] Psaros A.F., Kawaguchi K., Karniadakis G.E., "Meta-learning PINN
+     loss functions," JCP 458:111121, 2022.
+[12] Yu J., Lu L., Meng X., Karniadakis G.E., "gPINNs: gradient-enhanced
+     PINNs," CMAME 393:114823, 2022.
+[13] Wang S., Teng Y., Perdikaris P., "Understanding and mitigating
+     gradient flow pathologies in PINNs," SIAM J. Sci. Comput.
+     43(5):A3055-A3081, 2021.
+[14] Wang S., Yu X., Perdikaris P., "When and why PINNs fail to train: an
+     NTK perspective," JCP 449:110768, 2022.
+[15] Xiang Z. et al., "Self-adaptive loss balanced PINNs," Neurocomputing,
+     2022.
+[16] McClenny L., Braga-Neto U., "Self-adaptive PINNs using a soft
+     attention mechanism," arXiv:2009.04544, 2020.
+[17] Gu Y., Yang H., Zhou C., "SelectNet: self-paced learning for
+     high-D PDEs," JCP 441:110444, 2021.
+[18] Li W. et al., "Revisiting PINNs: GAN-PINN and point-weighting
+     method," arXiv:2205.08754, 2022.
+[19] Meng X. et al., "PPINN: Parareal physics-informed NN for
+     time-dependent PDEs," CMAME 370:113250, 2020.
+[20] Shukla K., Jagtap A.D., Karniadakis G.E., "Parallel PINNs via
+     domain decomposition," JCP 447:110683, 2021.
+[21] Jagtap A.D., Karniadakis G.E., "Extended PINNs (XPINNs)," Comm.
+     Comput. Phys. 28(5):2002-2041, 2020.
+[22] Wight C.L., Zhao J., "Solving Allen-Cahn and Cahn-Hilliard with
+     adaptive PINNs," arXiv:2007.04542, 2020.
+[23] Krishnapriyan A. et al., "Characterizing possible failure modes in
+     PINNs," NeurIPS 34:26548-26560, 2021.
+[24] Mattey R., Ghosh S., "A novel sequential method to train PINNs for
+     Allen-Cahn/Cahn-Hilliard," CMAME 390:114474, 2022.
+[25] Haitsiukevich K., Ilin A., "Improved training of PINNs with model
+     ensembles," arXiv:2204.05108, 2022.
+[26] Wang S., Sankaran S., Perdikaris P., "Respecting causality is all you
+     need for training PINNs," arXiv:2203.07404, 2022.
+[27] Lagari P.L. et al., "Systematic construction of neural forms for
+     PDEs in rectangular domains...," IJAIT 29(05):2050009, 2020.
+[28] Dong S., Ni N., "Method for representing periodic functions and
+     enforcing exactly periodic BCs with DNNs," JCP 435:110242, 2021.
+[29] McKay M.D., Beckman R.J., Conover W.J., "A comparison of three
+     methods for selecting values of input variables in computer-code
+     output analysis," Technometrics 42(1):55-61, 2000.
+[30] Stein M., "Large sample properties of simulations using LHS,"
+     Technometrics 29(2):143-151, 1987.
+[31] Sobol' I.M., "On the distribution of points in a cube and the
+     approximate evaluation of integrals," ZhVMMF 7(4):784-802, 1967.
+[32] Halton J.H., "On the efficiency of certain quasi-random sequences,"
+     Numerische Mathematik 2(1):84-90, 1960.
+[33] Hammersley J.M., Handscomb D.C., "Monte-Carlo methods," Methuen, 1964.
+[34] Guo H. et al., "Analysis of 3D potential problems in non-homogeneous
+     media with DL-based collocation," arXiv:2010.12060, 2020.
+[35] Das S., Tesfamariam S., "State-of-the-art review of design of
+     experiments for physics-informed DL," arXiv:2202.06416, 2022.
+[36] Mao Z., Jagtap A.D., Karniadakis G.E., "PINNs for high-speed flows,"
+     CMAME 360:112789, 2020.
+[37] Nabian M.A., Gladstone R.J., Meidani H., "Efficient training of
+     PINNs via importance sampling," CACAIE, 2021.
+[38] Zapf B. et al., "Investigating molecular transport in the human
+     brain from MRI with PINNs," arXiv:2205.02592, 2022.
+[39] Daw A. et al., "Rethinking the importance of sampling in PINNs,"
+     arXiv:2207.02338, 2022.
+[40] Gao W., Wang C., "Active learning based sampling for high-D
+     nonlinear PDEs," arXiv:2112.13988, 2021.
+[41] Tang K., Wan X., Yang C., "DAS: a deep adaptive sampling method
+     for solving PDEs," arXiv:2112.14038, 2021.
+[42] Peng W. et al., "RANG: a residual-based adaptive node generation
+     method for PINNs," arXiv:2205.01051, 2022.
+[43] Zeng S., Zhang Z., Zou Q., "Adaptive DNN methods for high-D PDEs,"
+     JCP 463:111232, 2022.
+[44] Hanna J.M. et al., "Residual-based adaptivity for two-phase flow
+     simulation in porous media using PINNs," CMAME 396:115100, 2022.
+[45] O'Neill M.E., "PCG: a family of simple fast space-efficient
+     statistically good algorithms for random number generation,"
+     ACM TOMS, 2014.
+[46] Goodfellow I. et al., "Generative adversarial nets," NeurIPS 27, 2014.
+[47] Fornberg B., Flyer N., "Fast generation of 2-D node distributions
+     for mesh-free PDE discretizations," CMA 69(7):531-544, 2015.
+
+================================================================================
+END OF FILE
+================================================================================

@@ -1,0 +1,97 @@
+# Zerilli (even parity) l=2 — Inverse + QNM extraction
+#
+# DIAGNOSTIC VARIANT B of zerilli_l2_inverse_qnm.yaml.
+# Sole change: ringdown.lambda_ring: 1.0 -> 100.0
+# Hypothesis: at lambda_ring=1.0 the template constraint is 100x weaker
+# than the PDE residuals (lambda=[100,100,100,...]), so the (omega,tau)
+# parameters drift to whatever minimises only the small residual rather
+# than being pinned by the template. Raising lambda_ring to 100 puts the
+# template on equal footing with the PDE.
+# All other settings identical to zerilli_l2_inverse_qnm.yaml.
+
+experiment:
+  name: zerilli_l2_inverse_qnm_lring100
+
+physics:
+  M: 1.0
+  l: 2
+  potential: zerilli
+  pde_sign: standard
+
+domain:
+  xmin: -50.0
+  xmax: 150.0
+  tmin: 0.0
+  tmax: 50.0
+
+initial_data:
+  A: 1.0
+  x0: 4.0
+  sigma: 5.0
+  velocity_profile: outgoing
+
+fd:
+  dx: 0.2
+  dt: 0.1
+  scheme: rk4_mol
+
+pinn:
+  seed: 1234
+  dtype: float64
+
+  Nr: 32000
+  Ni: 800
+  Nb: 400
+
+  hidden_layers: [80, 40, 20, 10]
+  activation: tanh
+  output_transform: tanh_bound
+
+  lambda: [100.0, 100.0, 100.0, 1.0, 100.0, 1.0, 1.0]
+
+  tau_est: 0.0
+
+  adaptive_sampling:
+    enabled: true
+    method: greedy
+    period: 1000
+    num_candidates: 100000
+    greedy_fraction: 0.3
+    eval_batch_size: 5000
+
+  adam:
+    lr: 1.0e-3
+    iters: 10000
+    resample_period: 100
+
+  lbfgs:
+    iters: 15000
+    resample_period: 100
+
+inverse:
+  enabled: true
+  M_init: 0.8
+  noise_level: 0.01
+  n_obs: 500
+  obs_t_min: 0.0
+  obs_t_max: 50.0
+  lambda_data: 10.0
+
+ringdown:
+  omega_init: 0.30
+  tau_init: 8.0
+  A_ring_init: 0.5
+  phi0_init: 0.0
+  lambda_ring: 100.0      # DIAGNOSTIC: raised from 1.0 to 100.0
+  x_obs: 10.0
+  t_ring_min: 10.0
+  n_ring_points: 200
+
+evaluation:
+  xq: 10.0
+
+qnm:
+  t_start: 10.0
+  t_end: 50.0
+  omega_theory: 0.3737
+  tau_theory: 11.241

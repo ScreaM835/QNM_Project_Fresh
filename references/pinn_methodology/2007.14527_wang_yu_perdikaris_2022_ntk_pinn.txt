@@ -1,0 +1,423 @@
+================================================================================
+TITLE:    When and Why PINNs Fail to Train: A Neural Tangent Kernel Perspective
+AUTHORS:  Sifan Wang, Xinling Yu, Paris Perdikaris
+          University of Pennsylvania
+ARXIV:    arXiv:2007.14527 (v3, 2021; published in J. Comput. Phys. 2022,
+          449:110768)
+SOURCE:   https://ar5iv.labs.arxiv.org/html/2007.14527
+SAVED:    Local literature reference for QNM-PINN paper write-up.
+WHY HERE: Foundational theoretical paper that derives the NTK of PINNs and
+          PROVES the existence of a fundamental discrepancy between
+          eigenvalues of K_uu (BC) vs K_rr (residual). This explains WHY
+          PINNs sometimes fail and motivates Algorithm 1: trace-based
+          adaptive weighting λ_i = Tr(K)/Tr(K_i). Cited by Wang-Teng-Perdikaris
+          (2001.04536) and McClenny-Braga-Neto SA-PINN (2009.04544) as the
+          theoretical justification for adaptive loss weighting. KEY for
+          our paper:
+          (i) provides the spectral-bias diagnosis that justifies our
+              adaptive weighting choices in inverse-QNM PINN;
+          (ii) Algorithm 1 (NTK-trace weighting) is one of the canonical
+               weighting schemes against which any new PINN method must be
+               compared;
+          (iii) eq 4.10 shows infinite-width PINN ↔ kernel regression;
+          (iv) experimental Section 7.3 (1D wave eq) is the key benchmark:
+               L2 error 4.518e-1 (baseline) → 1.728e-3 (NTK Algorithm 1)
+               with 80k Adam iterations, identical architecture
+               [2,500,500,500,500,500,1].
+          Code: https://github.com/PredictiveIntelligenceLab/PINNsNTK
+================================================================================
+
+ABSTRACT
+--------
+Physics-informed neural networks (PINNs) have lately received great attention
+thanks to their flexibility in tackling a wide range of forward and inverse
+problems involving partial differential equations. However, despite their
+noticeable empirical success, little is known about how such constrained neural
+networks behave during their training via gradient descent. More importantly,
+even less is known about why such models sometimes fail to train at all. In
+this work, we investigate these questions through the lens of the Neural
+Tangent Kernel (NTK); a kernel that captures the behavior of fully-connected
+neural networks in the infinite width limit during training via gradient
+descent. Specifically, we derive the NTK of PINNs and prove that, under
+appropriate conditions, it converges to a deterministic kernel that stays
+constant during training in the infinite-width limit. This allows us to
+analyze the training dynamics of PINNs through the lens of their limiting NTK
+and find a remarkable discrepancy in the convergence rate of the different
+loss components contributing to the total training error. To address this
+fundamental pathology, we propose a novel gradient descent algorithm that
+utilizes the eigenvalues of the NTK to adaptively calibrate the convergence
+rate of the total training error. Finally, we perform a series of numerical
+experiments to verify the correctness of our theory and the practical
+effectiveness of the proposed algorithms.
+
+KEYWORDS: Physics-informed neural networks · Spectral bias · Multi-task
+learning · Gradient descent · Scientific machine learning
+
+
+1  INTRODUCTION
+==============================================================================
+PINNs have produced remarkable results in fluids [1,2,4,5], bio-engineering
+[6,7], meta-materials [8,9,10], free boundary problems [11], Bayesian PINNs
+and UQ [12-16], high-D PDEs [17,18], SDEs [19], fractional PDEs [20,21], etc.
+
+KEY PROBLEM: PINNs with fully-connected architectures often FAIL to train
+stably, especially for solutions with high frequencies or multi-scale
+features [26,13,27]. Wang-Teng-Perdikaris [28] attributed this to multi-scale
+gradient interactions causing stiffness in the gradient flow ODE; they
+proposed an empirical learning-rate annealing scheme balancing back-prop
+gradient magnitudes. But the FUNDAMENTAL REASON for failure remained unclear.
+
+Parallel: SPECTRAL BIAS — fully-connected networks cannot learn
+high-frequency functions [29,30,31,32]. NTK theory of Jacot et al. [33,34]
+shows infinite-width networks are equivalent to kernel regression and lets
+us analyze training convergence via NTK eigenvalue spectrum.
+
+CONTRIBUTIONS:
+• Prove fully-connected PINNs converge to GPs at infinite width for
+  linear PDEs.
+• Derive NTK of PINNs; prove it converges to a deterministic kernel and
+  stays constant during gradient descent with infinitesimal learning rate.
+• Show overall convergence rate is governed by NTK spectrum at
+  initialization.
+• Show PINNs suffer from BOTH spectral bias AND a discrepancy in
+  convergence rate between loss components.
+• Propose novel adaptive training algorithm to resolve this
+  pathology.
+
+
+2  INFINITELY WIDE NEURAL NETWORKS
+==============================================================================
+Fully-connected NN with L hidden layers under "NTK parameterization":
+    f^(0)(x) = x
+    g^(h)(x) = σ(W^(h-1) f^(h-1)(x) + b^(h-1))                 (2.2)
+    f^(h)(x) = (1/sqrt(d_h)) W^(h) g^(h) + b^(h)                (2.1)
+    f(x,θ) = f^(L)(x) = (1/sqrt(d_L)) W^(L) g^(L)(x) + b^(L)    (2.3)
+W,b initialized i.i.d. N(0,1), sequential limit d_1, d_2, …, d_L → ∞.
+
+Recursive covariance kernels (Jacot et al.):
+    Σ^(0)(x,x') = x^T x' + 1
+    Λ^(h)(x,x') = 2×2 covariance matrix from Σ^(h-1)
+    Σ^(h)(x,x') = E_{(u,v)~N(0,Λ^(h))}[σ(u)σ(v)] + 1            (2.4)
+    Σ̇^(h)(x,x') = E[σ̇(u)σ̇(v)]                                  (2.5)
+
+NTK at training time t (definition):
+    Ker_t(x,x') = ⟨∂f(x,θ(t))/∂θ, ∂f(x',θ(t))/∂θ⟩               (2.6)
+
+In the infinite-width limit, Ker_0 → deterministic Θ^(L) (eq 2.7) defined
+recursively by:
+    Θ^(L)(x,x') = Σ_{h=1..L+1} ( Σ^(h-1)(x,x') ⋅ Π_{h'=h..L+1} Σ̇^(h')(x,x') )
+                                                                  (2.8)
+Jacot proved Ker_t → Θ^(L) for all 0 ≤ t ≤ T as width → ∞.
+
+
+3  PINN SETUP & NTK THEORY
+==============================================================================
+PDE on bounded Ω:
+    L[u](x) = f(x), x ∈ Ω                                        (3.1)
+    u(x)    = g(x), x ∈ ∂Ω                                       (3.2)
+(time treated as additional coord; IC = special Dirichlet BC.)
+
+Approximate by NN u(x,θ); residual r(x,θ) := Lu(x,θ) - f(x).    (3.3)
+
+Loss:
+    L(θ) = L_b(θ) + L_r(θ)                                       (3.4)
+    L_b(θ) = (1/2) Σ_i |u(x_b_i,θ) - g(x_b_i)|^2                  (3.5)
+    L_r(θ) = (1/2) Σ_i |r(x_r_i,θ)|^2                              (3.6)
+
+Continuous-time gradient flow:
+    dθ/dt = -∇L(θ)                                                (3.7)
+
+LEMMA 3.1 (NTK ODE): Under (3.7), with u(t) := {u(x_b_i,θ(t))} and
+L_u(t) := {Lu(x_r_i,θ(t))}:
+    [du/dt; dL_u/dt] = -[K_uu(t)  K_ur(t); K_ru(t)  K_rr(t)]
+                       · [u-g; L_u - f]                            (3.8)
+where
+    (K_uu)_ij(t) = ⟨du(x_b_i,θ(t))/dθ, du(x_b_j,θ(t))/dθ⟩
+    (K_ur)_ij(t) = ⟨du(x_b_i,θ(t))/dθ, dL_u(x_r_j,θ(t))/dθ⟩
+    (K_rr)_ij(t) = ⟨dL_u(x_r_i,θ(t))/dθ, dL_u(x_r_j,θ(t))/dθ⟩
+Holds for ANY differential operator and ANY architecture.
+The matrix K(t) is real symmetric PSD; K = J J^T with stacked Jacobian
+J = [J_u; J_r].
+
+
+4  TRAINING DYNAMICS VIA NTK — main theoretical results
+==============================================================================
+Model problem (1D Poisson):
+    u_xx(x) = f(x), x ∈ Ω; u = g on ∂Ω                            (4.1)
+1-hidden-layer FCN of width N, NTK parametrization (eq 4.2-4.3):
+    u(x,θ)    = (1/sqrt(N)) W^(1) σ(W^(0) x + b^(0)) + b^(1)
+    u_xx(x,θ) = (1/sqrt(N)) W^(1) [σ̈(W^(0)x+b^(0)) ⊙ W^(0) ⊙ W^(0)]
+
+THEOREM 4.1 (Joint GP for solution AND PDE residual):
+For one-hidden-layer FCN at init, σ smooth with bounded σ̈,
+    u(x,θ)    →_D  GP(0, Σ^(1)(x,x'))                              (4.4)
+    u_xx(x,θ) →_D  GP(0, Σ_xx^(1)(x,x'))                           (4.5)
+where Σ_xx^(1)(x,x') = E_{u,v~N(0,1)}[u^4 σ̈(ux+v) σ̈(ux'+v)]      (4.6)
+
+REMARK 4.2: extends by induction to ANY-order linear PDE operator and
+multiple hidden layers ⇒ PINNs ↔ joint GP for linear PDEs.
+
+THEOREM 4.3 (NTK convergence at init):
+For 1-hidden-layer PINN, as N → ∞:
+    K(0) →_P  K* := [Θ_uu^(1)  Θ_ur^(1); Θ_ru^(1)  Θ_rr^(1)]      (4.7)
+deterministic limit (explicit form in Appendix C).
+
+THEOREM 4.4 (NTK STAYS CONSTANT during training):
+Under assumptions:
+  (i)   parameters uniformly bounded ‖θ(t)‖_∞ ≤ C for t ∈ [0,T];
+  (ii)  loss-residue integrals uniformly bounded;
+  (iii) σ smooth with |σ^(k)| ≤ C for k = 0,1,2,3,4 (sigmoid, tanh, sin OK).
+Then:
+    lim_{N→∞} sup_{t∈[0,T]} ‖K(t) - K(0)‖_2 = 0                    (4.8)
+
+INTUITION: parameters move o(1/sqrt(N)) ⇒ ∇u, ∇u_xx barely change ⇒ kernel
+stays static. Combined with Theorem 4.3:
+    K(t) ≈ K(0) ≈ K*  ∀t                                            (4.9)
+which gives the closed-form prediction:
+    [u(x_test,θ(t)); u_xx(x_test,θ(t))]
+       ≈ K*_test (K*)^{-1} (I - exp(-K* t)) [g(x_b); f(x_r)]       (4.10)
+
+⇒ infinite-width PINN equivalent to kernel regression IF K* invertible
+(NOTE: NTK of PINNs is OFTEN DEGENERATE in practice).
+
+
+5  SPECTRAL BIAS IN PINNs
+==============================================================================
+From eq 5.2:
+    [du/dt; du_xx/dt] ≈ (I - exp(-K(0) t)) · [g; f]                 (5.2)
+With spectral decomposition K(0) = Q^T Λ Q:
+    Q · ([du/dt; du_xx/dt] - [g; f]) ≈ -exp(-Λ t) Q · [g; f]        (5.3)
+⇒ training error in i-th eigen-direction decays at rate exp(-λ_i t).
+Eigenvectors of HIGHER eigenvalues correspond to LOWER frequencies
+[29,42,32]. Hence PINNs inherit spectral bias.
+
+KEY RESULT (decomposition of Tr K):
+    Σ_i λ_i(t) = Tr(K(t)) = Tr(K_uu(t)) + Tr(K_rr(t))
+               = Σ_i λ_i^uu(t) + Σ_i λ_i^rr(t)
+DEFINITION 5.1: Average convergence rate c = Tr(K)/n (mean eigenvalue).
+K_1 DOMINATES K_2 if c_1 ≫ c_2.
+
+EMPIRICAL FINDING (Figure 1, fabricated solution u = sin(aπx), a=1,2,4):
+- Eigenvalues of NTK decay rapidly (most ≈ 0).
+- Eigenvalue distribution similar across frequencies a (heuristically
+  explaining why PINNs learn all frequencies almost simultaneously
+  [Lu et al. 43]).
+- K_rr DOMINATES K_uu (typical case for high-frequency f).
+- ⇒ residual loss converges much faster than BC fitting ⇒ PINN may FAIL
+  to enforce BCs.
+This is identified as A KEY ROOT CAUSE OF PINN TRAINING FAILURE.
+
+
+6  PRACTICAL INSIGHTS — Algorithm 1 (NTK-trace adaptive weighting)
+==============================================================================
+General weighted loss:
+    L(θ) = (λ_b/(2N_b)) Σ_i |u(x_b_i,θ) - g(x_b_i)|^2
+         + (λ_r/(2N_r)) Σ_i |r(x_r_i,θ)|^2                          (6.2)
+Gives modified NTK ODE (eq 6.3):
+    [du/dt; dL_u/dt] = -K̃(t) [u-g; L_u-f]
+    K̃(t) = [(λ_b/N_b) K_uu  (λ_r/N_r) K_ur;
+             (λ_b/N_b) K_ru  (λ_r/N_r) K_rr]
+Maximum stable learning rate: η ≤ 2/λ_max(K̃(t)).
+Increasing batch size N_b, N_r is equivalent to increasing λ_b, λ_r.
+
+ALGORITHM 1 (NTK ADAPTIVE TRAINING):
+  for n = 1,…,S do
+    (a) Compute λ_b, λ_r:
+          λ_b = ( Σ_i λ_i(t) ) / ( Σ_i λ_i^uu(t) )
+              ≈ Tr(K_rr(0)) / Tr(K_uu(0))
+          λ_r = ( Σ_i λ_i(t) ) / ( Σ_i λ_i^rr(t) )  ≈ 1
+    (b) Update θ via gradient descent on weighted loss (6.2).
+  end for
+Trace via Tr(K) — no full eigendecomposition needed. Update every K
+iterations (e.g. K = 10 or 1000) — extra cost negligible.
+
+KEY DISTINCTION FROM Wang-Teng-Perdikaris [28]: their gradient-statistics
+balancer was empirical & lacked theory. Algorithm 1 follows directly from
+NTK theory and tackles the convergence-rate discrepancy at its root.
+
+
+7  NUMERICAL EXPERIMENTS
+==============================================================================
+
+7.1 NTK convergence (model problem 1D Poisson, u = sin(πx))
+- N_b = N_r = 100 uniformly spaced; full-batch GD; LR = 1e-5; 10k iters.
+- Widths 10, 100, 500. Single hidden layer.
+- Figure 2 (a),(b): relative ‖θ‖, ‖K‖ change → 0 as width → ∞ (consistent
+  with Lemma D.2 and Theorem 4.4).
+- Figure 2 (c): eigenvalues of K(0) and K(10000) for width 500 nearly
+  identical.
+- Figure 3: same conclusions for 3-layer FCN — conjecture extends to deep
+  PINNs and nonlinear PDEs.
+
+7.2 Adaptive training (1D Poisson, u = sin(4πx) — high-freq)
+- 1 hidden layer, width 100; full-batch GD, LR = 1e-5, 40k iters; tanh
+  activation; NTK-parameterized.
+- Computed weights: λ_r = 1, λ_b ≈ 100 (from Algorithm 1).
+- Figure 4: BASELINE PINN L2 error = 2.40e-1 ; NTK-WEIGHTED L2 = 1.63e-3
+  (≈ 2 orders of magnitude improvement).
+- Figure 5 sweeps λ_b ∈ [1,500]: minimum near λ_b ≈ 100, matching theory.
+- Large λ_b ⇒ larger std-dev (due to indefinite kernel K̃ with imaginary
+  eigenvalues ⇒ instability).
+
+7.3 1D WAVE EQUATION (KEY BENCHMARK; same problem reused by McClenny SA-PINN)
+    u_tt - 4 u_xx = 0,  x,t ∈ [0,1]                                (7.5)
+    u(0,t) = u(1,t) = 0                                             (7.6)
+    u(x,0) = sin(πx) + (1/2) sin(4πx)                              (7.7)
+    u_t(x,0) = 0                                                    (7.8)
+Analytical (d'Alembert):
+    u(x,t) = sin(πx)cos(2πt) + (1/2)sin(4πx)cos(8πt)               (7.9)
+
+Loss has THREE components: BC (u), IC on u_t, residual (eq 7.10):
+    L = (λ_u/(2N_u)) Σ |u-g|^2
+      + (λ_ut/(2N_ut)) Σ |u_t|^2
+      + (λ_r/(2N_r)) Σ |L u|^2
+
+Network: 5 hidden layers × 500 neurons; tanh; Glorot init.
+Batch sizes N_u = N_ut = N_r = 300; Adam optimizer; 80k iterations.
+Initial λ_u = λ_ut = λ_r = 1.
+
+GENERALISED Algorithm 1 update (every 1000 iters):
+    λ_u  = [Tr(K_u) + Tr(K_ut) + Tr(K_r)] / Tr(K_u)                  (7.13)
+    λ_ut = [Tr(K_u) + Tr(K_ut) + Tr(K_r)] / Tr(K_ut)                 (7.14)
+    λ_r  = [Tr(K_u) + Tr(K_ut) + Tr(K_r)] / Tr(K_r)
+
+RESULTS (Figure 6):
+    Baseline PINN:   L2 = 4.518e-01  (FAILS — does not capture solution)
+    NTK Algorithm 1: L2 = 1.728e-03  (excellent agreement)
+
+DIAGNOSTIC (Figure 7-8):
+- Eigenvalues of K_u, K_ut, K_r at multiple training snapshots.
+- K_r and K_ut DOMINATE K_u in baseline ⇒ BC component is starved of
+  convergence ⇒ baseline collapses.
+- After applying Algorithm 1: λ_u, λ_ut grow rapidly then stabilise; λ_r
+  stays near 1. The eigenvalue mismatch between λ_p · K_p components is
+  resolved.
+
+
+8  DISCUSSION
+==============================================================================
+- First rigorous NTK theory for PINNs. Proves NTK convergence for
+  1-hidden-layer + linear PDE; conjectured to extend to deep + nonlinear.
+- PINN failure root cause: convergence-rate discrepancy among loss
+  components AND spectral bias.
+- Algorithm 1 dynamically updates loss weights based on NTK trace ratios.
+- Open questions: extension to multi-layer/nonlinear; CNNs/ResNets;
+  inverse problems (PINNs are empirically better at inverse — can NTK
+  theory explain why?); momentum optimizers (Adam); architectures that
+  natively avoid spectral bias.
+- IMPORTANT CAVEAT: weighting alone CANNOT change the eigenvalue
+  distribution shape of NTK ⇒ cannot fully resolve spectral bias. Weighting
+  may also produce indefinite K̃ with imaginary eigenvalues ⇒ training
+  instability. Better architectures/loss formulations needed.
+
+ACKNOWLEDGEMENTS
+DOE ASCR DE-SC0019116; AFOSR FA9550-20-1-0060.
+
+CODE
+https://github.com/PredictiveIntelligenceLab/PINNsNTK
+
+
+REFERENCES (full)
+==============================================================================
+[1]  Raissi M., Yazdani A., Karniadakis G.E., "Hidden fluid mechanics:
+     learning velocity and pressure fields from flow visualizations,"
+     Science 367(6481):1026-1030, 2020.
+[2]  Sun L., Gao H., Pan S., Wang J.-X., "Surrogate modeling for fluid
+     flows based on physics-constrained deep learning without simulation
+     data," CMAME 361:112732, 2020.
+[3]  Raissi M., Babaee H., Givi P., "Deep learning of turbulent scalar
+     mixing," PRF 4(12):124501, 2019.
+[4]  Raissi M., Wang Z., Triantafyllou M.S., Karniadakis G.E., "Deep
+     learning of vortex-induced vibrations," JFM 861:119-137, 2019.
+[5]  Jin X., Cai S., Li H., Karniadakis G.E., "NSFnets: PINNs for
+     incompressible Navier-Stokes," arXiv:2003.06496, 2020.
+[6]  Sahli Costabal F. et al., "PINNs for cardiac activation mapping,"
+     Frontiers in Physics 8:42, 2020.
+[7]  Kissas G. et al., "Machine learning in cardiovascular flows
+     modeling...," CMAME 358:112623, 2020.
+[8]  Fang Z., Zhan J., "Deep PINNs for metamaterial design," IEEE Access
+     8:24506-24513, 2019.
+[9]  Liu D., Wang Y., "Multi-fidelity physics-constrained NN for
+     materials modeling," J. Mech. Design 141(12), 2019.
+[10] Chen Y., Lu L., Karniadakis G.E., Dal Negro L., "PINNs for inverse
+     problems in nano-optics and metamaterials," Optics Express
+     28(8):11618-11633, 2020.
+[11] Wang S., Perdikaris P., "Deep learning of free boundary and Stefan
+     problems," arXiv:2006.05311, 2020.
+[12] Yang Y., Perdikaris P., "Adversarial UQ in PINNs," JCP 394:136-152,
+     2019.
+[13] Zhu Y., Zabaras N., Koutsourelakis P.-S., Perdikaris P., "Physics-
+     constrained DL for high-D surrogate modeling and UQ without labeled
+     data," JCP 394:56-81, 2019.
+[14] Yang Y., Perdikaris P., "Physics-informed deep generative models,"
+     arXiv:1812.03511, 2018.
+[15] Sun L., Wang J.-X., "Physics-constrained Bayesian NN for fluid flow
+     reconstruction with sparse and noisy data," arXiv:2001.05542, 2020.
+[16] Yang L., Meng X., Karniadakis G.E., "B-PINNs: Bayesian PINNs for
+     forward and inverse PDE problems with noisy data," arXiv:2003.06097,
+     2020.
+[17] Sirignano J., Spiliopoulos K., "DGM: a DL algorithm for solving PDEs,"
+     JCP 375:1339-1364, 2018.
+[18] Han J., Jentzen A., Weinan E., "Solving high-D PDEs using DL,"
+     PNAS 115(34):8505-8510, 2018.
+[19] Zhang D., Guo L., Karniadakis G.E., "Learning in modal space:
+     time-dependent stochastic PDEs," SISC 42(2):A639-A665, 2020.
+[20] Pang G., Lu L., Karniadakis G.E., "fPINNs: fractional PINNs," SISC
+     41(4):A2603-A2626, 2019.
+[21] Pang G., D'Elia M., Parks M., Karniadakis G.E., "nPINNs: nonlocal
+     PINNs," arXiv:2004.04276, 2020.
+[22] Tartakovsky A.M. et al., "Learning parameters and constitutive
+     relationships with physics-informed DNN," arXiv:1808.03398, 2018.
+[23] Lu L., Jin P., Karniadakis G.E., "DeepONet," arXiv:1910.03193, 2019.
+[24] Tartakovsky A.M. et al., "PINNs for parameters/constitutive
+     relationships in subsurface flow," WRR 56(5):e2019WR026731, 2020.
+[25] Shin Y., Darbon J., Karniadakis G.E., "On convergence/generalization
+     of PINNs," arXiv:2004.01806, 2020.
+[26] Tchelepi H.A., Fuks O., "Limitations of physics-informed ML for
+     nonlinear two-phase transport in porous media," J. Mach. Learn.
+     Model. Comput. 1(1), 2020.
+[27] Raissi M., "Deep hidden physics models," JMLR 19(1):932-955, 2018.
+[28] Wang S., Teng Y., Perdikaris P., "Understanding and mitigating
+     gradient pathologies in PINNs," arXiv:2001.04536, 2020.
+[29] Rahaman N. et al., "On the spectral bias of neural networks," ICML
+     pp 5301-5310, 2019.
+[30] Cao Y. et al., "Towards understanding the spectral bias of DL,"
+     arXiv:1912.01198, 2019.
+[31] Tancik M. et al., "Fourier features let networks learn high-frequency
+     functions in low-D domains," arXiv:2006.10739, 2020.
+[32] Basri R. et al., "Frequency bias in NNs for input of non-uniform
+     density," arXiv:2003.04560, 2020.
+[33] Jacot A., Gabriel F., Hongler C., "NTK: convergence and
+     generalization in neural networks," NeurIPS pp 8571-8580, 2018.
+[34] Yang G., "Scaling limits of wide NNs with weight sharing: GP
+     behavior, gradient independence, NTK derivation," arXiv:1902.04760,
+     2019.
+[35] Matthews A.G. de G. et al., "GP behaviour in wide deep NNs,"
+     arXiv:1804.11271, 2018.
+[36] Lee J. et al., "Deep NNs as Gaussian processes," arXiv:1711.00165,
+     2017.
+[37] MacKay D.J.C., "Introduction to Gaussian processes," NATO ASI Series
+     F 168:133-166, 1998.
+[38] Arora S. et al., "On exact computation with infinitely wide net,"
+     NeurIPS pp 8141-8150, 2019.
+[39] Raissi M., Perdikaris P., Karniadakis G.E., "PINNs: a deep learning
+     framework for solving forward/inverse PDE problems," JCP
+     378:686-707, 2019.
+[40] Lee J. et al., "Wide NNs of any depth evolve as linear models under
+     gradient descent," NeurIPS pp 8572-8583, 2019.
+[41] Xu Z.-Q.J. et al., "Frequency principle: Fourier analysis sheds
+     light on DNNs," arXiv:1901.06523, 2019.
+[42] Basri R. et al., "Convergence rate of NNs for learned functions of
+     different frequencies," NeurIPS pp 4761-4771, 2019.
+[43] Lu L., Meng X., Mao Z., Karniadakis G.E., "DeepXDE: a DL library for
+     solving differential equations," arXiv:1907.04502, 2019.
+[44] Moin P., "Fundamentals of engineering numerical analysis,"
+     Cambridge UP, 2010.
+[45] Evans L.C., "Partial Differential Equations," AMS, 1998.
+[46] Glorot X., Bengio Y., "Understanding the difficulty of training deep
+     feedforward NNs," AISTATS pp 249-256, 2010.
+[47] Kingma D.P., Ba J., "Adam," arXiv:1412.6980, 2014.
+
+================================================================================
+END OF FILE
+================================================================================

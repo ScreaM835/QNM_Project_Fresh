@@ -1,0 +1,441 @@
+================================================================================
+TITLE:    Quasinormal modes of black holes and black branes
+AUTHORS:  Emanuele Berti (Mississippi + Caltech),
+          Vitor Cardoso (CENTRA / IST Lisboa),
+          Andrei O. Starinets (Rudolf Peierls Centre, Oxford)
+ARXIV:    arXiv:0905.2975 (2009; Class. Quant. Grav. 26, 163001 — Topical Review)
+SOURCE:   https://ar5iv.labs.arxiv.org/html/0905.2975
+SAVED:    Local literature reference for QNM-PINN paper write-up.
+WHY HERE: Canonical, citation-mandatory review of the QNM literature.
+          Reasons it is essential for our paper:
+          * Provides the standard NUMERICAL VALUES we benchmark against:
+              Schwarzschild ℓ=2, n=0 (s=2):   Mω = 0.3737 − 0.0890 i
+              Schwarzschild ℓ=0, n=0 (s=0):   Mω = 0.1105 − 0.1049 i
+            These are the "exact" Leaver values that our FD and PINN
+            results must reproduce.
+          * Defines the QNM eigenvalue problem precisely (Section 3.1):
+            outgoing-wave at the horizon (eq 35), outgoing-wave at infinity
+            (eq 38). These are exactly the boundary conditions we encode
+            (weakly or hard) in the PINN loss.
+          * Catalogues the COMPETING METHODS we must position ourselves
+            against — WKB (§4.2), monodromy (§4.3), Frobenius/series
+            (§4.4), resonance (§4.5), Leaver continued fraction (§4.6),
+            time evolution (§5), Pöschl-Teller (§4.1). Each comes with
+            its accuracy regime; PINN slots in as a flexible but lower-
+            precision alternative whose value is breadth (multi-mode,
+            mesh-free, numerical backgrounds).
+          * Provides the GW-spectroscopy framing (§9): astrophysical
+            ringdown waveform, frequency f and damping time τ as
+            functions of ω, M, j; SNR, mode resolvability via Rayleigh
+            criterion; no-hair-theorem tests. This is the rhetorical
+            machinery our paper must reproduce when motivating
+            "PINN-derived QNMs are useful at SNR ≲ 100" — exactly the
+            argument Luna 2022 (2212.06103) borrowed.
+          * The review's RHETORICAL STYLE — milestone bullet list,
+            consistent symbol conventions, single canonical reference
+            implementation hosted online (the qnms.html web page) —
+            is a useful template for our literature/methods sections.
+          * Establishes the eikonal-limit / light-ring connection
+            ω ≃ Ω_c ℓ − i (n+½) λ (eqs 97, 110), useful for
+            qualitative discussion of why ω ~ 0.37/M makes physical
+            sense for ℓ=2 Schwarzschild.
+
+NOTE ON FETCH: This is a 156-page Topical Review (~700 references). Only
+the sections most relevant to our PINN-QNM paper are transcribed below
+(introduction milestones, perturbation theory primer, QNM definition,
+methods sections 4.1-4.6, asymptotically flat spectrum §§5.1-5.3,
+astrophysical applications §9 highlights, plus reference key for the
+direct citations we need). Sections on AdS/CFT (§§6, 8), de Sitter
+(§7), area quantisation (§10) are summarised but not transcribed in
+full.
+================================================================================
+
+ABSTRACT
+--------
+QNMs are eigenmodes of dissipative systems. Perturbations of classical
+gravitational backgrounds with BHs/branes lead to QNMs. Analysis requires
+solving non-Hermitian eigenvalue problems. In gauge-gravity duality, QNMs
+encode near-equilibrium properties of strongly coupled QFTs — viscosity,
+conductivity, diffusion. In astrophysics, QNM detection in GW experiments
+permits precise measurement of BH mass and spin and new tests of GR.
+Topical review with focus on recent developments.
+
+
+1. INTRODUCTION
+==============================================================================
+1.1 MILESTONES (selected, full list in source)
+- 1957  Regge & Wheeler — first study of perturbations of Schwarzschild.
+- 1967  Wheeler coins "black hole".
+- 1970  Zerilli — even-parity perturbations of Schwarzschild reduce to a
+        Schrödinger-like equation; applied to test-particle infall.
+- 1970  Vishveshwara — numerical scattering of GWs off Schwarzschild;
+        late-time waveform = damped sinusoids ("ringdown").
+- 1971  Press — identifies ringing as free oscillation modes of the BH.
+- 1971  Davis-Ruffini-Press-Price — first quantitative GW emission via
+        BH perturbation theory; ringing excited near r ≃ 3M.
+- 1972  Goebel — characteristic modes ≃ GWs in spiral orbits at light-ring.
+- 1973  Teukolsky — decoupled, separated equations for perturbations of
+        Kerr in Newman-Penrose formalism.
+- 1974  Moncrief — gauge-invariant perturbation formalism.
+- 1983  Mashhoon — WKB suggestion; Ferrari-Mashhoon analytic QNMs from
+        bound states of inverted potentials (Pöschl-Teller).
+- 1985  Stark-Piran — first QNM extraction from numerical-relativity collapse.
+- 1985  Schutz-Will — WKB approach to compute BH QNMs.
+- 1985  E. W. Leaver — continued-fraction (CF) algorithm; the most
+        accurate QNM method to date; Green's-function excitation theory.
+- 1989  Echeverria — first ringdown-based mass/spin measurement
+        accuracy estimate.
+- 1992  Nollert-Schmidt — Laplace transforms for QNMs;
+        Fröman et al. — phase-integral techniques.
+- 1993  Anninos et al. — first head-on BH-collision simulation; QNM ringing.
+- 1998  Hod — for highly damped Schwarzschild ω_R → T ln 3 (later
+        proven by Motl using CF); QNM/area-quantisation conjecture.
+- 1999  Reviews: Kokkotas-Schmidt; Nollert.
+- 2000  Horowitz-Hubeny — Frobenius series for SAdS QNMs; AdS/CFT use.
+- 2005  Pretorius — first stable BBH NR evolution; ringdown contributes
+        substantial radiated energy.
+- 2005  Kovtun-Starinets — QNMs in gauge-gravity duality, vector and
+        tensor perturbations, viscosity bounds.
+
+1.2 NOTATION (relevant subset)
+- G = c = 1.
+- (−,+,+,+) signature.
+- M  BH mass.
+- a  Kerr spin parameter (a = J/M ∈ [0, M]).
+- r_+, r_−  outer/inner horizons; r_± = M ± √(M² − a²).
+- ω = ω_R + i ω_I  Fourier-transform variable; e^{−iωt} convention;
+  STABLE spacetimes have ω_I < 0 (decaying modes).
+- s    spin weight of perturbing field (0, ±½, ±1, ±2).
+- ℓ, m  angular numbers of (spin-weighted) spheroidal harmonics.
+- n    overtone index, n = 0, 1, 2, …; n = 0 = fundamental = least damped.
+
+The QNM frequencies and a Mathematica notebook implementing Leaver's
+method are mirrored at http://www.phy.olemiss.edu/~berti/qnms.html — these
+are the canonical reference values our paper benchmarks against.
+
+
+2. BLACK-HOLE PERTURBATION THEORY PRIMER
+==============================================================================
+2.1 PERTURBATIONS OF SCHWARZSCHILD-(A)dS
+
+Background: f(r) = 1 − 2M/r^{d−3} ± r²/L²  (eq 3, sign + dS, − AdS).
+Wave equation in (3+1)D: 1/√(−g) ∂_μ(√(−g) g^{μν} ∂_ν Ψ) − μ² Ψ = 0  (eq 6).
+
+After separation Ψ = e^{−iωt} Y_ℓm(θ,φ) Φ(r)/r and switching to
+tortoise coordinate dr_*/dr = 1/f, one obtains the master equation
+  d²Φ/dr_*² + [ω² − V_s(r)] Φ = 0.                                (eq 10)
+
+For a SCALAR (s=0) Schwarzschild-(A)dS:
+  V_{s=0} = f [ ℓ(ℓ+1)/r² + (d−2)/4 ((d−4) f/r² + 2 f'/r + d γ/L²) ]   (eq 9)
+
+For Schwarzschild GRAVITATIONAL perturbations the two parities yield two
+potentials with different functional forms but the SAME QNM spectrum
+(isospectrality, Chandrasekhar-Detweiler):
+  REGGE-WHEELER (axial / vector-type): standard ℓ-dependent potential
+    V_{RW} = f [ ℓ(ℓ+1)/r² − 6M/r³ ]   (s = 2 axial).
+  ZERILLI (polar / scalar-type): Eq. (24)-(25) in source. We use Zerilli
+    here because that is what our PINN numerically solves for ℓ = 2.
+
+2.3 KERR / TEUKOLSKY (eq 33-34)
+Spin-weight-s perturbation expanded as
+  ψ(t,r,θ,φ) = (1/2π) ∫ e^{−iωt} Σ_ℓ Σ_m e^{imφ} S^s_ℓm(θ) R_ℓm(r) dω.
+Decouples into (eq 33):
+  Δ ∂²_r R + (s+1)(2r − 2M) ∂_r R + V R = 0,
+  V = 2 i s ω r − a² ω² − sA_ℓm
+      + Δ⁻¹ [(r² + a²)² ω² − 4 M a m ω r + a² m²
+             + i s (a m (2r − 2M) − 2 M ω (r² − a²)) ],
+  Δ = (r − r_+)(r − r_−);
+plus an angular spheroidal equation for S^s_ℓm(u), u = cos θ, with the
+separation constant sA_ℓm(aω). At a = 0, sA_ℓm → ℓ(ℓ+1) − s(s+1).
+
+
+3. DEFINING QUASINORMAL MODES
+==============================================================================
+3.1 EIGENVALUE PROBLEM
+QNM boundary conditions for asymptotically flat BHs:
+  HORIZON   :  Ψ ∼ e^{−iω(t + r_*)},  r → r_+    (purely INGOING).        (35)
+  INFINITY  :  Ψ ∼ e^{−iω(t − r_*)},  r → ∞     (purely OUTGOING).        (38)
+Both BCs enforce that no waves enter the system from outside; the
+combination renders the eigenvalue problem non-Hermitian, with discrete
+COMPLEX eigenfrequencies ω_n. For stable spacetimes Im(ω_n) < 0 with our
+convention, so the modes decay in time. The fundamental mode n = 0 has
+the smallest |ω_I| and dominates the long-time ringdown.
+
+3.2 GREEN-FUNCTION INTERPRETATION
+QNM frequencies are the poles of the Laplace-transformed retarded Green
+function. Mathematically: zeros of the Wronskian W = 2 i ω A_in(ω) of the
+two boundary-condition-satisfying solutions Ψ_{r_+}, Ψ_∞.
+The full time-domain response decomposes into:
+  (i)  prompt response (high-frequency arc),
+  (ii) QNM ringing — a sum Σ_n C_n e^{−iω_n t} from poles of 1/W,
+  (iii) late-time power-law tails — branch-cut contribution.
+This decomposition motivates ringdown waveform models h(t) = Σ_n A_n
+e^{−t/τ_n} cos(2π f_n t + φ_n).
+
+C_n = B_n ∫ I(ω, r) Ψ_{r_+}/A_out dr_*';  B_n = A_out / [2 ω (dA_in/dω)]  (46)
+The B_n are EXCITATION FACTORS, intrinsic to the spacetime; C_n depend on
+the source / initial data.
+
+
+4. COMPUTING QUASINORMAL MODES
+==============================================================================
+4.1 EXACT SOLUTIONS — PÖSCHL-TELLER POTENTIAL
+For V(r_*) = V_0 / cosh²[α(r_* − r̄_*)] (eq 47), exact QNMs are
+  ω = ± √(V_0 − α²/4) − i α (2n + 1)/2,  n = 0, 1, 2, …                  (52)
+
+Used as an approximation to the Schwarzschild potential (Ferrari-Mashhoon).
+Predicts Mω ≈ 0.1148 − 0.1148 i (s = 0, ℓ = 0) and Mω ≈ 0.3785 − 0.0905 i
+(s = 2, ℓ = 2), to be compared with the Leaver values
+Mω = 0.1105 − 0.1049 i and Mω = 0.3737 − 0.0890 i — accurate to a few %
+for the fundamental mode; exact in the eikonal limit.
+
+Other exact-solution sub-cases discussed: AdS normal modes Lω = 2n + d +
+ℓ − 1 (tensor) etc. (eqs 54-56); de Sitter Lω = −i(2n + d + ℓ) odd-d
+(eq 57); near-extremal SdS / Nariai (eqs 60-61); BTZ ωL = ±m − 2i(n+1)
+r_+/L (eq 64); massless topological BHs (eqs 66-67).
+
+4.2 WKB APPROXIMATION
+For a single-peak potential Q(r_*) ≡ ω² − V, expand near the maximum
+r_*=r̄_*:
+  Q ≈ Q_0 + (Q_0''/2) (r_* − r̄_*)²                                       (68)
+Equation reduces to parabolic-cylinder; QNM condition becomes the
+Bohr-Sommerfeld-like
+  Q_0 / √(2 Q_0'') = i (n + 1/2),  n = 0, 1, 2, …                         (72)
+Iyer-Will pushed to 3rd order; Konoplya to 6th order. WKB works best
+for low overtones and large ℓ (eikonal regime). Errors typically a few %
+for n = 0 and percent for n = 1.
+
+4.3 MONODROMY / PHASE-INTEGRAL (highly damped n → ∞ regime).
+
+4.4 ASYMPTOTICALLY ADS — FROBENIUS SERIES
+Map x = 1/r, expand around horizon x = h:
+  Φ(x) = (x − h)^α Σ_n a_n (x − h)^n,                                     (81)
+α determined by indicial equation; a_n by 3-term recurrence (eq 83).
+QNMs from boundary condition at infinity Φ(x = 0) = 0:
+  Σ_{n=0}^∞ a_n (−h)^n = 0.                                               (84)
+Truncate at order N and find polynomial roots. Mathematica notebook
+publicly available [47].
+
+4.5 RESONANCE METHOD — Breit-Wigner: |α² + β²| ≈ const · [(ω − ω_R)² + ω_I²]
+near a resonance (eq 85).
+
+4.6 CONTINUED-FRACTION (LEAVER) METHOD — the gold standard
+Series solutions for both angular and radial Teukolsky equations. For
+the angular eigenfunction:
+  S^s_ℓm(u) = e^{aωu} (1+u)^{k_−} (1−u)^{k_+} Σ_{p=0}^∞ a_p (1+u)^p,    (86)
+with k_± = |m ± s|/2 and a_p satisfying a 3-term recurrence
+  α_0 a_1 + β_0 a_0 = 0,
+  α_p a_{p+1} + β_p a_p + γ_p a_{p−1} = 0,  p = 1, 2, …                   (87)
+Imposing convergence yields a continued-fraction equation for sA_ℓm
+given ω. Similarly for the radial part using a Jaffé-type ansatz around
+r = r_+ (eq 90). The n-th overtone is the most stable root of the n-th
+inversion of the radial CF — this lets the method reach n ~ 50 for Kerr
+and n ~ 100 for Schwarzschild. Numerical CF tables and notebooks at
+http://www.phy.olemiss.edu/~berti/qnms.html [47]. THESE TABLES ARE OUR
+GROUND TRUTH.
+
+
+5. ASYMPTOTICALLY FLAT SPECTRUM
+==============================================================================
+5.1 SCHWARZSCHILD
+QNM spectrum splits into two regimes:
+  WEAKLY DAMPED (n ≲ 9 for ℓ = 2): the modes our paper targets.
+  HIGHLY DAMPED (n → ∞): asymptotic real part 2Mω_∞ ≃ 0.08742, i.e.
+    ω → T ln 3 − i(2n+1) πT + O(n⁻^{1/2})                                 (94)
+    where T = (8πM)⁻¹ is the Hawking temperature.
+
+REFERENCE FUNDAMENTAL MODE VALUES (Leaver, [10], [47]):
+  s = 0, ℓ = 0:   Mω = 0.1105 − 0.1049 i.
+  s = 1, ℓ = 1:   Mω = 0.2483 − 0.0925 i.
+  s = 2, ℓ = 2:   Mω = 0.3737 − 0.0890 i.   ← BENCHMARK FOR THIS PAPER
+
+For an astrophysical Schwarzschild BH the fundamental ℓ = 2 mode has
+  f  = ω_R / 2π  = 1.207 (10 M_⊙ / M) kHz                                 (92)
+  τ  = 1 / |ω_I| = 0.5537 (M / 10 M_⊙) ms                                 (93)
+For supermassive BHs:
+  f  = 1.207 × 10⁻² (10⁶ M_⊙ / M) Hz                                      (162)
+  τ  = 55.37 (M / 10⁶ M_⊙) s                                              (163)
+
+Eikonal limit (ℓ ≫ 1):
+  Mω = (1/3√3) [(ℓ + ½) − (1/3) ((5(n+½)²/12) + 115/144 − 1 + s²)
+                  · (1/ℓ − 1/2ℓ²)]
+       − i (n + ½)/(3√3) [1 + (1/9)(235(n+½)²/432 − 1415/1728 + 1 − s²)/ℓ²]
+                                                                          (97)
+Connection to light-ring: ω = Ω_c ℓ − i(n + ½) λ where Ω_c is the orbital
+frequency and 1/λ the instability timescale of the unstable circular null
+geodesic. (Goebel; Mashhoon; Cardoso-Miranda-Berti-Witek-Zanchin 2009.)
+
+ALGEBRAICALLY SPECIAL MODE: nearly purely-imaginary frequency
+  Mω_ℓ ≈ ± i (ℓ − 1) ℓ (ℓ + 1)(ℓ + 2)/12.                                 (91)
+For ℓ = 2 it sits at overtone n = 9. Splits Schwarzschild gravitational
+spectrum into a "lower" weakly-damped branch and an "upper" highly-damped
+branch.
+
+5.2 REISSNER-NORDSTRÖM
+Coupled gravitational-electromagnetic perturbations decouple into two
+master variables Z_l^±. Fundamental ℓ = 2 frequencies as a function of
+Q/M shown in Fig 6. Asymptotic algebraically-special-like value (eq 99):
+  ω_{1,2} = (i/2)(ℓ−1)ℓ(ℓ+1)(ℓ+2)/[3M ∓ √(9M² + 16Q²(ℓ−1)(ℓ+2))].
+Highly-damped large-Q regime: e^{ω/T} + 2 + 3 e^{Q⁴ω / (r_+⁴ T)} = 0
+(eq 100), T = √(M² − Q²)/(2π r_+²).
+
+5.3 KERR
+WEAKLY-DAMPED MODES: For m > 0 most modes cluster at the superradiant
+critical frequency 2Mω = m as a/M → 1; m = 6 has anomalous behaviour.
+Quality-factor fits (Berti-Cardoso-Will 2006, ref [10]) accurate to ≲ 5%
+for n = 0, 1, 2 and 2 ≤ ℓ ≤ 4 over a/M ∈ [0, 0.99] — these are the
+"BCW fits" used throughout the spectroscopy literature. With
+b̂ = √(1 − a/M):
+  Mω_22  ≃ 1.5251 − 1.1568 b̂^{0.1292},   Q_22 ≃ 0.700 + 1.4187 b̂^{−0.4990}  (104)
+  Mω_20  ≃ 0.4437 − 0.0739 b̂^{ 0.3350},   Q_20 ≃ 4.000 − 1.9550 b̂^{ 0.1420}  (105)
+
+Symmetry: if ω, sA_ℓm solve the system, then so does (m → −m, ω → −ω*,
+sA_ℓm → −sA*_ℓ−m). E.g. for a = 0.6M, s = −2:
+  Mω_22 = +0.49404 − 0.08376 i  ≡  Mω_2,−2 = −0.49404 − 0.08376 i.       (102)
+  Mω_22 = −0.31678 − 0.08889 i  ≡  Mω_2,−2 = +0.31678 − 0.08889 i.       (103)
+
+EIKONAL Kerr (partial result, ℓ = ±m):
+  ω = ± m Ω_c − (n + ½) |Ω_c| √(3M/r_c) δ⁻¹                              (110)
+
+
+9. QUASINORMAL MODES OF ASTROPHYSICAL BLACK HOLES
+==============================================================================
+9.1 PHYSICAL PARAMETERS
+Detector strain:  h = h_+ F_+ + h_× F_×  with
+  h_+/× = (M/r) Σ_{ℓmn} A_{ℓmn}^{+/×} e^{−t/τ_{ℓmn}} S_{ℓmn}(ι, β)
+            cos(2π f_{ℓmn} t − φ_{ℓmn}^{+/×})                            (158)
+where (f, τ) ↔ (Re ω, 1/|Im ω|) and S_{ℓmn} is the spin-weight −2
+spheroidal harmonic.
+
+Total ringdown energy radiated in mode (ℓ, m, n) — efficiency:
+  ε_{rd} ≈ Q_{ℓmn} (Mω_{ℓmn} / 32π) [(A^+)² + (A^×)²].                   (161)
+Astrophysically relevant quantities: BH MASS sets f, τ; BH SPIN shifts
+the mode pattern (Zeeman-like splitting); EFFICIENCY ε_{rd} ∼ 10⁻⁴–10⁻²
+sets detectability.
+
+SNR:
+  ρ² = 4 ∫_0^∞ |h̃(f)|² / S_h(f) df,                                     (160)
+S_h is the one-sided noise PSD of the detector.
+
+9.6-9.7 PARAMETER ESTIMATION & NO-HAIR TESTS
+Fisher-matrix uncertainties (Echeverria 1989; Berti-Cardoso-Will 2006):
+  ρ σ_f1 = (π/2) {f_1³ (3 + 16 Q_1⁴) / (A_1² Q_1⁷)
+            · [A_1² Q_1³ / f_1 (1 + 4 Q_1²) + A_2² Q_2³ / f_2 (1 + 4 Q_2²)]}^{1/2}  (169)
+  ρ σ_τ1 = (2/π) {(3 + 4 Q_1²) / (A_1² f_1 Q_1)
+            · [A_1² Q_1³ / f_1 (1 + 4 Q_1²) + A_2² Q_2³ / f_2 (1 + 4 Q_2²)]}^{1/2}  (170)
+Mode resolvability uses a Rayleigh-like criterion |f_1 − f_2| > max(σ_f1,
+σ_f2), |τ_1 − τ_2| > max(σ_τ1, σ_τ2). Three thresholds: ρ_GLRT (mode
+detection), ρ_crit (resolve f OR τ), ρ_both (resolve f AND τ).
+
+NO-HAIR TEST: measuring two independent modes (typically (2,2,0) and
+(3,3,0) or (4,4,0)) checks that f_2/f_1 and τ_2/τ_1 follow the Kerr
+prediction. Energy ε_rd ∼ 10⁻⁴ M into (2,2,0) of a 10⁶ M_⊙ SMBH at 3 Gpc
+gives ρ ∼ 200 ⇒ M, a/M measured to 1 %; ε_rd ∼ 10⁻⁶ ⇒ 10 %.
+
+9.4 DETECTION RANGES
+LISA reaches ringdown SNR ∼ 1000 for SMBH mergers out to z ∼ 5 with
+ε_rd = 1 % and j = 0.8. Earth-based interferometers reach ringdown SNR ∼
+10–30 for stellar-mass mergers. Einstein Telescope: SNR ∼ 100s.
+
+9.8 INSPIRAL-RINGDOWN MATCHING
+Davis-Ruffini-Press-Price 1971 onwards. EOB / NR-tuned models attach the
+plunge waveform to a sum of fundamental QNM + several overtones (Damour-
+Nagar; Buonanno; Pretorius numerical waveforms emphasising overtones).
+
+
+10. OTHER DEVELOPMENTS (summary)
+==============================================================================
+10.1 AREA QUANTISATION
+Hod's conjecture: Mω = ln 3 / (8π) ≃ 0.0437123 is the smallest emitted
+quantum; ΔA = 4 ℏ ln 3 (eq 176). Tied to Bekenstein's BH-area spectrum.
+Since proven for highly damped scalar/tensor modes by Motl using CF.
+
+10.2-10.6 Thermodynamics & phase transitions; QNMs of stars; modified-
+gravity backgrounds; analogue gravity (acoustic BHs); etc.
+
+
+APPENDIX A — ISOSPECTRALITY & ALGEBRAICALLY-SPECIAL MODES
+==============================================================================
+Chandrasekhar showed that V_{s=2}^± (Regge-Wheeler and Zerilli) are
+super-partner SUSY potentials:
+  V_{s=2}^± = W² ∓ dW/dr_* + β,   β = −λ²(λ+1)²/(9 M²),                  (179)
+with λ = (ℓ−1)(ℓ+2)/2 — explains identical QNM spectrum.
+At the algebraically special frequency Ω̃_ℓ ≈ ± i(ℓ−1)ℓ(ℓ+1)(ℓ+2)/12 the
+SUSY transformation becomes singular; Regge-Wheeler has NO mode at Ω̃_ℓ
+while Zerilli has a QNM and a left-going total-transmission mode (TTM L)
+(Maassen van den Brink 2000, [745]). Numerical CF picks up a QNM very
+close to but not exactly at Ω̃_ℓ for ℓ = 2 (Leaver 1985).
+
+
+REFERENCES (only those directly cited by our PINN-QNM paper)
+==============================================================================
+[9]   F. Echeverria, "Gravitational-wave measurements of the mass and
+      angular momentum of BHs," PRD 40, 3194 (1989) — first ringdown
+      Fisher analysis.
+[10]  E. Berti, V. Cardoso, C. M. Will, PRD 73, 064030 (2006), gr-qc/0512160
+      — "Gravitational-wave spectroscopy of massive BHs with LISA"; the
+      BCW QNM-fit tables; ground truth used here and online at [47].
+[11]  E. Berti, J. Cardoso, V. Cardoso, M. Cavaglià, PRD 76, 104044 (2007),
+      0707.1202 — Earth-based ringdown detection.
+[12]  J. D. E. Creighton, PRD 60, 022001 (1999), gr-qc/9901084 — first
+      LIGO ringdown search.
+[14]  F. Pretorius, PRL 95, 121101 (2005), gr-qc/0507014 — first stable
+      BBH NR evolution.
+[15]  Campanelli-Lousto-Marronetti-Zlochower 2006.
+[16]  Baker-Centrella-Choi-Koppitz-van Meter 2006.
+[17]  S. Hod, PRL 81, 4293 (1998), gr-qc/9812002 — area-quantisation /
+      ω → T ln 3 conjecture.
+[22]  S. Chandrasekhar, "The Mathematical Theory of Black Holes", OUP 1983.
+[44]  E. Berti et al., PRD 76, 064034 (2007), gr-qc/0703053 — equal-mass
+      NR ringdown amplitudes.
+[47]  Webpage with Mathematica notebooks and numerical QNM tables:
+      http://www.phy.olemiss.edu/~berti/qnms.html ;
+      http://gamow.ist.utl.pt/~vitor/ringdown.html .
+[48]  T. Regge, J. A. Wheeler, Phys. Rev. 108, 1063 (1957).
+[56]  F. J. Zerilli, PRL 24, 737 (1970).
+[57]  F. J. Zerilli, PRD 2, 2141 (1970).
+[58]  W. H. Press, ApJ L170, 105 (1971).
+[60]  S. A. Teukolsky, PRL 29, 1114 (1972).
+[62]  Chandrasekhar-Detweiler — Schwarzschild QNMs; isospectrality proof.
+[69]  B. Mashhoon (1983, WKB).
+[70]  V. Ferrari, B. Mashhoon, PRD 30, 295 (1984) — Pöschl-Teller QNMs.
+[73]  B. Mashhoon, PRD 31, 290 (1985) — light-ring/QNM analogy.
+[74]  B. F. Schutz, C. M. Will, ApJ L291, 33 (1985) — WKB QNM method.
+[75]  E. W. Leaver, Proc. R. Soc. A 402, 285 (1985) — continued-fraction
+      method (CANONICAL CITATION).
+[76]  E. W. Leaver, J. Math. Phys. 27, 1238 (1986).
+[77]  E. W. Leaver, PRD 34, 384 (1986).
+[80]  H.-P. Nollert, H. R. Schmidt — Laplace-transform QNMs (1992).
+[90]  H.-P. Nollert, PRD 47, 5253 (1993) — first reliable highly damped
+      Schwarzschild QNMs.
+[91]  L. Motl, ATMP 6, 1135 (2003), gr-qc/0212096 — analytic proof
+      ω_R → T ln 3.
+[92]  G. T. Horowitz, V. E. Hubeny, PRD 62, 024027 (2000) — Frobenius
+      series QNMs in SAdS.
+[101] L. Motl, A. Neitzke — monodromy method.
+[129] F. Mellor, I. Moss, PRD 41, 403 (1990) — RNdS QNMs.
+[130] V. Cardoso, J. P. S. Lemos, PRD 64, 084017 (2001) — SAdS QNMs.
+[141] S. Chandrasekhar (1979) — gravitational perturbations of Kerr.
+[142] S. Chandrasekhar (1984) — algebraically-special modes.
+[166] N. Andersson — QNM excitation factors.
+[179] G. Pöschl, E. Teller, Z. Phys. 83, 143 (1933).
+[188-189] B. Iyer, C. M. Will — 3rd-order WKB.
+[208] V. Cardoso, A. S. Miranda, E. Berti, H. Witek, V. T. Zanchin, PRD
+      79, 064016 (2009), 0812.1806 — geodesic interpretation of QNMs in
+      asymptotically flat spacetimes.
+[216] R. A. Konoplya — 6th-order WKB.
+[220] H.-P. Nollert (1993) — improved CF for highly damped Schwarzschild
+      modes.
+[230] H. Onozawa (1997) — Kerr highly damped CF + algebraically-special
+      Kerr modes.
+[231] E. Berti, V. Cardoso, K. D. Kokkotas, H. Onozawa, PRD 68, 124018
+      (2003) — high-overtone Kerr.
+[461] O. Dreyer et al., CQG 21, 787 (2004) — multimode no-hair test.
+[479-480] L. Gualtieri, J. A. Pons, E. Berti, V. Ferrari et al. — neutron-
+      star QNMs.
+[745] A. Maassen van den Brink, PRD 62, 064009 (2000), gr-qc/0001032 —
+      algebraically-special Schwarzschild modes; TTM classification.
+
+================================================================================
+END OF FILE
+================================================================================
