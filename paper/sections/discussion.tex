@@ -8,8 +8,8 @@ and physics setup of \citet{Patel2024pinn} to enable a direct
 field-accuracy comparison. Two changes
 account for the improvement from $\mathrm{RL2}=28.06\%$ in their
 Table~2 to $\mathrm{RL2}=0.58\%$ in our
-Eq.~\eqref{eq:fwd-metrics}: the doubled number of L-BFGS
-iterations ($30{,}000$ versus $15{,}000$), and the greedy adaptive
+Eq.~\eqref{eq:fwd-metrics}. The first is the doubled number of L-BFGS
+iterations ($30{,}000$ versus $15{,}000$). The second is the greedy adaptive
 resampling of Sec.~\ref{sec:fwd-pinn} (with resampling period
 $1{,}000$ iterations versus the $100$ of \citet{Patel2024pinn},
 so that each resampling event uses a residual field evaluated
@@ -39,9 +39,9 @@ effects of the ringdown weight $\lambda_{\mathrm{ring}}$, the
 ringdown lower bound $\tring$, and the addition of an overtone
 in the template.
 The curriculum-learning extension of Sec.~\ref{sec:cur-pinn}
-addresses a different question: whether splitting the temporal
+addresses a different question, namely whether splitting the temporal
 domain into smaller windows lowers the full-domain forward error.
-The answer on this problem is no.
+The answer is no.
 Table~\ref{tab:cur-summary} shows that, while the
 $W_{1} = [0,25]\,M$ window of the 2-window curriculum reaches
 RMSD $5.2\times 10^{-4}$ (the lowest sub-domain RMSD recorded
@@ -62,13 +62,13 @@ benefit a curriculum would provide without paying the per-stitch
 interpolation cost. We expect the curriculum strategy to be
 worthwhile when the time domain is long enough that even a
 fully-greedy single-window PINN cannot cover the late-time decay
-range with adequate collocation density --- e.g.\ for
+range with adequate collocation density (e.g.\ for
 $t_{\max} \gtrsim 5\,t_{\mathrm{tail}}$, where the QNM regime,
 the late tail, and the Sommerfeld arrival time all enter the
-same training window --- but on the present
+same training window). On the present
 $[0,50]\,M$ domain a single greedy PINN suffices.
 The analysis of Sec.~\ref{sec:res-inv} (Table~\ref{tab:tau-degeneracy})
-shows that the optimiser drifts along the amplitude--rate
+shows that the optimiser drifts along the amplitude--damping-time
 degeneracy of Eq.~\eqref{eq:loss-ring} during L-BFGS, leaving the
 learned
 $\tau$ ten to twenty percent below the Leaver value while the
@@ -78,11 +78,11 @@ therefore quotes the post-hoc M2 wide-window value of $\tau$ on
 $\Phi_\theta$, which recovers $\tau$ to within a few percent on
 the same runs. We expect the same convention to apply to any
 inverse PINN whose template loss admits a comparable
-amplitude--rate degeneracy.
+amplitude--damping-time degeneracy.
 
 The M4 plateau standard deviation $\sigma_\omega$ is, by
 definition, the spread of $\omega$ across the plateau, which we
-take as an estimate of the window-systematic uncertainty inside
+take as an estimate of the fit-window systematic uncertainty inside
 the fit window. Across the six inverse variants it
 discriminates cleanly between configurations on which the
 two-mode NLS finds a stable minimum
@@ -142,11 +142,11 @@ forecast for next-generation detectors \citep{Berti2007ringdown},
 at which point the forward--inverse precision gap will become
 a quantitative limiting factor.
 
-Three of the limitations are scope choices, three are substantive.
-The scope choices are the fixed Schwarzschild background, the
+Six limitations of this study fall into two groups: three are scope
+choices, three are substantive. The scope choices are the fixed Schwarzschild background, the
 single-channel quadrupole wavefunction $\Phi(\xq,t)$, and the
 single noise realisation per variant. Each lifts to a known
-extension: Kerr by substituting the Teukolsky operator for the
+extension. Kerr follows by substituting the Teukolsky operator for the
 Zerilli operator, multi-channel by training one head per
 harmonic, and the statistical scope by running the inverse
 pipeline at $\ge 30$ noise seeds and reporting the seed-to-seed

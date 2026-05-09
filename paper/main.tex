@@ -86,7 +86,7 @@ for Schwarzschild Quasi-Normal Modes Extraction}
 \noindent
 We apply physics-informed neural networks (PINNs) to the
 Schwarzschild $\ell = 2$ Zerilli equation in the time domain in
-three settings: forward, inverse, and a curriculum-learning
+three settings --- forward, inverse, and a curriculum-learning
 extension of the forward problem. The forward PINN reproduces a
 finite-difference reference field with relative $L^2$ error
 $0.58\%$, compared with $28.06\%$ in the closest prior PINN study
@@ -98,7 +98,7 @@ and a damped-sinusoid ringdown template against $500$ noisy
 observations of the field at $1\%$ Gaussian noise, recovering
 $M$ to $0.34\%$, $\omega$ to $0.30\%$, and the damping time
 $\tau$ to $1.6\%$. We show analytically and empirically that the
-embedded template loss admits an amplitude--rate degeneracy along
+embedded template loss admits an amplitude--damping-time degeneracy along
 which $\tau$ drifts by ten to twenty percent from the Leaver
 value with the loss almost stationary; quoting $\tau$ from a
 post-hoc fit to the converged network field, rather than from
@@ -108,16 +108,16 @@ trained sequentially with numerical-IC transfer between them, in
 both hard-stitched and soft-overlap blended forms; we find that
 it lowers the per-window error on the earliest sub-domain by
 $\sim\!37\%$ but does not improve the full-domain RMSD once the
-windows are stitched, on account of an interpolation error that
+windows are stitched, because an interpolation error
 compounds at every splice. We also
 introduce two plateau-based fit-window estimators that scan,
 respectively, the start time alone and both edges of the QNM fit
-window, and report the across-plateau standard deviation
-$\sigma_\omega$ as a window-systematic uncertainty on $\omega$.
+window, and report the plateau standard deviation
+$\sigma_\omega$ as a fit-window systematic uncertainty on $\omega$.
 The plateau width separates inverse-PINN configurations on which
 the two-mode nonlinear least-squares fit converges from those on
-which it does not, and so doubles as a deterministic quality
-flag computed from the same scan.
+which it does not, and therefore also serves as a deterministic
+quality flag computed from the same scan.
 \end{abstract}
 
 % =====================================================================
@@ -177,7 +177,7 @@ is also fixed by hand without a sensitivity scan. Second, no
 prior PINN-for-QNM study performs the inverse task of jointly
 recovering the black-hole mass and a damped-sinusoid ringdown
 template from noisy observations of the field. The embedded
-template loss admits an amplitude--rate degeneracy that, if
+template loss admits an amplitude--damping-time degeneracy that, if
 uncontrolled, biases the learned $\tau$.
 
 We address both points with a forward and inverse PINN for the
@@ -191,13 +191,13 @@ field error $0.58\%$ against the finite-difference reference, a
 factor of approximately $50$ smaller than the prior work.
 We apply five post-hoc QNM extraction methods to the converged
 network field. Two of them replace the conventional single-window
-fit by a plateau scan over the fit-window edges and report the
-across-plateau dispersion of $(\omega,\tau)$ as the
-window-systematic uncertainty; the construction is given in
-Sec.~\ref{sec:plateau}. Under this convention the forward PINN
+fit with a plateau scan (defined in Sec.~\ref{sec:plateau}) over the fit-window edges and report the
+plateau standard deviation $\sigma_\omega$ of $(\omega,\tau)$ as the
+fit-window systematic uncertainty.
+Under this convention the forward PINN
 recovers the fundamental QNM frequency to $0.029\%$. For the inverse problem we train under
 $1\%$ Gaussian observation noise on $500$ field samples, isolate
-the amplitude-rate degeneracy of the embedded ringdown template
+the amplitude--damping-time degeneracy of the embedded ringdown template
 analytically and empirically, and adopt a reporting convention
 that extracts $\tau$ post-hoc from the converged network field
 rather than from the learned template scalar. A six-variant
@@ -573,7 +573,7 @@ $\omega_{n}^{R} = \Im(\log z_{n})/\Delta t$ and
 $\tau_{n} = -\Delta t/\Re(\log z_{n})$, without a nonlinear
 optimisation. All three families share a single
 hyperparameter that dominates the systematic error budget, namely
-the choice of fit window $[t_0, t_{\mathrm{end}}]$. Outside the
+the choice of fit window $[t_0, \tend]$. Outside the
 QNM regime the template of Eq.~\eqref{eq:qnm-template} is
 misspecified, and the recovered $(\omega_n,\tau_n)$ carry a
 window-dependent bias that does not vanish with more data.
@@ -585,10 +585,13 @@ and has been addressed by Bayesian priors over the start time
 \citep{Isi2021priors}, but a deterministic plateau-based
 diagnostic reported alongside the primary estimate is not in
 common use. Sections~\ref{sec:qnm-methods} and \ref{sec:plateau}
-introduce five estimators M1--M5, of which M4 and M5 implement
+introduce five concrete estimators (M1: FFT plus log-line fit;
+M2: nonlinear least squares; M3: ESPRIT; M4: 1-D plateau scan over
+$t_0$; M5: 2-D plateau scan over $(t_0,\tend)$),
+of which M4 and M5 implement
 plateau scans over the start time alone and over both window
-edges respectively, and report the in-plateau dispersion as a
-window-systematic uncertainty. Figure~\ref{fig:bg-plateau-cartoon}
+edges respectively, and report the plateau standard deviation
+$\sigma_\omega$ as a fit-window systematic uncertainty. Figure~\ref{fig:bg-plateau-cartoon}
 illustrates the qualitative shape of $\omega(t_0)$ that motivates
 the plateau construction.
 
@@ -836,11 +839,12 @@ time-domain post-hoc fit.
 The two limitations stated in the introduction (forward field
 accuracy and absence of an inverse formulation) translate into
 four concrete gaps that we address in
-Secs.~\ref{sec:methods}--\ref{sec:res-inv}: no inverse PINN that
-recovers the mass jointly with a damped-sinusoid template; no
-fit-window systematic on the recovered $(\omega,\tau)$; no
-analysis of the amplitude--rate degeneracy of an embedded
-template; and no ablation of the template-loss hyperparameters.
+Secs.~\ref{sec:methods}--\ref{sec:res-inv}. First, no prior PINN
+recovers the mass jointly with a damped-sinusoid template. Second,
+no prior PINN reports a fit-window systematic on the recovered
+$(\omega,\tau)$. Third, no prior PINN analyses the
+amplitude--damping-time degeneracy of an embedded template.
+Fourth, no prior PINN ablates the template-loss hyperparameters.
 Figure~\ref{fig:bg-pipeline} summarises the resulting forward and
 inverse pipelines.
 
@@ -889,7 +893,7 @@ trained against $\Nobs = 500$ noisy field samples and jointly
 recovers the black-hole mass $M$ together with a single-mode
 ringdown template; the same five estimators are then applied to
 the converged network field. Both tracks report the M4 plateau
-standard deviation $\sigma_\omega$ as a window-systematic
+standard deviation $\sigma_\omega$ as a fit-window systematic
 uncertainty alongside the primary estimate.}
 \label{fig:bg-pipeline}
 \end{figure}
@@ -935,8 +939,8 @@ The main methodological contribution is the plateau-based
 extraction of Sec.~\ref{sec:plateau}. Across the six inverse
 variants the plateau standard deviation $\sigma_\omega$ separates
 configurations on which the two-mode NLS converges from those on
-which it does not, supplying a deterministic quality flag at no
-extra cost. The same diagnostic applies unchanged to the forward
+which it does not, supplying a deterministic quality flag without
+an additional fit. The same diagnostic applies unchanged to the forward
 PINN and to the FD reference solver, so that no quoted number
 depends on a fixed-by-hand fit window.
 
@@ -1389,8 +1393,8 @@ $n \sim 100$ for Schwarzschild
 Denote the truncated left-hand side of Eq.~\eqref{eq:lv-cf} (or
 of its $n$-th inversion Eq.~\eqref{eq:lv-inv}) by
 $F_N(\omega)$, where $N$ is the truncation depth. The continued
-fraction is evaluated by the modified Lentz algorithm: start from
-$f_0 = \beta_0$, $C_0 = f_0$, $D_0 = 0$ and iterate, for
+fraction is evaluated by the modified Lentz algorithm. Starting
+from $f_0 = \beta_0$, $C_0 = f_0$, $D_0 = 0$, we iterate, for
 $j = 1, 2, \dots, N$,
 \begin{equation}
   \begin{aligned}
@@ -1448,7 +1452,7 @@ digits,
   \label{eq:lv-values}
 \end{equation}
 giving the damping times $\tau_0/M = 1/|\Im(M\omega_0)| = 11.241$
-and $\tau_1/M = 1/|\Im(M\omega_1)| = 3.6508$. These are the
+and $\tau_1/M = 1/|\Im(M\omega_1)| = 3.651$. These are the
 reference values quoted in Eq.~\eqref{eq:qnm-ref} and used as
 ground truth for every percentage-error figure in
 Sec.~\ref{sec:results}.
@@ -1913,7 +1917,7 @@ FD reference
   & $0.2,\;0.1,\;$RK4--MoL \\
 Network
   & hidden layers (widths)            & $[80,\,40,\,20,\,10]$ \\
-  & activation, output transform      & tanh, tanh-bound \\
+  & activation, output transform      & tanh, $A\tanh(\cdot)\,\mathrm{NN}$ \\
   & dtype, seed                       & float64, $1234$ \\
 Collocation
   & $N_r,\;N_i,\;N_b$ & $32\,000,\;800,\;400$ \\
@@ -1932,7 +1936,7 @@ Adaptive sampling
 Observer
   & $x_{\mathrm{obs}}/M$             & $10.0$ \\
 QNM window
-  & $[t_{\mathrm{start}},t_{\mathrm{end}}]/M$ & $[10,\,50]$ \\
+  & $[t_{0},\tend]/M$ & $[10,\,50]$ \\
 \hline
 \end{tabular}
 \end{table}
@@ -2037,7 +2041,7 @@ reference but not for $\Phi_\theta$, where the QNM-dominated
 spectrum is precisely what the network has been trained to reproduce.
 On a clean damped sinusoid the conditioning of the underlying Hankel
 matrix degrades and ESPRIT returns spurious modes at machine
-precision, as is visible in Table~\ref{tab:esprit-fwd}: the
+precision, as is visible in Table~\ref{tab:esprit-fwd}. The
 amplitude-ranked first pole disagrees with the
 $(\omega,\tau)$-closest pole by tens of percent even though both
 sit deep in the numerical-noise floor.
@@ -2095,10 +2099,10 @@ E
 \begin{table}[h!]
 \centering
 \caption{M4 (1-D plateau scan over $t_0$) and M5 (2-D plateau
-scan over $(t_0,t_{\mathrm{end}})$) extractions of $(\omega,\tau)$
+scan over $(t_0,\tend)$) extractions of $(\omega,\tau)$
 from $\Phi_\theta(x_{\mathrm{obs}},t)$. The plateau standard
 deviation $\sigma_\omega$ is reported alongside $\omega$ and serves
-as the window-systematic uncertainty discussed in
+as the fit-window systematic uncertainty discussed in
 Sec.~\ref{sec:plateau}. Variant B does not produce a valid plateau
 (NaN entries) and is excluded from the summary.}
 \label{tab:m4m5-all}
@@ -2182,28 +2186,35 @@ window used to detect the plateau.}
 
 \begin{figure}[p]
 \centering
-\begin{tabular}{ccc}
-\includegraphics[width=0.32\textwidth]{../outputs/qnm/zerilli_l2_inverse_qnm/pinn_method5_2d_heatmap.png} &
-\includegraphics[width=0.32\textwidth]{../outputs/qnm/zerilli_l2_inverse_qnm_tring18/pinn_method5_2d_heatmap.png} &
-\includegraphics[width=0.32\textwidth]{../outputs/qnm/zerilli_l2_inverse_qnm_lring100/pinn_method5_2d_heatmap.png} \\
-Baseline & A & B \\[0.6em]
-\includegraphics[width=0.32\textwidth]{../outputs/qnm/zerilli_l2_inverse_qnm_nring1000/pinn_method5_2d_heatmap.png} &
-\includegraphics[width=0.32\textwidth]{../outputs/qnm/zerilli_l2_inverse_qnm_combo/pinn_method5_2d_heatmap.png} &
-\includegraphics[width=0.32\textwidth]{../outputs/qnm/zerilli_l2_inverse_qnm_2mode/pinn_method5_2d_heatmap.png} \\
-C & D & E \\
-\end{tabular}
-\caption{M5 (2-D plateau scan over $(t_0, t_{\mathrm{end}})$)
-heatmaps for the six inverse-PINN variants. Each panel reports
-$\omega(t_0,t_{\mathrm{end}})$ (top sub-panel) and
-$\tau(t_0,t_{\mathrm{end}})$ (bottom sub-panel) on the same colour
-scale; the red rectangle marks the auto-detected plateau (yellow
-region), and the inset annotations report the plateau-mean and
-percent error against the truth. The plateau region of variant D
-is the largest and tightest of the six panels and matches the
-M4 estimate of Fig.~\ref{fig:m4-grid}. Panels are reproduced at
-appendix scale; high-resolution single-variant versions are
-available in the artefact bundle.}
+\includegraphics[width=0.95\textwidth,keepaspectratio]{../outputs/qnm/zerilli_l2_inverse_qnm/pinn_method5_2d_heatmap.png}\\[0.4em]
+\textbf{Baseline}\\[0.6em]
+\includegraphics[width=0.95\textwidth,keepaspectratio]{../outputs/qnm/zerilli_l2_inverse_qnm_tring18/pinn_method5_2d_heatmap.png}\\[0.4em]
+\textbf{A}\\[0.6em]
+\includegraphics[width=0.95\textwidth,keepaspectratio]{../outputs/qnm/zerilli_l2_inverse_qnm_lring100/pinn_method5_2d_heatmap.png}\\[0.4em]
+\textbf{B}
+\caption{M5 (2-D plateau scan over $(t_0, \tend)$)
+heatmaps for the six inverse-PINN variants (Baseline, A, B; C, D,
+E continued in Fig.~\ref{fig:m5-grid} cont.). Each panel reports
+$\omega(t_0,\tend)$ (left) and
+$\tau(t_0,\tend)$ (right) on a shared colour scale
+matching Fig.~\ref{fig:fwd-plateau-m5}; the red rectangle marks
+the auto-detected plateau. The plateau region of variant D (next
+page) is the largest and tightest of the six panels and matches
+the M4 estimate of Fig.~\ref{fig:m4-grid}.}
 \label{fig:m5-grid}
+\end{figure}
+
+\begin{figure}[p]\ContinuedFloat
+\centering
+\includegraphics[width=0.95\textwidth,keepaspectratio]{../outputs/qnm/zerilli_l2_inverse_qnm_nring1000/pinn_method5_2d_heatmap.png}\\[0.4em]
+\textbf{C}\\[0.6em]
+\includegraphics[width=0.95\textwidth,keepaspectratio]{../outputs/qnm/zerilli_l2_inverse_qnm_combo/pinn_method5_2d_heatmap.png}\\[0.4em]
+\textbf{D}\\[0.6em]
+\includegraphics[width=0.95\textwidth,keepaspectratio]{../outputs/qnm/zerilli_l2_inverse_qnm_2mode/pinn_method5_2d_heatmap.png}\\[0.4em]
+\textbf{E}
+\caption{(continued) M5 2-D plateau scans for inverse variants
+C, D, E. Variant D shows the largest, tightest plateau region
+across both $\omega$ and $\tau$.}
 \end{figure}
 
 % =====================================================================

@@ -9,12 +9,18 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 RUNS = [
     "zerilli_l2_greedy_f03_lbfgs30k",
+    "zerilli_l2_inverse_qnm",
+    "zerilli_l2_inverse_qnm_tring18",
+    "zerilli_l2_inverse_qnm_lring100",
+    "zerilli_l2_inverse_qnm_nring1000",
     "zerilli_l2_inverse_qnm_combo",
+    "zerilli_l2_inverse_qnm_2mode",
     "zerilli_l2_curriculum",
     "zerilli_l2_curriculum_3w",
     "zerilli_l2_soft_overlap_curriculum",
@@ -52,12 +58,17 @@ TAU_LIM   = (5.0, 20.0)
 
 for r, (x, t, err) in err_data.items():
     out = os.path.join(ROOT, "outputs", "pinn", r, "error_heatmap.png")
+    # Log-scaled colour to reveal the broad dynamic range:
+    # typical pixels sit ~1e-4..1e-3 while shock fronts/spikes reach ~1e-1.
+    # Floor at vmax/1e4 to keep the lowest decade out of pure black.
+    vmin = max(abs_max * 1e-4, 1e-6)
+    err_clip = np.maximum(err, vmin)
     fig, ax = plt.subplots(figsize=(10, 5))
-    im = ax.pcolormesh(x, t, err, shading="auto", cmap="hot_r",
-                       vmin=0.0, vmax=abs_max)
+    im = ax.pcolormesh(x, t, err_clip, shading="auto", cmap="magma_r",
+                       norm=LogNorm(vmin=vmin, vmax=abs_max))
     cbar = fig.colorbar(im, ax=ax, pad=0.02)
     cbar.set_label(r"$|\Phi_{\mathrm{FD}} - \Phi_{\mathrm{PINN}}|$"
-                   f"  (shared scale, max={abs_max:.2e})")
+                   f"  (shared log scale, max={abs_max:.2e})")
     ax.set_xlabel(r"$x_* / M$"); ax.set_ylabel("t / M")
     ax.set_title(f"Pointwise error  ({r})")
     fig.tight_layout(); fig.savefig(out, dpi=200); plt.close(fig)
@@ -79,30 +90,21 @@ for r in RUNS:
     pidx = j.get("plateau_idx") or []
     om_th = j.get("omega_theory", 0.3737)
     ta_th = j.get("tau_theory", 11.241)
-    # mask out-of-range values to NaN so they do not draw spurious vertical
-    # lines through the plateau when forced to a shared y-axis
-    om_p = np.where((om >= OMEGA_LIM[0]) & (om <= OMEGA_LIM[1]), om, np.nan)
-    ta_p = np.where((ta >= TAU_LIM[0])   & (ta <= TAU_LIM[1]),   ta, np.nan)
-    n_clip_om = int(np.sum(np.isnan(om_p) & ~np.isnan(om)))
-    n_clip_ta = int(np.sum(np.isnan(ta_p) & ~np.isnan(ta)))
     fig, axes = plt.subplots(1, 2, figsize=(10, 4))
-    axes[0].plot(ts, om_p, "o-", label="per-window fit")
+    axes[0].plot(ts, om, "o-", label="per-window fit")
     if pidx:
-        axes[0].plot(ts[pidx], om_p[pidx], "o", color="C3", label="plateau")
+        axes[0].plot(ts[pidx], om[pidx], "o", color="C3", label="plateau")
         axes[0].axhline(j["omega"], color="C3", ls="--", lw=0.8)
     axes[0].axhline(om_th, color="k", ls=":", lw=0.8, label="theory")
     axes[0].set_xlabel("start time t0"); axes[0].set_ylabel(r"$\omega M$")
-    axes[0].set_ylim(OMEGA_LIM); axes[0].legend(loc="best", fontsize=8)
-    if n_clip_om: axes[0].text(0.98, 0.02, f"{n_clip_om} pts off-scale", transform=axes[0].transAxes, ha="right", va="bottom", fontsize=7, color="gray")
-    axes[1].plot(ts, ta_p, "o-")
+    axes[0].legend(loc="best", fontsize=8)
+    axes[1].plot(ts, ta, "o-")
     if pidx:
-        axes[1].plot(ts[pidx], ta_p[pidx], "o", color="C3")
+        axes[1].plot(ts[pidx], ta[pidx], "o", color="C3")
         axes[1].axhline(j["tau"], color="C3", ls="--", lw=0.8)
     axes[1].axhline(ta_th, color="k", ls=":", lw=0.8)
     axes[1].set_xlabel("start time t0"); axes[1].set_ylabel(r"$\tau / M$")
-    axes[1].set_ylim(TAU_LIM)
-    if n_clip_ta: axes[1].text(0.98, 0.02, f"{n_clip_ta} pts off-scale", transform=axes[1].transAxes, ha="right", va="bottom", fontsize=7, color="gray")
-    fig.suptitle(f"Method 4 stability scan ({r})  shared y: omega in {OMEGA_LIM}, tau in {TAU_LIM}")
+    fig.suptitle(f"Method 4 stability scan ({r})  per-plot auto y-axis")
     fig.tight_layout()
     tag = os.path.basename(files[0]).replace("_method4_two_mode.json", "")
     out = os.path.join(qd, f"{tag}_method4_stability.png")

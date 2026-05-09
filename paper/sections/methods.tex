@@ -1086,7 +1086,7 @@ eight consecutive start times of lowest combined relative scatter in
 $(\omega_0,\tau_0)$ and report the plateau mean and the plateau
 population standard deviation
 as the M4 estimate of $(\omega,\tau)$ and its
-window-systematic uncertainty $(\sigma_\omega,\sigma_\tau)$. The
+fit-window systematic uncertainty $(\sigma_\omega,\sigma_\tau)$. The
 block width $w = 8$ is fixed by the convention
 $w = \lfloor\tfrac12 N_{t_0}\rfloor$,
 which trades scan
@@ -1242,7 +1242,7 @@ reproducible criterion for the window. Definition~\ref{def:plateau}
 captures the operational criterion adopted in M4 and M5; inside the
 plateau the recovered $(\omega,\tau)$ are stationary in the window
 edges, and their variation across the plateau provides an estimate
-of the window-systematic uncertainty.
+of the fit-window systematic uncertainty.
 
 For the Schwarzschild $\ell = 2$ fundamental at our parameters the
 four relevant timescales are summarised by
@@ -1281,7 +1281,7 @@ approach extends these along two axes. First, we sweep both edges
 of the window simultaneously rather than $t_0$ alone (M5,
 Sec.~\ref{sec:qnm-methods}). Second, we quote the spread of the
 recovered $(\omega,\tau)$ across the empirically identified
-plateau as a window-systematic uncertainty for $\omega$, in lieu
+plateau as a fit-window systematic uncertainty for $\omega$, in lieu
 of the nonlinear-fit covariance which our M2 implementation
 discards (see Sec.~\ref{sec:reporting}).
 % --------------------------------------------------------------
@@ -1293,7 +1293,7 @@ the M4 plateau mean and $\tau$ from M2 on the wide window
 $[10,\,50]\,M$. The
 $\sigma_\omega$ quoted alongside $\omega$ is the M4 plateau standard
 deviation (Algorithm~\ref{alg:m4}, line~7), an estimate of the
-window-systematic uncertainty in the sense of
+fit-window systematic uncertainty in the sense of
 Def.~\ref{def:plateau}. M2 over a single fixed window does not
 produce an uncertainty, so the dispersion in $\tau$ across variants
 is reported only through the per-window per-method tables of
@@ -1327,7 +1327,7 @@ wider M2 window.
 
 The primary $\tau$ is taken from the post-hoc M2 wide-window fit
 on $\Phi_\theta(\xq,t)$ rather than from the learned scalar
-$\tau_{\mathrm{learned}}$, on account of the
+$\tau_{\mathrm{learned}}$, because of the
 $A_{\mathrm{ring}}$--$\tau$ degeneracy of
 Eq.~\eqref{eq:loss-ring} introduced in Sec.~\ref{sec:inv-pinn}
 and quantified in Sec.~\ref{sec:res-inv}.

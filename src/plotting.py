@@ -185,7 +185,7 @@ def plot_error_heatmap(
         cbar = fig.colorbar(im, ax=ax, pad=0.02)
         cbar.set_label(r"$\Phi_{\mathrm{FD}} - \Phi_{\mathrm{PINN}}$")
     else:
-        im = ax.pcolormesh(x, t, diff, shading="auto", cmap="hot_r")
+        im = ax.pcolormesh(x, t, diff, shading="auto", cmap="magma_r")
         cbar = fig.colorbar(im, ax=ax, pad=0.02)
         cbar.set_label(r"$|\Phi_{\mathrm{FD}} - \Phi_{\mathrm{PINN}}|$")
 

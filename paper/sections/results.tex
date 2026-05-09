@@ -147,7 +147,7 @@ M5 (2-D plateau)             & $0.3728{\pm}8{\times}10^{-4}$ & $0.23\%$ & $10.80
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.85\textwidth]{../outputs/qnm/zerilli_l2_greedy_f03_lbfgs30k/pinn_method4_stability.png}
+\includegraphics[width=0.95\textwidth]{../outputs/qnm/zerilli_l2_greedy_f03_lbfgs30k/pinn_method4_stability.png}
 \caption{M4 plateau diagnostic for the forward PINN.
 $(\omega_0,\tau_0)$ as a function of the start time $t_0$ on
 $[10,25]\,M$ at fixed $\tend = 50\,M$, with the eight-window
@@ -157,7 +157,7 @@ plateau block ($t_0\in[14,21]\,M$) shaded.}
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.75\textwidth,keepaspectratio]{../outputs/qnm/zerilli_l2_greedy_f03_lbfgs30k/pinn_method5_2d_heatmap.png}
+\includegraphics[width=0.85\textwidth,keepaspectratio]{../outputs/qnm/zerilli_l2_greedy_f03_lbfgs30k/pinn_method5_2d_heatmap.png}
 \caption{M5 plateau diagnostic for the forward PINN. Heatmap of
 the absolute deviation of the M2 estimate from the plateau median
 on the $(t_0,\tend)$ grid (capped at $5\%$); the contiguous
@@ -351,7 +351,7 @@ M5 (2-D plateau)             & $0.37485{\pm}3{\times}10^{-5}$ & $0.30\%$ & $9.48
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.85\textwidth]{../outputs/qnm/zerilli_l2_inverse_qnm_combo/pinn_method4_stability.png}
+\includegraphics[width=0.95\textwidth]{../outputs/qnm/zerilli_l2_inverse_qnm_combo/pinn_method4_stability.png}
 \caption{M4 plateau diagnostic for the inverse PINN, variant D.
 Format identical to Fig.~\ref{fig:fwd-plateau-m4}: $(\omega_0,
 \tau_0)$ as a function of $t_0$ at fixed $\tend = 50\,M$. The
@@ -364,7 +364,7 @@ $\sigma_\omega \sim 2\times 10^{-4}$ of the forward run.}
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.75\textwidth,keepaspectratio]{../outputs/qnm/zerilli_l2_inverse_qnm_combo/pinn_method5_2d_heatmap.png}
+\includegraphics[width=0.85\textwidth,keepaspectratio]{../outputs/qnm/zerilli_l2_inverse_qnm_combo/pinn_method5_2d_heatmap.png}
 \caption{M5 plateau diagnostic for the inverse PINN, variant D.
 Format identical to Fig.~\ref{fig:fwd-plateau-m5}: heatmap of the
 absolute deviation of the M2 estimate from the plateau median on
@@ -379,7 +379,7 @@ to within both methods' standard deviations.}
 
 The cross-method picture for variant D mirrors the forward run
 of Table~\ref{tab:fwd-qnm}: M4 and M5 yield mutually consistent
-$\omega$ estimates at the $0.30\%$ level with plateau scatters
+$\omega$ estimates at the $0.30\%$ level with plateau standard deviations
 $\sim 3\text{--}4\times 10^{-5}$, M1 is competitive on $\omega$
 ($0.29\%$) but loses on $\tau$ as expected from the
 log-line slope's sensitivity to the prompt burst, and M2 on the
@@ -693,7 +693,7 @@ exponentially-decaying ringdown after the prompt burst has
 exited.
 
 The 3-window hard partition (Cur-3w) makes the same diagnostic
-sharper: per-window RMSD grows monotonically with window index,
+sharper. Per-window RMSD grows monotonically with window index,
 $W_{1} \to W_{2} \to W_{3} = 5.5 \to 9.2 \to 13.2$ (units of
 $10^{-4}$). Each additional stitching boundary contributes a
 fresh interpolation error to the IC of the next window, and the
@@ -735,7 +735,7 @@ $\Phi_{\theta_{2}}$ across the overlap, drawn from the trained
 $\Phi_{\theta_{1}}$, which itself carries non-zero error
 ($\sim 1.7\times 10^{-3}$ on the overlap as measured against
 the FD reference); the anchors therefore propagate an error
-floor into $W_{2}$ that the PDE constraint has to fight against.
+floor into $W_{2}$ that the PDE constraint cannot reduce below.
 Second, the optimiser has to balance the PDE loss, the
 two IC residuals at $t = 20\,M$, and $\mathcal{L}_{\mathrm{cont}}$
 simultaneously, and the additional loss term modifies the
