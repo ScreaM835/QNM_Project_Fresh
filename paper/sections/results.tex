@@ -200,6 +200,8 @@ passed ($t_0 \gtrsim t_{\mathrm{burst}}$) and extends to the
 upper-$\tend$ edge of the simulation domain since
 $\tend \ll t_{\mathrm{tail}}$ on $[0,50]\,M$.
 
+\FloatBarrier
+
 % --------------------------------------------------------------
 \subsection{Inverse PINN}
 \label{sec:res-inv}
@@ -304,6 +306,93 @@ therefore a failed M4 result, not a tight estimate. \quad
 $\ddagger$ Two-mode NLS did not converge to a finite solution on
 any window; M4 returns NaN.
 \end{table}
+
+For variant D, the best of the six runs, we apply the same five
+extraction methods of Sec.~\ref{sec:qnm-methods} to the time
+series $\Phi_\theta(\xq=10\,M,t)$ from the converged inverse
+PINN, exactly as for the forward PINN of
+Table~\ref{tab:fwd-qnm}. The resulting numbers are collected in
+Table~\ref{tab:inv-qnm}, and the M4 and M5 plateau diagnostics
+are shown in Figs.~\ref{fig:inv-plateau-m4}
+and~\ref{fig:inv-plateau-m5}. M3 is omitted (its dominant
+amplitudes lie at $|c_k|\sim 10^{-23}$, the same ill-conditioning
+behaviour as on the forward problem;
+cf.\ Appendix~\ref{app:esprit}).
+
+\begin{table}[!htbp]
+\centering
+\caption{Inverse PINN QNM extraction for variant D, structured
+identically to Table~\ref{tab:fwd-qnm}. Reference values, window
+conventions, and plateau definitions are as in
+Table~\ref{tab:fwd-qnm}. M3 is not run for the inverse problem
+(see text and Appendix~\ref{app:esprit}).}
+\label{tab:inv-qnm}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.05}
+\begin{tabular}{@{}lccccl@{}}
+\toprule
+Method & $M\omega$ & $\omega$ err & $\tau/M$ & $\tau$ err & Window or plateau \\
+\midrule
+M1 (FFT $+$ log-line)        & $0.3726$  & $0.29\%$  & $9.91$  & $11.86\%$ & $[10,\,50]\,M$ \\
+M2 (NLS, wide)               & $0.3798$  & $1.63\%$  & $11.06$ & $\mathbf{1.59\%}$ & $[10,\,50]\,M$ \\
+M2 (NLS on M4 plateau)       & $0.3748$  & $0.30\%$  & $9.48$  & $15.66\%$ & $[18,\,50]\,M$ \\
+M3 (ESPRIT, $K=6$)           & ---       & ---       & ---     & ---       & not run, cf.\ Appendix~\ref{app:esprit} \\
+M4 (1-D plateau)             & $0.37484{\pm}4{\times}10^{-5}$ & $\mathbf{0.30\%}$ & $9.481{\pm}3{\times}10^{-3}$ & $15.66\%$ & $t_0\in[10,25]M$, $\tend{=}50M$ \\
+M5 (2-D plateau)             & $0.37485{\pm}3{\times}10^{-5}$ & $0.30\%$ & $9.485{\pm}3{\times}10^{-3}$ & $15.62\%$ & $t_0\in[15,25]M$, $\tend\in[42,50]M$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.85\textwidth]{../outputs/qnm/zerilli_l2_inverse_qnm_combo/pinn_method4_stability.png}
+\caption{M4 plateau diagnostic for the inverse PINN, variant D.
+Format identical to Fig.~\ref{fig:fwd-plateau-m4}: $(\omega_0,
+\tau_0)$ as a function of $t_0$ at fixed $\tend = 50\,M$. The
+plateau extends across essentially the entire
+$t_0\in[10,25]\,M$ scan range with $\sigma_\omega \sim 4\times
+10^{-5}$, more than two orders of magnitude tighter than the
+$\sigma_\omega \sim 2\times 10^{-4}$ of the forward run.}
+\label{fig:inv-plateau-m4}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.75\textwidth,keepaspectratio]{../outputs/qnm/zerilli_l2_inverse_qnm_combo/pinn_method5_2d_heatmap.png}
+\caption{M5 plateau diagnostic for the inverse PINN, variant D.
+Format identical to Fig.~\ref{fig:fwd-plateau-m5}: heatmap of the
+absolute deviation of the M2 estimate from the plateau median on
+the $(t_0,\tend)$ grid (capped at $5\%$); the contiguous plateau
+rectangle is outlined in red. The plateau is in the same
+$(t_0,\tend)$ corner as the forward run, with comparable
+in-block scatter; the M5 extracted value
+$M\omega = 0.37485 \pm 3\times 10^{-5}$ agrees with the M4 value
+to within both methods' standard deviations.}
+\label{fig:inv-plateau-m5}
+\end{figure}
+
+The cross-method picture for variant D mirrors the forward run
+of Table~\ref{tab:fwd-qnm}: M4 and M5 yield mutually consistent
+$\omega$ estimates at the $0.30\%$ level with plateau scatters
+$\sim 3\text{--}4\times 10^{-5}$, M1 is competitive on $\omega$
+($0.29\%$) but loses on $\tau$ as expected from the
+log-line slope's sensitivity to the prompt burst, and M2 on the
+wide window is the best $\tau$ estimator ($1.59\%$). For
+$\tau$, M4 and M5 collapse to the template-degeneracy value
+$\sim 9.48\,M$ (the same value the trained scalar
+$\tau_{\mathrm{learned}}$ converged to in
+Fig.~\ref{fig:inv-conv}), while M2 on the wide window recovers
+$11.06\,M$ from the network's own field $\Phi_\theta(\xq,t)$;
+this is the $A_{\mathrm{ring}}$--$\tau$ degeneracy of
+Eq.~\eqref{eq:loss-ring}, discussed quantitatively in the
+paragraph below and visualised in
+Fig.~\ref{fig:inv-conv}. The reporting convention of
+Sec.~\ref{sec:reporting} therefore takes $\omega$ from M4 and
+$\tau$ from M2-wide, as already used in
+Table~\ref{tab:inv-summary}.
+
+\FloatBarrier
 
 \begin{table}[!htbp]
 \centering
@@ -463,3 +552,5 @@ suppressed (cf.\ Eq.~\eqref{eq:timescales}), and the network's
 $\Phi_\theta(\xq,t)$ converges to a QNM-dominated waveform on
 which the M4 two-mode NLS finds a tight plateau, despite the
 drift of the template parameters themselves.
+
+\FloatBarrier

@@ -22,6 +22,8 @@
 \usepackage{caption}
 \usepackage{subcaption}
 \usepackage{float}  % provides [H] placement specifier
+\providecommand{\FloatBarrier}{\par\medskip}  % no-op fallback if placeins not installed
+\IfFileExists{placeins.sty}{\usepackage{placeins}}{}
 \captionsetup{font=small,labelfont=bf,labelsep=period}
 
 % --- Diagrams (TikZ) ---------------------------------------------------
