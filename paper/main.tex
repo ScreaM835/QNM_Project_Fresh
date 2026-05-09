@@ -22,7 +22,11 @@
 \usepackage{caption}
 \usepackage{subcaption}
 \usepackage{float}  % provides [H] placement specifier
-\providecommand{\FloatBarrier}{\par\medskip}  % no-op fallback if placeins not installed
+% placeins.sty is not installed on this TeXLive; emulate \FloatBarrier
+% with \clearpage so that subsection-end barriers actually flush all
+% pending floats. Weak fallbacks (e.g. \par\medskip) silently let
+% figures drift across subsection boundaries.
+\providecommand{\FloatBarrier}{\clearpage}
 \IfFileExists{placeins.sty}{\usepackage{placeins}}{}
 \captionsetup{font=small,labelfont=bf,labelsep=period}
 

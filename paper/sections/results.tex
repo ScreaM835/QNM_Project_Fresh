@@ -52,7 +52,7 @@ in Fig.~\ref{fig:fwd-heatmap}, and the per-component loss
 histories underlying Eq.~\eqref{eq:fwd-metrics} in
 Fig.~\ref{fig:fwd-loss}.
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.82\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/snapshots.png}\\[0.4em]
 \includegraphics[width=0.82\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/abs_diff_snapshots.png}
@@ -66,7 +66,7 @@ and remaining below $\sim\!5\times 10^{-3}$ throughout.}
 \label{fig:fwd-field}
 \end{figure}
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.92\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/error_heatmap.png}
 \caption{Forward PINN global pointwise error. Heatmap of
@@ -76,7 +76,7 @@ bound of Fig.~\ref{fig:fwd-field} holds globally.}
 \label{fig:fwd-heatmap}
 \end{figure}
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/loss.png}
 \caption{Forward PINN training history. Total loss
@@ -101,7 +101,7 @@ numbers from each method are collected in
 Table~\ref{tab:fwd-qnm}, and the plateau diagnostics that justify
 the M4 and M5 estimates are shown in Figs.~\ref{fig:fwd-plateau-m4} and~\ref{fig:fwd-plateau-m5}.
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/ringdown_overlay.png}\\[0.6em]
 \includegraphics[width=0.85\textwidth]{../outputs/qnm/zerilli_l2_greedy_f03_lbfgs30k/pinn_ringdown.png}
@@ -116,7 +116,7 @@ produce the entries of Table~\ref{tab:fwd-qnm}.}
 \label{fig:fwd-ringdown}
 \end{figure}
 
-\begin{table}[H]
+\begin{table}[!htbp]
 \centering
 \caption{Forward PINN QNM extraction. Reference values are the
 Leaver continued-fraction Schwarzschild $\ell = 2$ fundamental
@@ -145,7 +145,7 @@ M5 (2-D plateau)             & $0.3728{\pm}8{\times}10^{-4}$ & $0.23\%$ & $10.80
 \end{tabular}
 \end{table}
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.85\textwidth]{../outputs/qnm/zerilli_l2_greedy_f03_lbfgs30k/pinn_method4_stability.png}
 \caption{M4 plateau diagnostic for the forward PINN.
@@ -155,7 +155,7 @@ plateau block ($t_0\in[14,21]\,M$) shaded.}
 \label{fig:fwd-plateau-m4}
 \end{figure}
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.75\textwidth,keepaspectratio]{../outputs/qnm/zerilli_l2_greedy_f03_lbfgs30k/pinn_method5_2d_heatmap.png}
 \caption{M5 plateau diagnostic for the forward PINN. Heatmap of
@@ -211,7 +211,7 @@ Fig.~\ref{fig:inv-field}, the global pointwise error in
 Fig.~\ref{fig:inv-heatmap}, and the training-time convergence
 of the five learnable scalars in Fig.~\ref{fig:inv-conv}.
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.82\textwidth]{../outputs/pinn/zerilli_l2_inverse_qnm_combo/snapshots.png}\\[0.4em]
 \includegraphics[width=0.82\textwidth]{../outputs/pinn/zerilli_l2_inverse_qnm_combo/abs_diff_snapshots.png}
@@ -227,7 +227,7 @@ $M$ is simultaneously inferred to $0.34\%$ of its true value
 \label{fig:inv-field}
 \end{figure}
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.92\textwidth]{../outputs/pinn/zerilli_l2_inverse_qnm_combo/error_heatmap.png}
 \caption{Inverse PINN global pointwise error for variant D, in
@@ -237,7 +237,7 @@ domain $x\in[-50,150]\,M$, $t\in[0,50]\,M$.}
 \label{fig:inv-heatmap}
 \end{figure}
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_inverse_qnm_combo/param_convergence.png}
 \caption{Inverse PINN training-time parameter convergence for
@@ -260,7 +260,7 @@ Tables~\ref{tab:inv-learned} and~\ref{tab:tau-degeneracy}).}
 \label{fig:inv-conv}
 \end{figure}
 
-\begin{table}[H]
+\begin{table}[!htbp]
 \centering
 \caption{Inverse PINN primary results. $M$ is the learned mass.
 $\omega$ is the M4 plateau mean and $\sigma_\omega$ its plateau
@@ -308,7 +308,7 @@ amplitudes lie at $|c_k|\sim 10^{-23}$, the same ill-conditioning
 behaviour as on the forward problem;
 cf.\ Appendix~\ref{app:esprit}).
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_inverse_qnm_combo/ringdown_overlay.png}\\[0.6em]
 \includegraphics[width=0.85\textwidth]{../outputs/qnm/zerilli_l2_inverse_qnm_combo/pinn_ringdown.png}
@@ -324,7 +324,7 @@ entries of Table~\ref{tab:inv-qnm}.}
 \label{fig:inv-ringdown}
 \end{figure}
 
-\begin{table}[H]
+\begin{table}[!htbp]
 \centering
 \caption{Inverse PINN QNM extraction for variant D, structured
 identically to Table~\ref{tab:fwd-qnm}. Reference values, window
@@ -349,7 +349,7 @@ M5 (2-D plateau)             & $0.37485{\pm}3{\times}10^{-5}$ & $0.30\%$ & $9.48
 \end{tabular}
 \end{table}
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.85\textwidth]{../outputs/qnm/zerilli_l2_inverse_qnm_combo/pinn_method4_stability.png}
 \caption{M4 plateau diagnostic for the inverse PINN, variant D.
@@ -362,7 +362,7 @@ $\sigma_\omega \sim 2\times 10^{-4}$ of the forward run.}
 \label{fig:inv-plateau-m4}
 \end{figure}
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.75\textwidth,keepaspectratio]{../outputs/qnm/zerilli_l2_inverse_qnm_combo/pinn_method5_2d_heatmap.png}
 \caption{M5 plateau diagnostic for the inverse PINN, variant D.
@@ -398,7 +398,7 @@ Sec.~\ref{sec:reporting} therefore takes $\omega$ from M4 and
 $\tau$ from M2-wide, as already used in
 Table~\ref{tab:inv-summary}.
 
-\begin{table}[H]
+\begin{table}[!htbp]
 \centering
 \caption{Inverse PINN learned template parameters at the end of
 training for each
@@ -504,7 +504,7 @@ Table~\ref{tab:tau-degeneracy} compares
 $\tau_{\mathrm{learned}}$ to the post-hoc M2 wide-window fit on
 $\Phi_\theta(\xq,t)$ for all six variants.
 
-\begin{table}[H]
+\begin{table}[!htbp]
 \centering
 \caption{$A_{\mathrm{ring}}$--$\tau$ degeneracy diagnostic. The
 training-time learned $\tau_{\mathrm{learned}}$ is the value of the
