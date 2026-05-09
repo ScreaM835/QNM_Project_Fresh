@@ -1,4 +1,6 @@
-# Project 32 — Schwarzschild QNMs with a PINN (Even parity Zerilli, ℓ=2)
+# A Unified Physics-Informed Neural Network Framework for Schwarzschild Quasi-Normal Modes Extraction
+
+*(Project 32 — Even parity Zerilli, ℓ=2)*
 
 This repository is a **reproducibility-first** implementation of the time-domain
 Schwarzschild perturbation problem used in Project 32, focusing on the **even-parity
