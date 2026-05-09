@@ -46,43 +46,28 @@ $5.0\times 10^{-4}$ versus their $1.82\times 10^{-2}$, a factor
 of~$\sim\!36$. We attribute the improvement to the larger number
 of L-BFGS iterations and the greedy adaptive sampling of
 Sec.~\ref{sec:fwd-pinn}; see also the discussion in
-Sec.~\ref{sec:discussion}. The snapshot and
-error-heatmap visualisations are collected in
-Fig.~\ref{fig:fwd-field}, the pointwise residual at the snapshot
-times and on the full $(x,t)$ domain in
-Fig.~\ref{fig:fwd-field-full}, and the per-component loss
-histories underlying Eq.~\eqref{eq:fwd-metrics} are shown in
+Sec.~\ref{sec:discussion}. The field-accuracy visualisations
+(snapshot overlay, pointwise residual at the snapshot times,
+and full-domain pointwise error heatmap) are collected in
+Fig.~\ref{fig:fwd-field}, and the per-component loss histories
+underlying Eq.~\eqref{eq:fwd-metrics} are shown in
 Fig.~\ref{fig:fwd-loss}.
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/snapshots.png}\\[0.6em]
-\includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/error_heatmap_zoomed.png}
+\includegraphics[width=0.82\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/snapshots.png}\\[0.4em]
+\includegraphics[width=0.82\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/abs_diff_snapshots.png}\\[0.4em]
+\includegraphics[width=0.82\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/error_heatmap.png}
 \caption{Forward PINN versus FD reference. Top: snapshots of
-$\Phi(x,t)$ at four times $t/M\in\{10,20,30,40\}$ overlaid for the
-PINN and the FD reference; the two curves are visually
-indistinguishable on this scale. Bottom: heatmap of
-$|\Phi_\theta - \Phi_{\mathrm{FD}}|$ on the QNM-relevant subdomain
-$x \in [-20,60]\,M$, $t \in [0,50]\,M$, with the colour scale
-saturating below $7\times 10^{-3}$.}
+$\Phi(x,t)$ at four times $t/M\in\{10,20,30,40\}$ overlaid for
+the PINN and the FD reference; the two curves are visually
+indistinguishable on this scale. Middle: pointwise
+$|\Phi_\theta - \Phi_{\mathrm{FD}}|$ at the same four times,
+concentrated near the potential barrier and remaining below
+$\sim\!5\times 10^{-3}$ throughout. Bottom: full-domain
+heatmap of $|\Phi_\theta - \Phi_{\mathrm{FD}}|$ on
+$x\in[-50,150]\,M$, $t\in[0,50]\,M$.}
 \label{fig:fwd-field}
-\end{figure}
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/abs_diff_snapshots.png}\\[0.6em]
-\includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/error_heatmap.png}
-\caption{Forward PINN pointwise residual. Top: pointwise
-$|\Phi_\theta - \Phi_{\mathrm{FD}}|$ as a function of $x$ at the
-four snapshot times $t/M\in\{10,20,30,40\}$, showing that the
-residual is concentrated near the potential barrier and remains
-below $\sim\!5\times 10^{-3}$ at all four times. Bottom: the
-full-domain analogue of the bottom panel of
-Fig.~\ref{fig:fwd-field}, on the entire training domain rather
-than the QNM-relevant subdomain. The same colour scale is used,
-confirming that the bound visible in Fig.~\ref{fig:fwd-field}
-holds globally.}
-\label{fig:fwd-field-full}
 \end{figure}
 
 \begin{figure}[!htbp]
@@ -224,16 +209,20 @@ paragraph below, before mass recovery and M4 plateau quality.
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_inverse_qnm_combo/snapshots.png}\\[0.6em]
-\includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_inverse_qnm_combo/abs_diff_snapshots.png}
-\caption{Inverse PINN versus FD reference for variant D. Top:
+\includegraphics[width=0.82\textwidth]{../outputs/pinn/zerilli_l2_inverse_qnm_combo/snapshots.png}\\[0.4em]
+\includegraphics[width=0.82\textwidth]{../outputs/pinn/zerilli_l2_inverse_qnm_combo/abs_diff_snapshots.png}\\[0.4em]
+\includegraphics[width=0.82\textwidth]{../outputs/pinn/zerilli_l2_inverse_qnm_combo/error_heatmap.png}
+\caption{Inverse PINN versus FD reference for variant D, in the
+same three-panel format as Fig.~\ref{fig:fwd-field}. Top:
 snapshots of $\Phi(x,t)$ at $t/M\in\{10,20,30,40\}$ overlaid for
 the inverse PINN and the FD reference, with $M$ treated as an
-unknown trainable scalar. Bottom: pointwise
-$|\Phi_\theta - \Phi_{\mathrm{FD}}|$ at the same four times. The
-field-recovery quality is comparable to the forward run
-(Fig.~\ref{fig:fwd-field}) while $M$ is simultaneously inferred
-to $0.34\%$ of its true value (Table~\ref{tab:inv-summary}).}
+unknown trainable scalar. Middle: pointwise
+$|\Phi_\theta - \Phi_{\mathrm{FD}}|$ at the same four times.
+Bottom: full-domain heatmap of
+$|\Phi_\theta - \Phi_{\mathrm{FD}}|$ on $x\in[-50,150]\,M$,
+$t\in[0,50]\,M$. The field-recovery quality is comparable to
+the forward run while $M$ is simultaneously inferred to $0.34\%$
+of its true value (Table~\ref{tab:inv-summary}).}
 \label{fig:inv-field}
 \end{figure}
 
@@ -339,7 +328,7 @@ M2 (NLS, wide)               & $0.3798$  & $1.63\%$  & $11.06$ & $\mathbf{1.59\%
 M2 (NLS on M4 plateau)       & $0.3748$  & $0.30\%$  & $9.48$  & $15.66\%$ & $[18,\,50]\,M$ \\
 M3 (ESPRIT, $K=6$)           & ---       & ---       & ---     & ---       & not run, cf.\ Appendix~\ref{app:esprit} \\
 M4 (1-D plateau)             & $0.37484{\pm}4{\times}10^{-5}$ & $\mathbf{0.30\%}$ & $9.481{\pm}3{\times}10^{-3}$ & $15.66\%$ & $t_0\in[10,25]M$, $\tend{=}50M$ \\
-M5 (2-D plateau)             & $0.37485{\pm}3{\times}10^{-5}$ & $0.30\%$ & $9.485{\pm}3{\times}10^{-3}$ & $15.62\%$ & $t_0\in[15,25]M$, $\tend\in[42,50]M$ \\
+M5 (2-D plateau)             & $0.37485{\pm}3{\times}10^{-5}$ & $0.30\%$ & $9.485{\pm}3{\times}10^{-3}$ & $15.62\%$ & $t_0\in[10,16.7]M$, $\tend\in[42,50]M$ \\
 \bottomrule
 \end{tabular}
 \end{table}
