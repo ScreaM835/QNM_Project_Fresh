@@ -767,6 +767,237 @@ value is reported separately as a diagnostic in
 Sec.~\ref{sec:results} to characterise the degeneracy.
 
 % --------------------------------------------------------------
+\subsection{Curriculum PINN}
+\label{sec:cur-pinn}
+
+The forward PINN of Sec.~\ref{sec:fwd-pinn} trains a single
+network on the full temporal domain $t \in [0,50]\,M$. The
+pointwise error of the converged baseline grows monotonically
+with $t$: the late-time band $t \in [37.5,\,50]\,M$ contributes
+$\sim 41\%$ of the total RMSD against the FD reference, despite
+spanning only a quarter of the domain. This motivates a
+curriculum-learning strategy
+\citep{Bengio2009curriculum,Krishnapriyan2021failure} in which
+the temporal domain is split into $K$ contiguous windows and a
+separate PINN is trained sequentially on each window, with the
+trained $k$-th PINN providing the initial conditions for the
+$(k{+}1)$-th. Smaller temporal sub-domains carry less of the
+late-time decay range and therefore an easier optimisation
+landscape; the price is that the initial conditions of every
+window after the first are themselves PINN outputs, and so
+inherit the residual error of the previous window.
+
+\paragraph{Hard partition.} The general $K$-window curriculum
+splits the temporal domain at $K-1$ split points
+$t_{\min} < t_{1} < \dots < t_{K-1} < t_{\max}$ into $K$ disjoint
+windows
+\begin{equation}
+  W_{k} = [t_{k-1},\,t_{k}],
+  \qquad
+  t_{0} = t_{\min},\;\; t_{K} = t_{\max}.
+  \label{eq:cur-split}
+\end{equation}
+On each window we train an independent PINN
+$\Phi_{\theta_{k}}$ with the same architecture as
+Sec.~\ref{sec:fwd-pinn}, the loss Eq.~\eqref{eq:loss-fwd},
+weights Eq.~\eqref{eq:weights}, and optimiser schedule (Adam
+$10{,}000$ + L-BFGS $30{,}000$). Window $W_{1}$ uses the analytic
+Gaussian-pulse initial conditions of Eq.~\eqref{eq:ic};
+for $k \ge 2$ the initial conditions at $t = t_{k-1}$ are
+extracted from the trained $\Phi_{\theta_{k-1}}$ at the matching
+time slice,
+\begin{equation}
+  \Phi^{\mathrm{IC}}_{k}(x) = \Phi_{\theta_{k-1}}(x,\,t_{k-1}),
+  \qquad
+  \partial_{t}\Phi^{\mathrm{IC}}_{k}(x)
+   = \partial_{t}\Phi_{\theta_{k-1}}(x,\,t_{k-1}),
+  \label{eq:cur-ic}
+\end{equation}
+with the velocity field $\partial_{t}\Phi_{\theta_{k-1}}$
+computed by automatic differentiation on the trained network and
+both fields then evaluated by cubic-spline interpolation at the
+collocation points of $W_{k}$. The IC residuals
+$\mathcal{L}_{\Phi}^{\mathrm{IC}},
+\mathcal{L}_{\partial_{t}\Phi}^{\mathrm{IC}}$ in
+Eq.~\eqref{eq:loss-components} are then evaluated against
+Eq.~\eqref{eq:cur-ic} rather than against the analytic IC. The
+greedy adaptive resampler of Sec.~\ref{sec:fwd-pinn} is restarted
+fresh on each window so that $0.3 N_{r}$ collocation points are
+concentrated on the window's own residual field. The final
+stitched field is
+\begin{equation}
+  \Phi_{\mathrm{cur}}(x,t)
+  = \Phi_{\theta_{k}}(x,t),
+  \qquad t \in W_{k},
+  \label{eq:cur-stitch}
+\end{equation}
+with the splits $\{t_{k}\}_{k=1}^{K-1}$ being the only points at
+which two networks could disagree; we adopt the convention that
+$\Phi_{\theta_{k+1}}$ owns the splice time exactly.
+
+\paragraph{Soft-overlap partition.} The hard partition of
+Eq.~\eqref{eq:cur-stitch} produces a discontinuity in the stitched
+field whenever
+$\Phi_{\theta_{k}}(x,t_{k}) \ne \Phi_{\theta_{k+1}}(x,t_{k})$,
+which occurs generically because $\Phi_{\theta_{k+1}}$ is trained
+against an interpolated rather than exact initial condition. We
+also implement a soft-overlap variant in which two consecutive
+windows share an overlap band of width $\Delta_{\mathrm{ov}}$
+centred on $t_{\mathrm{split}}$,
+\begin{equation}
+  W_{1}^{\mathrm{ov}}
+   = [t_{\min},\,t_{\mathrm{split}} + \Delta_{\mathrm{ov}}/2],
+  \qquad
+  W_{2}^{\mathrm{ov}}
+   = [t_{\mathrm{split}} - \Delta_{\mathrm{ov}}/2,\,t_{\max}],
+  \label{eq:cur-soft}
+\end{equation}
+with two additional ingredients on top of Eq.~\eqref{eq:cur-ic}.
+First, $\Phi_{\theta_{2}}$ receives a fixed
+\emph{continuity-anchor} loss term on a uniform grid of
+$n_{x} \times n_{t}$ points across the overlap rectangle
+$[x_{\min},x_{\max}] \times
+[t_{\mathrm{split}} - \Delta_{\mathrm{ov}}/2,\,
+ t_{\mathrm{split}} + \Delta_{\mathrm{ov}}/2]$,
+\begin{equation}
+  \mathcal{L}_{\mathrm{cont}}
+  = \frac{\lambda_{\mathrm{cont}}}{n_{x} n_{t}}
+    \sum_{i=1}^{n_{x}}\sum_{j=1}^{n_{t}}
+    \bigl(\Phi_{\theta_{2}}(x_{i},t_{j})
+        - \Phi_{\theta_{1}}(x_{i},t_{j})\bigr)^{2},
+  \label{eq:cur-anchor}
+\end{equation}
+that pulls $\Phi_{\theta_{2}}$ towards the (already-trained)
+$\Phi_{\theta_{1}}$ across the entire overlap rather than at the
+splice time alone. Second, the final field on the overlap is a
+smoothstep-blended average of the two networks,
+\begin{equation}
+  \Phi_{\mathrm{cur}}^{\mathrm{ov}}(x,t)
+  = \bigl(1 - s(\xi)\bigr)\,\Phi_{\theta_{1}}(x,t)
+   + s(\xi)\,\Phi_{\theta_{2}}(x,t),
+  \quad
+  s(\xi) = \xi^{2}(3 - 2\xi),
+  \quad
+  \xi = \frac{t - t_{\mathrm{ov}}^{-}}{\Delta_{\mathrm{ov}}},
+  \label{eq:cur-blend}
+\end{equation}
+with $t_{\mathrm{ov}}^{-} = t_{\mathrm{split}} -
+\Delta_{\mathrm{ov}}/2$, on the band
+$t \in W_{1}^{\mathrm{ov}} \cap W_{2}^{\mathrm{ov}}$. The
+smoothstep $s$ is $C^{1}$ and satisfies $s(0) = 0$, $s(1) = 1$,
+$s'(0) = s'(1) = 0$, so the blended field is continuously
+differentiable across the overlap edges. Outside the overlap the
+stitching reduces to Eq.~\eqref{eq:cur-stitch}.
+
+We study three configurations of the curriculum PINN, summarised
+in Table~\ref{tab:cur-variants}: a 2-window hard partition at
+$t_{\mathrm{split}} = 25\,M$, a 3-window hard partition at
+$\{17,34\}\,M$, and a 2-window soft-overlap partition with
+$\Delta_{\mathrm{ov}} = 10\,M$, $n_{x} \times n_{t} = 201\times 11$
+continuity anchors and $\lambda_{\mathrm{cont}} = 10$. All three
+variants share the per-window architecture of
+Sec.~\ref{sec:fwd-pinn}, the loss Eq.~\eqref{eq:loss-fwd}, the
+weights Eq.~\eqref{eq:weights}, and the (Adam + L-BFGS) optimiser
+schedule applied independently per window (so the total training
+budget scales linearly with $K$).
+
+\begin{table}[!htbp]
+\centering
+\caption{Curriculum PINN variants. ``Windows'' lists the temporal
+sub-domains in units of $M$. The hard-partition variants stitch
+through Eq.~\eqref{eq:cur-stitch}; the soft-overlap variant
+additionally applies the continuity anchors of
+Eq.~\eqref{eq:cur-anchor} and the smoothstep blend of
+Eq.~\eqref{eq:cur-blend} on the overlap band.}
+\label{tab:cur-variants}
+\small
+\setlength{\tabcolsep}{6pt}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Tag      & Config name                          & Windows                          & Stitching \\
+\midrule
+Cur-2w   & \texttt{curriculum}                  & $[0,25]\cup[25,50]$              & hard \\
+Cur-3w   & \texttt{curriculum\_3w}              & $[0,17]\cup[17,34]\cup[34,50]$   & hard \\
+Cur-soft & \texttt{soft\_overlap\_curriculum}   & $[0,30]\cup[20,50]$              & soft, $\Delta_{\mathrm{ov}}{=}10$, $\lambda_{\mathrm{cont}}{=}10$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The schematic of the three partitions is shown in
+Fig.~\ref{fig:cur-partition}, alongside the IC-transfer arrows
+that distinguish each variant.
+
+\begin{figure}[!htbp]
+\centering
+\begin{tikzpicture}[
+  every node/.style={font=\small},
+  win/.style={draw, rounded corners=2pt, minimum height=8mm,
+              inner sep=2pt, font=\small},
+  ovl/.style={draw, rounded corners=2pt, minimum height=8mm,
+              inner sep=2pt, fill=purple!15, font=\small},
+  arr/.style={->, >=stealth, thick, gray!70!black},
+  tick/.style={font=\scriptsize, gray!70!black},
+]
+  % Horizontal axis scale: 1 cm per 5 M of time.
+  \def\sc{0.24}    % cm per M
+
+  % --- Cur-2w: [0,25] U [25,50] ---
+  \node[font=\small\bfseries] at (-0.5*\sc*50 - 1.4, 1.6) {Cur-2w:};
+  \node[win, fill=orange!20, minimum width={25*\sc cm}] (a1)
+       at ({(0+25)/2*\sc - 0.5*50*\sc}, 1.6) {$W_{1}=[0,25]M$};
+  \node[win, fill=blue!15,   minimum width={25*\sc cm}] (a2)
+       at ({(25+50)/2*\sc - 0.5*50*\sc}, 1.6) {$W_{2}=[25,50]M$};
+  \draw[arr] (a1.east) -- node[above, font=\scriptsize]{IC at $t{=}25$} (a2.west);
+
+  % --- Cur-3w: [0,17] U [17,34] U [34,50] ---
+  \node[font=\small\bfseries] at (-0.5*\sc*50 - 1.4, 0.0) {Cur-3w:};
+  \node[win, fill=orange!20, minimum width={17*\sc cm}] (b1)
+       at ({(0+17)/2*\sc - 0.5*50*\sc}, 0.0) {$[0,17]M$};
+  \node[win, fill=blue!15,   minimum width={17*\sc cm}] (b2)
+       at ({(17+34)/2*\sc - 0.5*50*\sc}, 0.0) {$[17,34]M$};
+  \node[win, fill=green!15,  minimum width={16*\sc cm}] (b3)
+       at ({(34+50)/2*\sc - 0.5*50*\sc}, 0.0) {$[34,50]M$};
+  \draw[arr] (b1.east) -- (b2.west);
+  \draw[arr] (b2.east) -- (b3.west);
+
+  % --- Cur-soft: [0,30] and [20,50] with overlap [20,30] ---
+  \node[font=\small\bfseries] at (-0.5*\sc*50 - 1.4, -1.6) {Cur-soft:};
+  % Background W1 [0,30]
+  \node[win, fill=orange!20, minimum width={30*\sc cm}] (c1)
+       at ({(0+30)/2*\sc - 0.5*50*\sc}, -1.6) {$W_{1}^{\mathrm{ov}}=[0,30]M$};
+  % Background W2 [20,50]
+  \node[win, fill=blue!15,   minimum width={30*\sc cm}] (c2)
+       at ({(20+50)/2*\sc - 0.5*50*\sc}, -2.4) {$W_{2}^{\mathrm{ov}}=[20,50]M$};
+  % Overlap band marker
+  \node[ovl, minimum width={10*\sc cm}] (cov)
+       at ({(20+30)/2*\sc - 0.5*50*\sc}, -3.2) {overlap $[20,30]M$};
+  \draw[arr] (c1.east) |- node[right, font=\scriptsize, pos=0.25]{IC + anchors} (c2.east);
+
+  % Time axis (bottom)
+  \draw[->, thick] ({0*\sc - 0.5*50*\sc}, -4.2)
+                -- ({50*\sc - 0.5*50*\sc + 0.4}, -4.2)
+                node[right]{$t/M$};
+  \foreach \t in {0,10,20,25,30,34,40,50}{
+    \draw ({\t*\sc - 0.5*50*\sc}, -4.2) -- ({\t*\sc - 0.5*50*\sc}, -4.35);
+    \node[tick, below] at ({\t*\sc - 0.5*50*\sc}, -4.35) {\t};
+  }
+\end{tikzpicture}
+\caption{Curriculum PINN partitions. Cur-2w (top) splits the
+temporal domain at $t = 25\,M$ into two disjoint hard-stitched
+windows; the trained network on $W_{1}$ supplies the numerical
+initial condition Eq.~\eqref{eq:cur-ic} for $W_{2}$. Cur-3w
+(middle) splits at $\{17,34\}\,M$ into three windows with the
+same hard-stitch IC transfer between consecutive windows.
+Cur-soft (bottom) uses overlapping windows
+$W_{1}^{\mathrm{ov}} = [0,30]\,M$ and
+$W_{2}^{\mathrm{ov}} = [20,50]\,M$ with a $10\,M$ overlap band
+(purple) on which the continuity anchors of
+Eq.~\eqref{eq:cur-anchor} are imposed and the smoothstep blend of
+Eq.~\eqref{eq:cur-blend} is applied to the final stitched field.}
+\label{fig:cur-partition}
+\end{figure}
+
+% --------------------------------------------------------------
 \subsection{QNM extraction methods}
 \label{sec:qnm-methods}
 

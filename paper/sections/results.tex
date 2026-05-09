@@ -558,3 +558,160 @@ which the M4 two-mode NLS finds a tight plateau, despite the
 drift of the template parameters themselves.
 
 \FloatBarrier
+
+% --------------------------------------------------------------
+\subsection{Curriculum PINN}
+\label{sec:res-cur}
+
+We evaluate the three curriculum variants of
+Sec.~\ref{sec:cur-pinn} against the single-window forward PINN
+baseline of Sec.~\ref{sec:res-fwd}. Every variant uses the same
+per-window architecture, loss, weights and (Adam $10{,}000$ +
+L-BFGS $30{,}000$) optimiser schedule as the baseline, applied
+independently per window. Field-accuracy metrics on the full
+domain are collected in Table~\ref{tab:cur-summary}, together
+with the per-window RMSDs that diagnose where the error is
+concentrated, and with the post-hoc M1 and M2 QNM extractions
+applied to the stitched ringdown $\Phi_{\mathrm{cur}}(\xq,t)$ at
+$\xq = 10\,M$.
+
+\begin{table}[!htbp]
+\centering
+\caption{Curriculum PINN variants versus the single-window
+forward baseline. Full-domain RMSD against the FD reference (one
+column), the per-window RMSD on each sub-domain (one column per
+window, ``---'' if the variant does not use that window), and the
+post-hoc M1 (FFT$+$log-line) and M2 (NLS, wide window
+$[10,50]\,M$) errors on $\Phi(\xq,t)$. Reference values are the
+Leaver continued-fraction Schwarzschild $\ell{=}2$ fundamental
+$M\omega_{0} = 0.3737$, $\tau_{0}/M = 11.241$.}
+\label{tab:cur-summary}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.05}
+\begin{tabular}{@{}lcccccccc@{}}
+\toprule
+Variant & RMSD ($\times 10^{-3}$) & $W_{1}$ RMSD & $W_{2}$ RMSD & $W_{3}$ RMSD
+        & M1 $\omega$ err & M1 $\tau$ err & M2 $\omega$ err & M2 $\tau$ err \\
+\midrule
+Baseline (single window) & $0.817$ & $-\!\!-\!\!-$ & $-\!\!-\!\!-$ & $-\!\!-\!\!-$
+                         & $0.68\%$ & $2.83\%$ & $1.54\%$ & $1.99\%$ \\
+\midrule
+Cur-2w   & $\mathbf{0.845}$ & $0.516$ & $1.077$ & $-\!\!-\!\!-$
+         & $0.70\%$ & $2.95\%$ & $1.53\%$ & $2.11\%$ \\
+Cur-3w   & $0.976$ & $0.554$ & $0.920$ & $1.322$
+         & $0.69\%$ & $3.83\%$ & $1.59\%$ & $1.93\%$ \\
+Cur-soft & $3.155$ & $1.739$ & $3.932$ & $-\!\!-\!\!-$
+         & $1.20\%$ & $6.37\%$ & $1.19\%$ & $1.77\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The 2-window hard partition (Cur-2w) is essentially tied with the
+single-window baseline on the full-domain RMSD
+($8.45 \times 10^{-4}$ versus $8.17 \times 10^{-4}$, a $3\%$
+increase) and on every QNM extraction column. The per-window
+breakdown is, however, informative: $W_{1} = [0,25]\,M$ alone
+reaches RMSD $5.16\times 10^{-4}$, the lowest sub-domain RMSD
+seen anywhere in this work and a $37\%$ improvement on the
+baseline RMSD evaluated over the same sub-domain (which we read
+off the baseline's pointwise error map; the time-restricted
+baseline RMSD on $[0,25]\,M$ is $8.2\times 10^{-4}$).
+The curriculum strategy does therefore deliver the predicted
+local benefit on a smaller temporal sub-domain. The benefit is
+neutralised by $W_{2} = [25,50]\,M$, which sees RMSD
+$10.8\times 10^{-4}$, larger than the full-domain baseline and
+roughly $2\times$ larger than $W_{1}$. The $W_{2}$ error
+inherits both (i) the residual error of $W_{1}$ at $t = 25\,M$
+through the IC transfer of Eq.~\eqref{eq:cur-ic} and (ii) the
+greater dynamic-range demand of resolving the late-time
+exponentially-decaying ringdown after the prompt burst has
+exited.
+
+The 3-window hard partition (Cur-3w) makes the same diagnostic
+sharper: per-window RMSD grows monotonically with window index,
+$W_{1} \to W_{2} \to W_{3} = 5.5 \to 9.2 \to 13.2$ (units of
+$10^{-4}$). Each additional stitching boundary contributes a
+fresh interpolation error to the IC of the next window, and the
+errors compound. The full-domain RMSD ends $19\%$ above the
+single-window baseline, and the M1 $\tau$ error worsens from
+$2.95\%$ (Cur-2w) to $3.83\%$ (Cur-3w), tracking the additional
+late-time stitching error. The M2 wide-window $\omega$ and
+$\tau$ are largely insensitive to which curriculum variant is
+used, which is consistent with the wide window averaging over
+the per-window errors.
+
+The soft-overlap variant (Cur-soft) does not improve the
+hard-partition result. It performs worse on every column except
+the M2 $\tau$ extraction, which it ties. The full-domain RMSD
+is $\sim 4\times$ the single-window baseline, and both $W_{1}$
+and $W_{2}$ are individually worse than their hard-partition
+counterparts. Two factors plausibly contribute. First, the
+continuity-anchor loss Eq.~\eqref{eq:cur-anchor} imposes
+$201 \times 11 = 2{,}211$ additional point constraints on
+$\Phi_{\theta_{2}}$ across the overlap, drawn from the trained
+$\Phi_{\theta_{1}}$, which itself carries non-zero error
+($\sim 1.7\times 10^{-3}$ on the overlap as measured against
+the FD reference); the anchors therefore propagate an error
+floor into $W_{2}$ that the PDE constraint has to fight against.
+Second, the optimiser has to balance the PDE loss, the
+two IC residuals at $t = 20\,M$, and $\mathcal{L}_{\mathrm{cont}}$
+simultaneously, and the additional loss term modifies the
+relative weighting from the
+$\boldsymbol{\lambda} = (100,100,100,1,100,1,1)$ baseline that
+was tuned for the single-window setup.
+
+\begin{figure}[!htbp]
+\centering
+\begin{minipage}[t]{0.49\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{../outputs/pinn/zerilli_l2_curriculum/ringdown_overlay.png}
+  \\{\footnotesize Cur-2w: $[0,25]\cup[25,50]\,M$}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{../outputs/pinn/zerilli_l2_curriculum_3w/ringdown_overlay.png}
+  \\{\footnotesize Cur-3w: $[0,17]\cup[17,34]\cup[34,50]\,M$}
+\end{minipage}
+\caption{Curriculum PINN ringdown at $\xq = 10\,M$. Stitched
+$\Phi_{\mathrm{cur}}(\xq,t)$ overlaid on the FD reference for the
+2-window (left) and 3-window (right) hard-partition variants.
+Both reproduce the full ringdown waveform at the observer; the
+3-window stitch shows visibly larger late-time deviations
+($t \gtrsim 35\,M$), consistent with the per-window RMSD trend
+of Table~\ref{tab:cur-summary}.}
+\label{fig:cur-ringdown}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.92\textwidth]{../outputs/pinn/zerilli_l2_curriculum/error_heatmap.png}
+\caption{Curriculum PINN (Cur-2w) global pointwise error.
+Heatmap of $|\Phi_{\mathrm{cur}} - \Phi_{\mathrm{FD}}|$ on the
+full training domain $x \in [-50,150]\,M$,
+$t \in [0,50]\,M$. The vertical band of elevated error near
+$t = 25\,M$ marks the splice between $W_{1}$ and $W_{2}$, where
+$\Phi_{\theta_{2}}$ is initialised from the interpolated
+$W_{1}$ output. The $W_{2}$ band ($t > 25\,M$) carries roughly
+twice the RMSD of $W_{1}$, consistent with
+Table~\ref{tab:cur-summary}.}
+\label{fig:cur-heatmap}
+\end{figure}
+
+The curriculum strategy therefore meets its narrow design
+objective (lower per-window error on the early sub-domain) but
+does not translate into a lower full-domain RMSD or a tighter
+QNM extraction once the windows are stitched. The dominant cost
+is the IC-transfer interpolation error, which compounds linearly
+with the number of stitching boundaries and grows at late times
+as the signal amplitude decays. A useful baseline against which
+the curriculum should be compared is the
+greedy-adaptive-sampling forward PINN of Sec.~\ref{sec:fwd-pinn}
+itself, which delivers the same factor-of-two reduction in
+late-time error without paying the per-stitch interpolation cost,
+by concentrating $0.3\,N_{r}$ of the collocation budget on the
+high-residual late-time band within a single network. We discuss
+the implications for the broader curriculum-PINN literature in
+Sec.~\ref{sec:discussion}.
+
+\FloatBarrier

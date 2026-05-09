@@ -38,7 +38,35 @@ six-variant ablation of Table~\ref{tab:variants} isolates the
 effects of the ringdown weight $\lambda_{\mathrm{ring}}$, the
 ringdown lower bound $\tring$, and the addition of an overtone
 in the template.
-
+The curriculum-learning extension of Sec.~\ref{sec:cur-pinn}
+addresses a different question: whether splitting the temporal
+domain into smaller windows lowers the full-domain forward error.
+The answer on this problem is no.
+Table~\ref{tab:cur-summary} shows that, while the
+$W_{1} = [0,25]\,M$ window of the 2-window curriculum reaches
+RMSD $5.2\times 10^{-4}$ (the lowest sub-domain RMSD recorded
+anywhere in this work), the $W_{2}$ stitching error and the
+late-time error growth offset the local gain, leaving the
+full-domain RMSD slightly worse than the single-window
+greedy-adaptive baseline; the 3-window variant compounds the
+stitching error monotonically across windows, and the
+soft-overlap variant performs worse still. The curriculum
+literature \citep{Krishnapriyan2021failure,Bengio2009curriculum}
+predicts gains for problems whose loss landscape is dominated by
+late-time stiffness once the network has been forced to learn
+the full domain at once. In our setup, the residual-greedy
+adaptive sampler of Sec.~\ref{sec:fwd-pinn} already concentrates
+$0.3\,N_r$ of the collocation budget on the high-residual
+late-time band within a single network, and so absorbs the same
+benefit a curriculum would provide without paying the per-stitch
+interpolation cost. We expect the curriculum strategy to be
+worthwhile when the time domain is long enough that even a
+fully-greedy single-window PINN cannot cover the late-time decay
+range with adequate collocation density --- e.g.\ for
+$t_{\max} \gtrsim 5\,t_{\mathrm{tail}}$, where the QNM regime,
+the late tail, and the Sommerfeld arrival time all enter the
+same training window --- but on the present
+$[0,50]\,M$ domain a single greedy PINN suffices.
 The analysis of Sec.~\ref{sec:res-inv} (Table~\ref{tab:tau-degeneracy})
 shows that the optimiser drifts along the amplitude--rate
 degeneracy of Eq.~\eqref{eq:loss-ring} during L-BFGS, leaving the

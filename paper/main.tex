@@ -85,8 +85,9 @@ for Schwarzschild Quasi-Normal Modes Extraction}
 \begin{abstract}
 \noindent
 We apply physics-informed neural networks (PINNs) to the
-Schwarzschild $\ell = 2$ Zerilli equation in the time domain, in
-both forward and inverse settings. The forward PINN reproduces a
+Schwarzschild $\ell = 2$ Zerilli equation in the time domain in
+three settings: forward, inverse, and a curriculum-learning
+extension of the forward problem. The forward PINN reproduces a
 finite-difference reference field with relative $L^2$ error
 $0.58\%$, compared with $28.06\%$ in the closest prior PINN study
 of the same equation \citep{Patel2024pinn}, and recovers the
@@ -101,7 +102,14 @@ embedded template loss admits an amplitude--rate degeneracy along
 which $\tau$ drifts by ten to twenty percent from the Leaver
 value with the loss almost stationary; quoting $\tau$ from a
 post-hoc fit to the converged network field, rather than from
-the learned template scalar, removes this drift. We also
+the learned template scalar, removes this drift. The curriculum
+PINN partitions the temporal domain into two or three windows
+trained sequentially with numerical-IC transfer between them, in
+both hard-stitched and soft-overlap blended forms; we find that
+it lowers the per-window error on the earliest sub-domain by
+$\sim\!37\%$ but does not improve the full-domain RMSD once the
+windows are stitched, on account of an interpolation error that
+compounds at every splice. We also
 introduce two plateau-based fit-window estimators that scan,
 respectively, the start time alone and both edges of the QNM fit
 window, and report the across-plateau standard deviation
@@ -173,7 +181,8 @@ template loss admits an amplitude--rate degeneracy that, if
 uncontrolled, biases the learned $\tau$.
 
 We address both points with a forward and inverse PINN for the
-Schwarzschild $\ell=2$ Zerilli equation.
+Schwarzschild $\ell=2$ Zerilli equation, supplemented by a
+curriculum-learning extension of the forward problem.
 For the forward problem we extend the architecture-matched
 \citet{Patel2024pinn} baseline by doubling the number of L-BFGS
 iterations (from $15{,}000$ to $30{,}000$) and adding
@@ -195,18 +204,29 @@ rather than from the learned template scalar. A six-variant
 ablation of the template-loss hyperparameters identifies a
 configuration that recovers the black-hole mass to $0.34\%$,
 $\omega$ to $0.30\%$ with plateau standard deviation
-$\sigma_\omega = 4\times 10^{-5}$, and $\tau$ to $1.6\%$.
+$\sigma_\omega = 4\times 10^{-5}$, and $\tau$ to $1.6\%$. The
+curriculum-learning extension partitions the temporal domain
+into $K = 2$ or $K = 3$ windows trained sequentially, with the
+trained $k$-th network supplying the initial condition for the
+$(k{+}1)$-th, in both hard-stitched and soft-overlap blended
+forms. The strategy is motivated by the observation that the
+full-domain forward PINN concentrates $\sim\!41\%$ of its RMSD
+on the late-time band $t \in [37.5,50]\,M$, despite that band
+occupying only one quarter of the temporal domain.
 
 The remainder of the paper is organised as follows.
 Section~\ref{sec:background} reviews the Schwarzschild perturbation
 problem, the standard QNM extraction methods, the PINN framework,
 and the prior PINN-for-QNM literature. Section~\ref{sec:methods}
-states the forward and inverse PINNs and defines the five
-extraction methods. Section~\ref{sec:results} reports the forward
-PINN field accuracy and the six inverse variants.
+states the forward, inverse and curriculum PINNs and defines the
+five extraction methods. Section~\ref{sec:results} reports the
+forward PINN field accuracy, the six inverse PINN variants, and
+the three curriculum PINN variants.
 Section~\ref{sec:discussion} discusses the relation to prior work,
-the role of the plateau as a quality diagnostic, and the residual
-gap between forward and inverse precision.
+the role of the plateau as a quality diagnostic, the residual
+gap between forward and inverse precision, and why the
+curriculum extension fails to improve on the single-window
+baseline.
 Section~\ref{sec:conclusion} concludes. Full hyperparameter tables
 and per-window extraction tables are collected in the appendices.
 
@@ -886,8 +906,9 @@ uncertainty alongside the primary estimate.}
 % =====================================================================
 \section{Conclusion}\label{sec:conclusion}
 
-We applied a forward and inverse PINN to the Schwarzschild
-$\ell = 2$ Zerilli equation. On the forward problem, doubling the
+We applied a forward, inverse and curriculum PINN to the
+Schwarzschild $\ell = 2$ Zerilli equation. On the forward
+problem, doubling the
 number of L-BFGS iterations (from $15{,}000$ to $30{,}000$) and
 adding residual-greedy adaptive sampling reduces the relative
 $L^2$ field error against the FD reference from $28.06\%$ in
@@ -918,6 +939,20 @@ which it does not, supplying a deterministic quality flag at no
 extra cost. The same diagnostic applies unchanged to the forward
 PINN and to the FD reference solver, so that no quoted number
 depends on a fixed-by-hand fit window.
+
+The curriculum PINN of Sec.~\ref{sec:cur-pinn} delivers its
+intended local benefit on the earliest sub-domain (a $37\%$
+reduction in RMSD on $t\in[0,25]\,M$ relative to the same
+sub-domain of the single-window baseline) but does not translate
+that benefit into a lower full-domain RMSD or a tighter QNM
+extraction. The cost is the per-stitch interpolation error of
+the numerical IC transfer between consecutive windows, which
+grows with the number of stitching boundaries; the soft-overlap
+blending and continuity anchors do not recover the lost
+precision and in fact perform worse than the hard-partition
+stitch on this problem. The single-window forward PINN with
+greedy adaptive sampling therefore remains the recommended
+configuration for the time-domain Zerilli QNM problem.
 
 Three follow-up directions are immediate. A Cram\'er--Rao bound
 on $(M,\omega,\tau)$ for the noisy ringdown template would
