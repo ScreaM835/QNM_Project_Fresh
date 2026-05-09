@@ -112,12 +112,15 @@ the M4 and M5 estimates are shown in Figs.~\ref{fig:fwd-plateau-m4} and~\ref{fig
 
 \begin{figure}[!htbp]
 \centering
+\includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/ringdown_overlay.png}\\[0.6em]
 \includegraphics[width=0.85\textwidth]{../outputs/qnm/zerilli_l2_greedy_f03_lbfgs30k/pinn_ringdown.png}
-\caption{Forward PINN ringdown at $\xq = 10\,M$. The time series
-$\Phi_\theta(\xq,t)$ on $[0,50]\,M$, exhibiting the prompt burst
-followed by a clean exponentially-damped sinusoidal ringdown that
-the five extraction methods of Sec.~\ref{sec:qnm-methods} are
-applied to.}
+\caption{Forward PINN ringdown at $\xq = 10\,M$. Top:
+$\Phi_\theta(\xq,t)$ from the forward PINN overlaid on the FD
+reference, showing the prompt burst followed by the
+exponentially-damped sinusoidal ringdown. Bottom: the same
+time series isolated from $\Phi_\theta$, on which the five
+extraction methods of Sec.~\ref{sec:qnm-methods} are applied to
+produce the entries of Table~\ref{tab:fwd-qnm}.}
 \label{fig:fwd-ringdown}
 \end{figure}
 
