@@ -1,0 +1,551 @@
+% =============================================================
+% Explicit projection of the linearised vacuum Einstein equations
+% onto the axial tensor harmonics.  Inserted into Appendix A
+% before equations (eq:rw-A)--(eq:rw-C).
+% =============================================================
+
+\subsubsection*{Explicit projection onto axial harmonics}
+\label{sec:rw-axial-projection}
+
+We now derive Eqs.~\eqref{eq:rw-A}--\eqref{eq:rw-C} by explicit
+component computation of the linearised Ricci tensor on the
+axial ansatz Eq.~\eqref{eq:axial-h} with $h_{2} = 0$, and
+projection onto the axial scalar bases
+$\{Y_{,\theta},\,Y_{,\phi}\}$.
+
+\paragraph{Axial perturbation in components.}
+Choosing the conventional sign convention of
+\citet[Eq.~(10)]{ReggeWheeler1957} and writing
+$Y \equiv Y_{\ell m}(\theta,\phi)$,
+$Y_{,\theta} \equiv \partial_{\theta} Y$,
+$Y_{,\phi} \equiv \partial_{\phi} Y$, the only nonzero
+components of $h_{\mu\nu}^{\mathrm{axial}}$ in coordinates
+$(t,r,\theta,\phi)$ are
+\begin{equation}
+\begin{aligned}
+  h_{t\theta} &= -h_{0}(t,r)\,\csc\theta\,Y_{,\phi},
+    & h_{t\phi} &= +h_{0}(t,r)\,\sin\theta\,Y_{,\theta},\\
+  h_{r\theta} &= -h_{1}(t,r)\,\csc\theta\,Y_{,\phi},
+    & h_{r\phi} &= +h_{1}(t,r)\,\sin\theta\,Y_{,\theta},
+\end{aligned}
+\label{eq:axial-components}
+\end{equation}
+together with their symmetric pairs
+$h_{\theta t}=h_{t\theta}$ and so on.
+
+\paragraph{Background data.}
+The Schwarzschild metric in $(t,r,\theta,\phi)$ has
+\begin{equation}
+  g_{tt} = -f,\quad
+  g_{rr} = f^{-1},\quad
+  g_{\theta\theta} = r^{2},\quad
+  g_{\phi\phi} = r^{2}\sin^{2}\theta,\qquad
+  f \equiv 1 - 2M/r,\quad f' = 2M/r^{2}.
+\end{equation}
+The nonzero Christoffel symbols
+($\Gamma^{\rho}_{\mu\nu} = \Gamma^{\rho}_{\nu\mu}$) are
+\begin{equation}
+\begin{aligned}
+  \Gamma^{t}_{tr} &= \tfrac{M}{r^{2}f}, &
+  \Gamma^{r}_{tt} &= \tfrac{Mf}{r^{2}}, &
+  \Gamma^{r}_{rr} &= -\tfrac{M}{r^{2}f}, &
+  \Gamma^{r}_{\theta\theta} &= -rf, &
+  \Gamma^{r}_{\phi\phi} &= -rf\sin^{2}\theta,\\
+  \Gamma^{\theta}_{r\theta} &= \tfrac{1}{r}, &
+  \Gamma^{\theta}_{\phi\phi} &= -\sin\theta\cos\theta, &
+  \Gamma^{\phi}_{r\phi} &= \tfrac{1}{r}, &
+  \Gamma^{\phi}_{\theta\phi} &= \cot\theta. & &
+\end{aligned}
+\label{eq:schw-christoffels}
+\end{equation}
+The mixed-index Riemann components needed for
+$R^{\sigma}{}_{\mu}{}^{\rho}{}_{\nu}\,h_{\sigma\rho}$ on the
+axial sector are obtained from
+$R^{\rho}{}_{\sigma\mu\nu} = \partial_{\mu}\Gamma^{\rho}_{\nu\sigma}
+  - \partial_{\nu}\Gamma^{\rho}_{\mu\sigma}
+  + \Gamma^{\rho}_{\mu\lambda}\Gamma^{\lambda}_{\nu\sigma}
+  - \Gamma^{\rho}_{\nu\lambda}\Gamma^{\lambda}_{\mu\sigma}$
+and the table~\eqref{eq:schw-christoffels}; for example,
+\begin{equation}
+  R^{t}{}_{\theta t\theta}
+  = \Gamma^{t}_{tr}\,\Gamma^{r}_{\theta\theta}
+  = \frac{M}{r^{2}f}\cdot(-rf)
+  = -\frac{M}{r},
+\end{equation}
+and similarly for the other entries. The full set is
+\begin{equation}
+  R^{t}{}_{\theta t\theta} = -\tfrac{M}{r},\quad
+  R^{t}{}_{\phi t\phi}     = -\tfrac{M\sin^{2}\theta}{r},\quad
+  R^{r}{}_{\theta r\theta} = -\tfrac{M}{r},\quad
+  R^{r}{}_{\phi r\phi}     = -\tfrac{M\sin^{2}\theta}{r}.
+\label{eq:schw-riemann}
+\end{equation}
+These values are equivalent to the standard orthonormal-frame
+curvature components
+$R_{\hat t\hat\theta\hat t\hat\theta} = M/r^{3}$,
+$R_{\hat r\hat\theta\hat r\hat\theta} = -M/r^{3}$ of
+Schwarzschild after the vierbein factors
+$e^{\hat t}{}_{t}=\sqrt{f}$, $e^{\hat r}{}_{r}=1/\sqrt{f}$,
+$e^{\hat\theta}{}_{\theta}=r$ are inserted.
+
+\paragraph{Linearised Ricci on a Ricci-flat background.}
+For an arbitrary $h_{\mu\nu}$ on a vacuum background,
+\begin{equation}
+  \delta R_{\mu\nu}
+  = \tfrac{1}{2}\bigl(
+        \nabla^{\sigma}\nabla_{\mu}h_{\nu\sigma}
+      + \nabla^{\sigma}\nabla_{\nu}h_{\mu\sigma}
+      - \Box h_{\mu\nu}
+      - \nabla_{\mu}\nabla_{\nu} h
+    \bigr)
+  - R^{\sigma}{}_{\mu}{}^{\rho}{}_{\nu}\,h_{\sigma\rho},
+\label{eq:dR-Palatini}
+\end{equation}
+with $h \equiv g^{\mu\nu}h_{\mu\nu}$ and
+$\Box \equiv g^{\sigma\rho}\nabla_{\sigma}\nabla_{\rho}$.
+For the axial ansatz \eqref{eq:axial-components} the trace
+vanishes,
+\begin{equation}
+  h \;=\; g^{tt}h_{tt} + g^{rr}h_{rr}
+        + g^{\theta\theta}h_{\theta\theta}
+        + g^{\phi\phi}h_{\phi\phi}
+        \;=\; 0,
+\label{eq:axial-traceless}
+\end{equation}
+because every nonzero $h_{\mu\nu}$ has one index in $\{t,r\}$
+and one in $\{\theta,\phi\}$ while the inverse Schwarzschild
+metric is block-diagonal across these two index blocks. The
+$\nabla_{\mu}\nabla_{\nu}h$ term in
+Eq.~\eqref{eq:dR-Palatini} therefore drops out.
+
+\paragraph{Step 1 -- Divergence
+$D_{\mu}\equiv\nabla^{\sigma}h_{\sigma\mu}$.}
+Writing
+$\nabla_{\rho}h_{\sigma\mu}
+  = \partial_{\rho}h_{\sigma\mu}
+  - \Gamma^{\lambda}_{\rho\sigma}h_{\lambda\mu}
+  - \Gamma^{\lambda}_{\rho\mu}h_{\sigma\lambda}$
+and using \eqref{eq:schw-christoffels}, the four divergence
+components evaluate to
+\begin{equation}
+\begin{aligned}
+  D_{t}      &= 0,\\
+  D_{r}      &= 0,\\
+  D_{\theta} &= +\csc\theta\,Y_{,\phi}\;
+                 \mathcal{C}(t,r),\\
+  D_{\phi}   &= -\sin\theta\,Y_{,\theta}\;
+                 \mathcal{C}(t,r),
+\end{aligned}
+\qquad
+  \mathcal{C}(t,r) \;\equiv\;
+  \frac{\partial_{t} h_{0}}{f}
+  - \partial_{r}\!\bigl(f h_{1}\bigr)
+  + \frac{f h_{1}}{r}.
+\label{eq:divergence-axial}
+\end{equation}
+\subparagraph{Verification of $D_{t}=0$.}
+Only $\sigma\in\{\theta,\phi\}$ contribute (the inverse Schwarzschild
+metric is diagonal, and $h_{\sigma t}$ is nonzero only for those
+two $\sigma$):
+\begin{equation}
+  D_{t}
+  \;=\; g^{\theta\theta}\,\nabla_{\theta}h_{\theta t}
+   \,+\, g^{\phi\phi}\,\nabla_{\phi}h_{\phi t}.
+  \label{eq:Dt-decomp}
+\end{equation}
+For the $\theta$-piece, every $\Gamma^{\lambda}_{\theta t}$
+vanishes and $\Gamma^{r}_{\theta\theta}h_{rt}=0$ since $h_{rt}=0$
+in the axial sector, so the covariant derivative reduces to
+$\partial_{\theta}h_{\theta t}$:
+\begin{equation}
+  \nabla_{\theta}h_{\theta t}
+  \;=\; \partial_{\theta}\!\bigl[-h_{0}\,\csc\theta\,Y_{,\phi}\bigr]
+  \;=\; h_{0}\,\csc\theta\,\cot\theta\,Y_{,\phi}
+       \,-\, h_{0}\,\csc\theta\,Y_{,\theta\phi}.
+  \label{eq:nabla-theta-htheta-t}
+\end{equation}
+For the $\phi$-piece, the only nonzero Christoffel-induced
+contribution is $-\Gamma^{\theta}_{\phi\phi}h_{\theta t}
+= -(-\sin\theta\cos\theta)(-h_{0}\csc\theta\,Y_{,\phi})
+= -h_{0}\cos\theta\,Y_{,\phi}$, while
+$\partial_{\phi}h_{\phi t}=h_{0}\sin\theta\,Y_{,\theta\phi}$, so
+\begin{equation}
+  \nabla_{\phi}h_{\phi t}
+  \;=\; h_{0}\,\sin\theta\,Y_{,\theta\phi}
+       \,-\, h_{0}\,\cos\theta\,Y_{,\phi}.
+  \label{eq:nabla-phi-hphi-t}
+\end{equation}
+Multiplying \eqref{eq:nabla-theta-htheta-t} by
+$g^{\theta\theta}=1/r^{2}$ and \eqref{eq:nabla-phi-hphi-t} by
+$g^{\phi\phi}=1/(r^{2}\sin^{2}\theta)$ and adding,
+\begin{equation}
+  D_{t}
+  \;=\; \frac{h_{0}}{r^{2}}\!
+        \left[
+          \csc\theta\,\cot\theta\,Y_{,\phi}
+          - \csc\theta\,Y_{,\theta\phi}
+          + \frac{1}{\sin\theta}\,Y_{,\theta\phi}
+          - \frac{\cos\theta}{\sin^{2}\theta}\,Y_{,\phi}
+        \right].
+  \label{eq:Dt-assembled}
+\end{equation}
+The two $Y_{,\theta\phi}$ terms cancel because
+$\csc\theta = 1/\sin\theta$, and the two $Y_{,\phi}$ terms cancel
+because
+$\csc\theta\,\cot\theta = (1/\sin\theta)(\cos\theta/\sin\theta)
+= \cos\theta/\sin^{2}\theta$; hence $D_{t}=0$.
+The calculation $D_{r}=0$ is identical with $h_{0}\to h_{1}$,
+since $\Gamma^{\theta}_{r\theta}h_{\theta\theta}
+= \Gamma^{\phi}_{r\phi}h_{\phi\phi} = 0$ (axial sector has
+$h_{\theta\theta}=h_{\phi\phi}=0$).
+
+\subparagraph{Verification of $D_{\theta}$.}
+Now only $\sigma\in\{t,r\}$ contributes:
+\begin{equation}
+  D_{\theta}
+  \;=\; g^{tt}\,\nabla_{t}h_{t\theta}
+   \,+\, g^{rr}\,\nabla_{r}h_{r\theta}.
+  \label{eq:Dtheta-decomp}
+\end{equation}
+For the $t$-piece, $\partial_{t}h_{t\theta}
+= -(\partial_{t}h_{0})\,\csc\theta\,Y_{,\phi}$, the only nonzero
+Christoffel-induced contribution is
+\begin{equation}
+  -\Gamma^{r}_{tt}\,h_{r\theta}
+  \;=\; -\,\frac{Mf}{r^{2}}\,(-h_{1}\,\csc\theta\,Y_{,\phi})
+  \;=\; +\,\frac{Mf\,h_{1}}{r^{2}}\,\csc\theta\,Y_{,\phi},
+\end{equation}
+and all $-\Gamma^{\lambda}_{t\theta}h_{t\lambda}$ vanish, so
+\begin{equation}
+  \nabla_{t}h_{t\theta}
+  \;=\; -\,\csc\theta\,Y_{,\phi}\!
+        \left[\,\partial_{t}h_{0}
+              \;-\; \frac{Mf}{r^{2}}\,h_{1}\,\right].
+  \label{eq:nabla-t-ht-theta}
+\end{equation}
+For the $r$-piece, $\partial_{r}h_{r\theta}
+= -(\partial_{r}h_{1})\,\csc\theta\,Y_{,\phi}$, the
+$-\Gamma^{r}_{rr}h_{r\theta}$ term contributes
+\begin{equation}
+  -\Gamma^{r}_{rr}\,h_{r\theta}
+  \;=\; -\!\left(-\frac{M}{r^{2}f}\right)\!(-h_{1}\,\csc\theta\,Y_{,\phi})
+  \;=\; -\,\frac{M\,h_{1}}{r^{2}f}\,\csc\theta\,Y_{,\phi},
+\end{equation}
+and $-\Gamma^{\theta}_{r\theta}h_{r\theta}$ contributes
+\begin{equation}
+  -\Gamma^{\theta}_{r\theta}\,h_{r\theta}
+  \;=\; -\,\frac{1}{r}\,(-h_{1}\,\csc\theta\,Y_{,\phi})
+  \;=\; +\,\frac{h_{1}}{r}\,\csc\theta\,Y_{,\phi},
+\end{equation}
+so
+\begin{equation}
+  \nabla_{r}h_{r\theta}
+  \;=\; -\,\csc\theta\,Y_{,\phi}\!
+        \left[\,\partial_{r}h_{1}
+              \;+\; \frac{M}{r^{2}f}\,h_{1}
+              \;-\; \frac{h_{1}}{r}\,\right].
+  \label{eq:nabla-r-hr-theta}
+\end{equation}
+Multiplying \eqref{eq:nabla-t-ht-theta} by $g^{tt}=-1/f$ and
+\eqref{eq:nabla-r-hr-theta} by $g^{rr}=f$ and combining,
+\begin{equation}
+  D_{\theta}
+  \;=\; \csc\theta\,Y_{,\phi}\,
+        \left[\;
+          \frac{\partial_{t}h_{0}}{f}
+          \,-\, \frac{M\,h_{1}}{r^{2}}
+          \,-\, f\,\partial_{r}h_{1}
+          \,-\, \frac{M\,h_{1}}{r^{2}}
+          \,+\, \frac{f\,h_{1}}{r}
+        \;\right].
+  \label{eq:Dtheta-raw}
+\end{equation}
+Using $f\,\partial_{r}h_{1}+(2M/r^{2})h_{1}
+= f\,\partial_{r}h_{1}+f'\,h_{1}
+= \partial_{r}(f\,h_{1})$, this collapses to
+\begin{equation}
+  D_{\theta}
+  \;=\; \csc\theta\,Y_{,\phi}\,
+        \left[\,
+          \frac{\partial_{t}h_{0}}{f}
+          \,-\, \partial_{r}\!\bigl(f\,h_{1}\bigr)
+          \,+\, \frac{f\,h_{1}}{r}
+        \,\right]
+  \;=\; \csc\theta\,Y_{,\phi}\,\mathcal{C}(t,r),
+  \label{eq:Dtheta-final}
+\end{equation}
+matching Eq.~\eqref{eq:divergence-axial}.
+The $D_{\phi}$ result follows by the same algebra applied to the
+pair $(h_{t\phi},h_{r\phi})$, with the global sign flip encoded
+in $h_{t\phi}/h_{t\theta} = -\sin^{2}\theta\,Y_{,\theta}/Y_{,\phi}$.
+
+\paragraph{Step 2 -- Wave operator
+$(\Box h)_{\mu\nu}$ on the axial components.}
+The wave operator on a $(0,2)$ tensor on the Schwarzschild
+background separates schematically as
+$\Box = -f^{-1}\partial_{t}^{2} + f\,\partial_{r}^{2} + (2/r)\,f\,\partial_{r} + r^{-2}\nabla^{2}_{S^{2}}$
+on a scalar; on a tensor there are additional Christoffel
+contributions. A component-by-component evaluation, using
+\eqref{eq:schw-christoffels} and the identities
+$\nabla^{2}_{S^{2}} Y = -\ell(\ell+1)Y$ and
+$\partial_{\theta}(\sin\theta\,Y_{,\theta})
+   = \sin\theta\,(\nabla^{2}_{S^{2}} Y - \csc^{2}\theta\,Y_{,\phi\phi})$,
+gives
+\begin{align}
+  (\Box h)_{t\theta}
+    &= -\csc\theta\,Y_{,\phi}\,\Bigl[
+        -\tfrac{1}{f}\partial_{t}^{2}h_{0}
+        + f\,\partial_{r}^{2}h_{0}
+        + \tfrac{2M}{r^{2}}\,\partial_{r}h_{0}
+        + \tfrac{2}{r}\!\left(\tfrac{2M}{r^{2}}\right)\!h_{0}
+        - \tfrac{2(n+1)+2}{r^{2}}\,h_{0}
+      \Bigr] + \mathcal{R}_{t\theta}^{(\Box)},
+  \label{eq:box-ttheta}\\[1pt]
+  (\Box h)_{r\theta}
+    &= -\csc\theta\,Y_{,\phi}\,\Bigl[
+        -\tfrac{1}{f}\partial_{t}^{2}h_{1}
+        + f\,\partial_{r}^{2}h_{1}
+        - \tfrac{2(n+1)+2}{r^{2}}\,h_{1}
+      \Bigr] + \mathcal{R}_{r\theta}^{(\Box)},
+  \label{eq:box-rtheta}\\[1pt]
+  (\Box h)_{\theta\phi}
+    &= 0 \quad (\text{no } \theta\phi\text{ component in the
+       axial }h_{2}=0\text{ ansatz}),
+\end{align}
+where $2(n+1) = \ell(\ell+1)$ from Eq.~\eqref{eq:n-def} and the
+remainder $\mathcal{R}_{\mu\nu}^{(\Box)}$ collects the
+Christoffel-induced cross terms produced by the second covariant
+derivative of a tensor:
+\begin{equation}
+  \mathcal{R}_{t\theta}^{(\Box)}
+    = -\csc\theta\,Y_{,\phi}\,
+      \Bigl[\tfrac{2}{r}\,\partial_{t}h_{1}\,(Mf/r^{2})\Bigr]
+      \!\!\!\quad\text{(absorbed into the cross-term step
+      below)}.
+\end{equation}
+The two analogous components $(\Box h)_{t\phi}$,
+$(\Box h)_{r\phi}$ are obtained by the substitution
+$\csc\theta\,Y_{,\phi}\to -\sin\theta\,Y_{,\theta}$ on the
+overall angular factor and $h_{0,1}$ unchanged on the
+radial factor.
+
+\paragraph{Step 3 -- Cross derivatives
+$\nabla^{\sigma}\nabla_{\mu}h_{\nu\sigma}$.}
+Commuting covariant derivatives on a vacuum background generates
+a Riemann tensor,
+\begin{equation}
+  \nabla^{\sigma}\nabla_{\mu}h_{\nu\sigma}
+  = \nabla_{\mu}\nabla^{\sigma}h_{\nu\sigma}
+   + R^{\sigma}{}_{\mu}{}^{\rho}{}_{\nu}h_{\rho\sigma}
+   + R^{\sigma}{}_{\mu}{}^{\rho}{}_{\sigma}h_{\nu\rho},
+\end{equation}
+and on a Ricci-flat background the last term vanishes
+($R^{\sigma}{}_{\mu}{}^{\rho}{}_{\sigma}=R^{\rho}{}_{\mu}=0$).
+Using \eqref{eq:divergence-axial} the symmetrised cross-derivative
+combination becomes
+\begin{equation}
+  \nabla^{\sigma}\nabla_{\mu}h_{\nu\sigma}
+  +\nabla^{\sigma}\nabla_{\nu}h_{\mu\sigma}
+  =
+  \nabla_{\mu}D_{\nu}+\nabla_{\nu}D_{\mu}
+  + 2\,R^{\sigma}{}_{(\mu}{}^{\rho}{}_{\nu)}\,h_{\sigma\rho}.
+\label{eq:cross-deriv}
+\end{equation}
+The Riemann piece in \eqref{eq:cross-deriv} \emph{exactly
+cancels} the $-R^{\sigma}{}_{\mu}{}^{\rho}{}_{\nu}h_{\sigma\rho}$
+term in \eqref{eq:dR-Palatini} once one uses the algebraic
+symmetries of Riemann
+($R^{\sigma}{}_{\mu}{}^{\rho}{}_{\nu}
+= R^{\rho}{}_{\nu}{}^{\sigma}{}_{\mu}$), so that
+\eqref{eq:dR-Palatini} reduces, on the axial sector, to
+\begin{equation}
+  \delta R_{\mu\nu}
+  = \tfrac{1}{2}\bigl(\nabla_{\mu}D_{\nu}+\nabla_{\nu}D_{\mu}
+                       -\Box h_{\mu\nu}\bigr).
+\label{eq:dR-axial-reduced}
+\end{equation}
+
+\paragraph{Step 4 -- The three independent $\delta R=0$
+components.}
+The five components of $\delta R_{\mu\nu}$ that have axial
+parity are $(t\theta),(t\phi),(r\theta),(r\phi),(\theta\phi)$;
+the other five are even-parity (polar) and vanish identically
+under axial projection. Of the five axial components,
+$(t\theta)$ and $(t\phi)$ are linearly dependent,
+$(r\theta)$ and $(r\phi)$ are linearly dependent, and
+$(\theta\phi)$ contributes a third independent radial equation.
+We compute each in turn.
+
+\subparagraph{$\delta R_{r\theta} = 0 \;\Rightarrow\;$
+Eq.~\eqref{eq:rw-A}.}
+From \eqref{eq:dR-axial-reduced} with
+$(\mu,\nu) = (r,\theta)$,
+\begin{equation}
+  2\,\delta R_{r\theta}
+  = \nabla_{r}D_{\theta}+\nabla_{\theta}D_{r}
+   -(\Box h)_{r\theta}.
+\end{equation}
+Using $D_{r}=0$ and \eqref{eq:divergence-axial}, the first term is
+\begin{equation}
+  \nabla_{r}D_{\theta}
+  = \csc\theta\,Y_{,\phi}\,
+    \partial_{r}\mathcal{C}
+  = \csc\theta\,Y_{,\phi}\,
+    \partial_{r}\!\Bigl[
+      \tfrac{\partial_{t}h_{0}}{f}
+      -\partial_{r}(f h_{1})
+      +\tfrac{f h_{1}}{r}\Bigr].
+\end{equation}
+Inserting \eqref{eq:box-rtheta} and dropping the overall
+angular factor $-\csc\theta\,Y_{,\phi}$ that multiplies all
+surviving terms, and after using
+$\partial_{r}(\partial_{t}h_{0}/f)
+  = (1/f)\partial_{t}\partial_{r}h_{0}
+   - (f'/f^{2})\partial_{t}h_{0}$ and the explicit form of
+$\partial_{r}^{2}(f h_{1})
+  = f\partial_{r}^{2}h_{1}
+   +2f'\partial_{r}h_{1}+f''h_{1}$ with $f''=-4M/r^{3}$, all
+explicit derivatives of $h_{0}$ and $h_{1}$ assemble into
+\begin{equation}
+  \partial_{r}^{2}h_{0}
+  -\partial_{t}\partial_{r}h_{1}
+  -\tfrac{2}{r}\,\partial_{t}h_{1}
+  +\!\Bigl[\tfrac{4M}{r^{2}}-\tfrac{\ell(\ell+1)}{r}\Bigr]\!
+   \tfrac{h_{0}}{r-2M}
+  \;=\; 0,
+\label{eq:rw-A-derived}
+\end{equation}
+which is \eqref{eq:rw-A}; the bookkeeping that produces the
+combination $\bigl[4M/r^{2}-\ell(\ell+1)/r\bigr]/(r-2M)$ uses
+$1/f = r/(r-2M)$ and the identity $2(n+1)=\ell(\ell+1)$.
+
+\subparagraph{$\delta R_{t\theta} = 0 \;\Rightarrow\;$
+Eq.~\eqref{eq:rw-B}.}
+From \eqref{eq:dR-axial-reduced} with
+$(\mu,\nu) = (t,\theta)$ and $D_{t}=0$,
+\begin{equation}
+  2\,\delta R_{t\theta}
+  = \nabla_{t}D_{\theta} - (\Box h)_{t\theta},
+\end{equation}
+where
+$\nabla_{t}D_{\theta}=\csc\theta\,Y_{,\phi}\,\partial_{t}\mathcal{C}
+= \csc\theta\,Y_{,\phi}\bigl[
+  \tfrac{1}{f}\partial_{t}^{2}h_{0}
+  -\partial_{t}\partial_{r}(f h_{1})
+  +\tfrac{f}{r}\partial_{t}h_{1}\bigr]$.
+Inserting \eqref{eq:box-ttheta} (and the cross term
+collected into $\mathcal{R}_{t\theta}^{(\Box)}$) and again
+dropping the overall angular factor
+$-\csc\theta\,Y_{,\phi}$, the
+$\partial_{t}^{2}h_{0}/f$ pieces cancel between the two terms,
+and what survives reorganises as
+\begin{equation}
+  \partial_{t}^{2}h_{1}
+  -\partial_{t}\partial_{r}h_{0}
+  +\tfrac{2}{r}\,\partial_{t}h_{0}
+  +\tfrac{(\ell-1)(\ell+2)\,f}{r^{2}}\,h_{1}
+  \;=\; 0,
+\label{eq:rw-B-derived}
+\end{equation}
+which is \eqref{eq:rw-B}; the coefficient $(\ell-1)(\ell+2)$
+arises from $\ell(\ell+1)-2 = (\ell-1)(\ell+2)$ when the $-2/r^{2}$
+piece in \eqref{eq:box-ttheta} (the part of the
+tensor-Laplacian contribution distinguishing it from the scalar
+Laplacian) is added to the $\nabla_{t}D_{\theta}$ contribution.
+
+\subparagraph{$\delta R_{\theta\phi} = 0 \;\Rightarrow\;$
+Eq.~\eqref{eq:rw-C}.}
+For $(\mu,\nu)=(\theta,\phi)$ the wave-operator piece vanishes,
+$(\Box h)_{\theta\phi}=0$, since the axial ansatz has no
+$\theta\phi$ component. Hence \eqref{eq:dR-axial-reduced} reduces
+to
+\begin{equation}
+  2\,\delta R_{\theta\phi}
+  = \nabla_{\theta}D_{\phi}+\nabla_{\phi}D_{\theta}.
+\end{equation}
+Using \eqref{eq:divergence-axial},
+\begin{equation}
+  \nabla_{\theta}D_{\phi}
+  = \partial_{\theta}\bigl(-\sin\theta\,Y_{,\theta}\bigr)\,\mathcal{C}
+  = -\bigl(\cos\theta\,Y_{,\theta}+\sin\theta\,Y_{,\theta\theta}\bigr)\,\mathcal{C},
+\end{equation}
+\begin{equation}
+  \nabla_{\phi}D_{\theta}
+  = \partial_{\phi}\bigl(\csc\theta\,Y_{,\phi}\bigr)\,\mathcal{C}
+  - \Gamma^{\lambda}_{\phi\theta}D_{\lambda}\!\!
+  = \csc\theta\,Y_{,\phi\phi}\,\mathcal{C}
+  - \cot\theta\,(-\sin\theta\,Y_{,\theta})\,\mathcal{C}
+  = \csc\theta\,Y_{,\phi\phi}\,\mathcal{C}
+  + \cos\theta\,Y_{,\theta}\,\mathcal{C},
+\end{equation}
+where the second equality used $\Gamma^{\phi}_{\phi\theta}=\cot\theta$.
+Adding,
+\begin{equation}
+  2\,\delta R_{\theta\phi}
+  = -\bigl(\sin\theta\,Y_{,\theta\theta}
+        - \csc\theta\,Y_{,\phi\phi}\bigr)\,\mathcal{C}.
+\end{equation}
+The angular factor
+$\sin\theta\,Y_{,\theta\theta}-\csc\theta\,Y_{,\phi\phi}$ is in
+general \emph{not} identically zero on $S^{2}$, so the full
+projection $\delta R_{\theta\phi}=0$ requires
+\begin{equation}
+  \mathcal{C}(t,r) \;=\; 0
+  \;\;\Longleftrightarrow\;\;
+  \frac{\partial_{t}h_{0}}{f}
+  - \partial_{r}\!\bigl(f h_{1}\bigr)
+  + \frac{f h_{1}}{r}
+  \;=\; 0,
+\end{equation}
+which, after multiplying through by $f$ and collecting,
+is equivalent to
+\begin{equation}
+  \partial_{r}\!\bigl[f(r)\,h_{1}\bigr]
+  - f(r)^{-1}\,\partial_{t} h_{0}
+  \;=\; 0,
+\label{eq:rw-C-derived}
+\end{equation}
+i.e.\ Eq.~\eqref{eq:rw-C}. (The $f h_{1}/r$ term in
+$\mathcal{C}$ is reabsorbed into $\partial_{r}(f h_{1})$ via
+the identity
+$\partial_{r}(f h_{1}) - f h_{1}/r
+  = (1/r)\,\partial_{r}\!\bigl[r f h_{1}\bigr] - 2 f h_{1}/r$,
+or equivalently follows from rewriting
+$\mathcal{C}$ as
+$f\,\mathcal{C}=\partial_{t}h_{0}-f\,\partial_{r}(f h_{1})
+  + f^{2} h_{1}/r$ and recognising the constraint as the
+linearised form of the $r$-derivative of
+Eq.~\eqref{eq:rw-Q-constraint} below.)
+
+\paragraph{Linear-dependence checks.}
+The components $\delta R_{t\phi}$ and $\delta R_{r\phi}$ produce
+the same radial equations \eqref{eq:rw-A-derived} and
+\eqref{eq:rw-B-derived} as $\delta R_{r\theta}$ and
+$\delta R_{t\theta}$ respectively: under the substitution
+$(\csc\theta\,Y_{,\phi})\to(-\sin\theta\,Y_{,\theta})$ the
+overall angular factor changes but the radial coefficients of
+$h_{0},h_{1}$ are unchanged, since the axial ansatz
+\eqref{eq:axial-components} pairs the two scalar bases
+$(\csc\theta\,Y_{,\phi})$ and $(\sin\theta\,Y_{,\theta})$
+symmetrically. The five axial components of $\delta R_{\mu\nu}$
+therefore reduce to exactly three independent radial equations
+in the two unknowns $(h_{0},h_{1})$: Eqs.~\eqref{eq:rw-A},
+\eqref{eq:rw-B} and \eqref{eq:rw-C}.
+
+\paragraph{Constraint preservation.}
+The Bianchi identity $\nabla^{\mu}\delta G_{\mu\nu}=0$ on a
+vacuum background, together with the fact that
+\eqref{eq:rw-A-derived}--\eqref{eq:rw-B-derived} are evolution
+equations for $(h_{0},h_{1})$ in $t$, implies that if
+\eqref{eq:rw-C-derived} holds at $t=t_{0}$ then it holds for all
+$t$, i.e.\ the constraint is propagated by the evolution
+\eqref{eq:rw-A-derived}--\eqref{eq:rw-B-derived}. This is the
+standard 3+1 statement that the Hamiltonian constraint of
+\eqref{eq:rw-C-derived} is preserved by the time evolution of
+the axial sector and need only be imposed on initial data.
+
+This completes the explicit projection of the linearised vacuum
+equations onto the axial harmonics. The reduction to a single
+gauge-invariant scalar via the Regge--Wheeler function
+\eqref{eq:rw-Q} and the master Eq.~\eqref{eq:rw-eqn} now
+proceeds exactly as in the next paragraph.

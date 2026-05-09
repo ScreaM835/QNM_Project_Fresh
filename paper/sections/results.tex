@@ -48,8 +48,10 @@ of L-BFGS iterations and the greedy adaptive sampling of
 Sec.~\ref{sec:fwd-pinn}; see also the discussion in
 Sec.~\ref{sec:discussion}. The snapshot and
 error-heatmap visualisations are collected in
-Fig.~\ref{fig:fwd-field}, and the per-component loss histories
-underlying Eq.~\eqref{eq:fwd-metrics} are shown in
+Fig.~\ref{fig:fwd-field}, the pointwise residual at the snapshot
+times and on the full $(x,t)$ domain in
+Fig.~\ref{fig:fwd-field-full}, and the per-component loss
+histories underlying Eq.~\eqref{eq:fwd-metrics} are shown in
 Fig.~\ref{fig:fwd-loss}.
 
 \begin{figure}[!htbp]
@@ -64,6 +66,23 @@ $|\Phi_\theta - \Phi_{\mathrm{FD}}|$ on the QNM-relevant subdomain
 $x \in [-20,60]\,M$, $t \in [0,50]\,M$, with the colour scale
 saturating below $7\times 10^{-3}$.}
 \label{fig:fwd-field}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/abs_diff_snapshots.png}\\[0.6em]
+\includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/error_heatmap.png}
+\caption{Forward PINN pointwise residual. Top: pointwise
+$|\Phi_\theta - \Phi_{\mathrm{FD}}|$ as a function of $x$ at the
+four snapshot times $t/M\in\{10,20,30,40\}$, showing that the
+residual is concentrated near the potential barrier and remains
+below $\sim\!5\times 10^{-3}$ at all four times. Bottom: the
+full-domain analogue of the bottom panel of
+Fig.~\ref{fig:fwd-field}, on the entire training domain rather
+than the QNM-relevant subdomain. The same colour scale is used,
+confirming that the bound visible in Fig.~\ref{fig:fwd-field}
+holds globally.}
+\label{fig:fwd-field-full}
 \end{figure}
 
 \begin{figure}[!htbp]
@@ -143,7 +162,7 @@ plateau block ($t_0\in[14,21]\,M$) shaded.}
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[height=0.78\textheight,keepaspectratio]{../outputs/qnm/zerilli_l2_greedy_f03_lbfgs30k/pinn_method5_2d_heatmap.png}
+\includegraphics[width=0.75\textwidth,keepaspectratio]{../outputs/qnm/zerilli_l2_greedy_f03_lbfgs30k/pinn_method5_2d_heatmap.png}
 \caption{M5 plateau diagnostic for the forward PINN. Heatmap of
 the absolute deviation of the M2 estimate from the plateau median
 on the $(t_0,\tend)$ grid (capped at $5\%$); the contiguous
@@ -190,12 +209,42 @@ Sec.~\ref{sec:reporting}, and the M4 plateau quality as a
 diagnostic. Numbers are summarised in
 Table~\ref{tab:inv-summary}. The training-time learned template
 parameters are tabulated separately in
-Table~\ref{tab:inv-learned}. The training-time convergence of the
-five learnable scalars for variant D, the best of the six
-variants, is shown in Fig.~\ref{fig:inv-conv}; the
-$A_{\mathrm{ring}}$--$\tau$ degeneracy visible in the parameter
-histories is described in the paragraph below, before mass
-recovery and M4 plateau quality.
+Table~\ref{tab:inv-learned}. The reconstructed field for variant D
+is shown in Fig.~\ref{fig:inv-field}, the corresponding ringdown
+at $\xq = 10\,M$ in Fig.~\ref{fig:inv-ringdown}, and the
+training-time convergence of the five learnable scalars in
+Fig.~\ref{fig:inv-conv}; the $A_{\mathrm{ring}}$--$\tau$
+degeneracy visible in the parameter histories is described in the
+paragraph below, before mass recovery and M4 plateau quality.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_inverse_qnm_combo/snapshots.png}\\[0.6em]
+\includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_inverse_qnm_combo/abs_diff_snapshots.png}
+\caption{Inverse PINN versus FD reference for variant D. Top:
+snapshots of $\Phi(x,t)$ at $t/M\in\{10,20,30,40\}$ overlaid for
+the inverse PINN and the FD reference, with $M$ treated as an
+unknown trainable scalar. Bottom: pointwise
+$|\Phi_\theta - \Phi_{\mathrm{FD}}|$ at the same four times. The
+field-recovery quality is comparable to the forward run
+(Fig.~\ref{fig:fwd-field}) while $M$ is simultaneously inferred
+to $0.34\%$ of its true value (Table~\ref{tab:inv-summary}).}
+\label{fig:inv-field}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_inverse_qnm_combo/ringdown_overlay.png}\\[0.6em]
+\includegraphics[width=0.85\textwidth]{../outputs/qnm/zerilli_l2_inverse_qnm_combo/pinn_ringdown.png}
+\caption{Inverse PINN ringdown at $\xq = 10\,M$ for variant D.
+Top: $\Phi_\theta(\xq,t)$ from the inverse PINN overlaid on the
+FD reference, showing the prompt burst followed by the
+exponentially-damped sinusoidal ringdown. Bottom: the same
+time series isolated from $\Phi_\theta$, on which the five
+extraction methods of Sec.~\ref{sec:qnm-methods} are applied to
+produce the entries of Table~\ref{tab:inv-summary}.}
+\label{fig:inv-ringdown}
+\end{figure}
 
 \begin{figure}[!htbp]
 \centering
