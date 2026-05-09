@@ -569,40 +569,98 @@ baseline of Sec.~\ref{sec:res-fwd}. Every variant uses the same
 per-window architecture, loss, weights and (Adam $10{,}000$ +
 L-BFGS $30{,}000$) optimiser schedule as the baseline, applied
 independently per window. Field-accuracy metrics on the full
-domain are collected in Table~\ref{tab:cur-summary}, together
-with the per-window RMSDs that diagnose where the error is
-concentrated, and with the post-hoc M1 and M2 QNM extractions
-applied to the stitched ringdown $\Phi_{\mathrm{cur}}(\xq,t)$ at
-$\xq = 10\,M$.
+domain and the per-window RMSDs that diagnose where the error is
+concentrated are collected in Table~\ref{tab:cur-summary}, with
+the per-window decomposition restricted to the temporal sub-domain
+of each window. The same five post-hoc QNM extraction methods
+introduced in Sec.~\ref{sec:qnm-methods} (M1: FFT$+$log-line;
+M2: NLS on the wide window $[10,50]\,M$; M3: ESPRIT, $K{=}6$;
+M4: 1-D plateau scan; M5: 2-D plateau scan) are applied to the
+stitched ringdown $\Phi_{\mathrm{cur}}(\xq,t)$ at $\xq = 10\,M$
+of each variant, exactly as for the forward baseline of
+Table~\ref{tab:fwd-qnm}, and reported in
+Table~\ref{tab:cur-qnm}. M2 on the M4 plateau (the wide-window
+NLS evaluated on the M4 plateau midpoint, the convention adopted
+in Table~\ref{tab:fwd-qnm}) is also included.
 
 \begin{table}[!htbp]
 \centering
 \caption{Curriculum PINN variants versus the single-window
-forward baseline. Full-domain RMSD against the FD reference (one
-column), the per-window RMSD on each sub-domain (one column per
-window, ``---'' if the variant does not use that window), and the
-post-hoc M1 (FFT$+$log-line) and M2 (NLS, wide window
-$[10,50]\,M$) errors on $\Phi(\xq,t)$. Reference values are the
-Leaver continued-fraction Schwarzschild $\ell{=}2$ fundamental
-$M\omega_{0} = 0.3737$, $\tau_{0}/M = 11.241$.}
+forward baseline: field accuracy. Full-domain RMSD against the FD
+reference and the per-window RMSDs on each sub-domain (``---''
+if the variant does not use that window). For Cur-soft the third
+``$W$'' column reports the RMSD on the soft-blend overlap region
+$[20,30]\,M$ rather than a third disjoint window.}
 \label{tab:cur-summary}
 \footnotesize
 \setlength{\tabcolsep}{4pt}
 \renewcommand{\arraystretch}{1.05}
-\begin{tabular}{@{}lcccccccc@{}}
+\begin{tabular}{@{}lcccc@{}}
 \toprule
-Variant & RMSD ($\times 10^{-3}$) & $W_{1}$ RMSD & $W_{2}$ RMSD & $W_{3}$ RMSD
-        & M1 $\omega$ err & M1 $\tau$ err & M2 $\omega$ err & M2 $\tau$ err \\
+Variant & Full-domain RMSD & $W_{1}$ RMSD & $W_{2}$ RMSD & $W_{3}$ / overlap RMSD \\
+        & ($\times 10^{-3}$) & ($\times 10^{-3}$) & ($\times 10^{-3}$) & ($\times 10^{-3}$) \\
 \midrule
-Baseline (single window) & $0.817$ & $-\!\!-\!\!-$ & $-\!\!-\!\!-$ & $-\!\!-\!\!-$
-                         & $0.68\%$ & $2.83\%$ & $1.54\%$ & $1.99\%$ \\
+Baseline (single window) & $\mathbf{0.817}$ & $-\!\!-\!\!-$ & $-\!\!-\!\!-$ & $-\!\!-\!\!-$ \\
 \midrule
-Cur-2w   & $\mathbf{0.845}$ & $0.516$ & $1.077$ & $-\!\!-\!\!-$
-         & $0.70\%$ & $2.95\%$ & $1.53\%$ & $2.11\%$ \\
-Cur-3w   & $0.976$ & $0.554$ & $0.920$ & $1.322$
-         & $0.69\%$ & $3.83\%$ & $1.59\%$ & $1.93\%$ \\
-Cur-soft & $3.155$ & $1.739$ & $3.932$ & $-\!\!-\!\!-$
-         & $1.20\%$ & $6.37\%$ & $1.19\%$ & $1.77\%$ \\
+Cur-2w   & $0.845$ & $\mathbf{0.516}$ & $1.077$ & $-\!\!-\!\!-$ \\
+Cur-3w   & $0.976$ & $0.554$          & $0.920$ & $1.322$ \\
+Cur-soft & $3.155$ & $1.739$          & $3.932$ & $2.394$ (overlap) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[!htbp]
+\centering
+\caption{Curriculum PINN variants: post-hoc QNM extraction at
+$\xq = 10\,M$ with the same five methods of
+Table~\ref{tab:fwd-qnm}, against the Leaver Schwarzschild
+$\ell{=}2$ fundamental $M\omega_{0} = 0.3737$,
+$\tau_{0}/M = 11.241$. The forward baseline row reproduces the
+relevant entries of Table~\ref{tab:fwd-qnm} for direct
+comparison. M4 and M5 quote the plateau mean $\pm$
+plateau standard deviation across the plateau block; ``no
+plateau'' indicates that no plateau of size $\lfloor N/4 \rfloor$
+satisfying the relative-scatter criterion of
+Sec.~\ref{sec:plateau} forms.}
+\label{tab:cur-qnm}
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+Method & $M\omega$ & $\omega$ err & $\tau/M$ & $\tau$ err & Window or plateau \\
+\midrule
+\multicolumn{6}{@{}l}{\textit{Baseline (single-window forward PINN, reproduces Table~\ref{tab:fwd-qnm})}} \\
+  M1 (FFT$+$log-line)         & $0.3712$  & $0.68\%$  & $10.92$ & $2.83\%$ & $[10,\,50]\,M$ \\
+  M2 (NLS, wide window)       & $0.3795$  & $1.54\%$  & $11.46$ & $1.99\%$ & $[10,\,50]\,M$ \\
+  M2 (NLS on M4 plateau)      & $0.3749$  & $0.31\%$  & $10.41$ & $7.38\%$ & $[14,\,50]\,M$ \\
+  M3 (ESPRIT, $K{=}6$)        & $0.4829$  & $29.2\%$  & $7.84$  & $30.3\%$ & $[10,\,50]\,M$ \\
+  M4 (1-D plateau)            & $0.37359{\pm}2{\times}10^{-4}$ & $\mathbf{0.029\%}$ & $10.94{\pm}0.02$ & $2.65\%$ & $t_0\in[14,21]M$, $\tend{=}50M$ \\
+  M5 (2-D plateau)            & $0.3728{\pm}8{\times}10^{-4}$  & $0.23\%$  & $10.80{\pm}0.12$ & $3.91\%$ & $t_0\in[10,16.7]M$, $\tend\in[42,50]M$ \\
+\midrule
+\multicolumn{6}{@{}l}{\textit{Cur-2w (hard partition, $W_{1}{=}[0,25]M$, $W_{2}{=}[25,50]M$)}} \\
+  M1                          & $0.3711$  & $0.70\%$  & $10.91$ & $2.95\%$ & $[10,\,50]\,M$ \\
+  M2 (wide)                   & $0.3794$  & $1.53\%$  & $11.48$ & $2.11\%$ & $[10,\,50]\,M$ \\
+  M2 on M4 plateau            & $0.3748$  & $0.31\%$  & $10.44$ & $7.16\%$ & $[14,\,50]\,M$ \\
+  M3                          & $0.3774$  & $1.00\%$  & $10.46$ & $6.97\%$ & $[10,\,50]\,M$ \\
+  M4                          & $0.3708{\pm}9{\times}10^{-4}$  & $0.79\%$  & $10.98{\pm}0.08$ & $2.28\%$ & $t_0\in[10,15]M$, $\tend{=}50M$ \\
+  M5                          & $0.3729{\pm}1.8{\times}10^{-3}$ & $0.22\%$ & $10.91{\pm}0.08$ & $2.98\%$ & $t_0\in[13.3,20]M$, $\tend\in[42,50]M$ \\
+\midrule
+\multicolumn{6}{@{}l}{\textit{Cur-3w (hard partition, $[0,17]\cup[17,34]\cup[34,50]M$)}} \\
+  M1                          & $0.3711$  & $0.69\%$  & $10.81$ & $3.83\%$ & $[10,\,50]\,M$ \\
+  M2 (wide)                   & $0.3796$  & $1.59\%$  & $11.46$ & $1.93\%$ & $[10,\,50]\,M$ \\
+  M2 on M4 plateau            & $0.3751$  & $0.36\%$  & $10.39$ & $7.58\%$ & $[14,\,50]\,M$ \\
+  M3                          & $0.3776$  & $1.04\%$  & $10.45$ & $7.03\%$ & $[10,\,50]\,M$ \\
+  M4                          & $0.3713{\pm}5{\times}10^{-4}$  & $0.64\%$  & $10.78{\pm}0.04$ & $4.12\%$ & $t_0\in[10,15]M$, $\tend{=}50M$ \\
+  M5                          & $0.3713{\pm}7{\times}10^{-4}$  & $0.64\%$  & $10.82{\pm}0.08$ & $3.78\%$ & $t_0\in[13.3,20]M$, $\tend\in[42,50]M$ \\
+\midrule
+\multicolumn{6}{@{}l}{\textit{Cur-soft (overlap $[20,30]M$, anchors\,+\,smoothstep blend)}} \\
+  M1                          & $0.3692$  & $1.20\%$  & $10.53$ & $6.37\%$ & $[10,\,50]\,M$ \\
+  M2 (wide)                   & $0.3782$  & $1.19\%$  & $11.44$ & $1.77\%$ & $[10,\,50]\,M$ \\
+  M2 on M4 plateau            & $0.3669$  & $1.82\%$  & $10.55$ & $6.12\%$ & $[18,\,50]\,M$ \\
+  M3                          & $0.3777$  & $1.07\%$  & $10.48$ & $6.78\%$ & $[10,\,50]\,M$ \\
+  M4                          & no plateau & $25.7\%$ & --- & --- & $\sigma_\omega/|\omega|>0.06$ \\
+  M5                          & $0.385{\pm}3.8{\times}10^{-2}$ & $2.95\%$ & $11.99{\pm}2.98$ & $6.66\%$ & $t_0\in[10,16.7]M$, $\tend\in[30,38]M$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -610,8 +668,14 @@ Cur-soft & $3.155$ & $1.739$ & $3.932$ & $-\!\!-\!\!-$
 The 2-window hard partition (Cur-2w) is essentially tied with the
 single-window baseline on the full-domain RMSD
 ($8.45 \times 10^{-4}$ versus $8.17 \times 10^{-4}$, a $3\%$
-increase) and on every QNM extraction column. The per-window
-breakdown is, however, informative: $W_{1} = [0,25]\,M$ alone
+increase) and recovers the same headline QNM at the M5 plateau
+($M\omega = 0.3729$, error $0.22\%$ versus $0.23\%$ for the
+baseline). The M4 plateau, by contrast, degrades from
+$\sigma_\omega = 2\times 10^{-4}$ to
+$\sigma_\omega = 9\times 10^{-4}$ and the M4 mean drifts from
+$0.029\%$ to $0.79\%$, a 27-fold loss of plateau quality. The
+per-window breakdown of Table~\ref{tab:cur-summary} is
+informative: $W_{1} = [0,25]\,M$ alone
 reaches RMSD $5.16\times 10^{-4}$, the lowest sub-domain RMSD
 seen anywhere in this work and a $37\%$ improvement on the
 baseline RMSD evaluated over the same sub-domain (which we read
@@ -636,18 +700,36 @@ fresh interpolation error to the IC of the next window, and the
 errors compound. The full-domain RMSD ends $19\%$ above the
 single-window baseline, and the M1 $\tau$ error worsens from
 $2.95\%$ (Cur-2w) to $3.83\%$ (Cur-3w), tracking the additional
-late-time stitching error. The M2 wide-window $\omega$ and
-$\tau$ are largely insensitive to which curriculum variant is
-used, which is consistent with the wide window averaging over
+late-time stitching error. The M4 and M5 plateaux of
+Table~\ref{tab:cur-qnm} continue to form (no plateau failure)
+but with $\sigma_\omega = 5\!-\!7 \times 10^{-4}$ and a mean
+bias $0.64\%$, two-and-a-half times the bias of the
+single-window baseline. The M2 wide-window $\omega$ and $\tau$
+are largely insensitive to which curriculum variant is used,
+which is consistent with the wide window averaging over
 the per-window errors.
 
 The soft-overlap variant (Cur-soft) does not improve the
-hard-partition result. It performs worse on every column except
-the M2 $\tau$ extraction, which it ties. The full-domain RMSD
-is $\sim 4\times$ the single-window baseline, and both $W_{1}$
-and $W_{2}$ are individually worse than their hard-partition
-counterparts. Two factors plausibly contribute. First, the
-continuity-anchor loss Eq.~\eqref{eq:cur-anchor} imposes
+hard-partition result. It performs worse than Cur-2w on every
+extraction column except M2 wide-window $\tau$, which it
+marginally ties. The full-domain RMSD is $\sim 4\times$ the
+single-window baseline; both $W_{1}$ and the overlap region
+$[20,30]\,M$ are individually worse than the corresponding
+hard-partition entries. Most strikingly, the M4 plateau scan
+fails to identify any contiguous block of size
+$\lfloor N/4 \rfloor$ for which
+$\mathrm{std}(\omega)/|\bar\omega| < 3\%$, i.e.\ no plateau
+forms; the table reports the relative-scatter floor
+($\sigma_\omega/|\omega| > 0.06$) and the corresponding
+single-best two-mode fit, $M\omega = 0.278$ at $25.7\%$ error,
+which is the standard manifestation of the no-plateau condition
+of Sec.~\ref{sec:plateau}. M5 finds a small valid 2-D plateau
+($t_0 \in [10,16.7]\,M$, $\tend \in [30,38]\,M$) but with
+$\sigma_\omega = 4\times 10^{-2}$, two orders of magnitude
+larger than the baseline, signalling that even the 2-D scan
+struggles to find a stable region. Two factors plausibly
+contribute. First, the continuity-anchor loss
+Eq.~\eqref{eq:cur-anchor} imposes
 $201 \times 11 = 2{,}211$ additional point constraints on
 $\Phi_{\theta_{2}}$ across the overlap, drawn from the trained
 $\Phi_{\theta_{1}}$, which itself carries non-zero error

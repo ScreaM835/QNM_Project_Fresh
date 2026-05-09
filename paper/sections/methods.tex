@@ -931,55 +931,71 @@ that distinguish each variant.
 \centering
 \begin{tikzpicture}[
   every node/.style={font=\small},
-  win/.style={draw, rounded corners=2pt, minimum height=8mm,
+  win/.style={draw, rounded corners=2pt, minimum height=9mm,
               inner sep=2pt, font=\small},
-  ovl/.style={draw, rounded corners=2pt, minimum height=8mm,
-              inner sep=2pt, fill=purple!15, font=\small},
-  arr/.style={->, >=stealth, thick, gray!70!black},
-  tick/.style={font=\scriptsize, gray!70!black},
+  ovl/.style={draw, rounded corners=2pt, minimum height=9mm,
+              inner sep=2pt, fill=purple!25, font=\small},
+  arr/.style={->, >=stealth, thick, gray!50!black},
+  tick/.style={font=\scriptsize, gray!50!black},
 ]
-  % Horizontal axis scale: 1 cm per 5 M of time.
-  \def\sc{0.24}    % cm per M
+  % Horizontal axis scale.
+  \def\sc{0.28}    % cm per M
+  \def\xo{-0.5*50*\sc} % so t=0 sits at this x
 
   % --- Cur-2w: [0,25] U [25,50] ---
-  \node[font=\small\bfseries] at (-0.5*\sc*50 - 1.4, 1.6) {Cur-2w:};
-  \node[win, fill=orange!20, minimum width={25*\sc cm}] (a1)
-       at ({(0+25)/2*\sc - 0.5*50*\sc}, 1.6) {$W_{1}=[0,25]M$};
-  \node[win, fill=blue!15,   minimum width={25*\sc cm}] (a2)
-       at ({(25+50)/2*\sc - 0.5*50*\sc}, 1.6) {$W_{2}=[25,50]M$};
-  \draw[arr] (a1.east) -- node[above, font=\scriptsize]{IC at $t{=}25$} (a2.west);
+  \node[font=\small\bfseries, anchor=east] at ({\xo - 0.4}, 2.6) {Cur-2w:};
+  \node[win, fill=orange!20, minimum width={25*\sc cm}, anchor=west] (a1)
+       at ({0*\sc + \xo}, 2.6) {$W_{1}=[0,25]M$};
+  \node[win, fill=blue!15, minimum width={25*\sc cm}, anchor=west] (a2)
+       at ({25*\sc + \xo}, 2.6) {$W_{2}=[25,50]M$};
+  % IC transfer arrow lifted above the boundary
+  \draw[arr] ($(a1.north)!0.85!(a1.north east)$)
+          .. controls +(0.2,0.7) and +(-0.2,0.7) ..
+             ($(a2.north)!0.15!(a2.north west)$);
+  \node[font=\scriptsize, anchor=south]
+       at ({25*\sc + \xo}, 3.85) {IC at $t{=}25M$};
 
   % --- Cur-3w: [0,17] U [17,34] U [34,50] ---
-  \node[font=\small\bfseries] at (-0.5*\sc*50 - 1.4, 0.0) {Cur-3w:};
-  \node[win, fill=orange!20, minimum width={17*\sc cm}] (b1)
-       at ({(0+17)/2*\sc - 0.5*50*\sc}, 0.0) {$[0,17]M$};
-  \node[win, fill=blue!15,   minimum width={17*\sc cm}] (b2)
-       at ({(17+34)/2*\sc - 0.5*50*\sc}, 0.0) {$[17,34]M$};
-  \node[win, fill=green!15,  minimum width={16*\sc cm}] (b3)
-       at ({(34+50)/2*\sc - 0.5*50*\sc}, 0.0) {$[34,50]M$};
-  \draw[arr] (b1.east) -- (b2.west);
-  \draw[arr] (b2.east) -- (b3.west);
+  \node[font=\small\bfseries, anchor=east] at ({\xo - 0.4}, 0.7) {Cur-3w:};
+  \node[win, fill=orange!20, minimum width={17*\sc cm}, anchor=west] (b1)
+       at ({0*\sc + \xo}, 0.7) {$[0,17]M$};
+  \node[win, fill=blue!15,   minimum width={17*\sc cm}, anchor=west] (b2)
+       at ({17*\sc + \xo}, 0.7) {$[17,34]M$};
+  \node[win, fill=green!15,  minimum width={16*\sc cm}, anchor=west] (b3)
+       at ({34*\sc + \xo}, 0.7) {$[34,50]M$};
+  \draw[arr] ($(b1.north)!0.85!(b1.north east)$)
+          .. controls +(0.15,0.55) and +(-0.15,0.55) ..
+             ($(b2.north)!0.15!(b2.north west)$);
+  \draw[arr] ($(b2.north)!0.85!(b2.north east)$)
+          .. controls +(0.15,0.55) and +(-0.15,0.55) ..
+             ($(b3.north)!0.15!(b3.north west)$);
+  \node[font=\scriptsize, anchor=south]
+       at ({17*\sc + \xo}, 1.85) {IC};
+  \node[font=\scriptsize, anchor=south]
+       at ({34*\sc + \xo}, 1.85) {IC};
 
-  % --- Cur-soft: [0,30] and [20,50] with overlap [20,30] ---
-  \node[font=\small\bfseries] at (-0.5*\sc*50 - 1.4, -1.6) {Cur-soft:};
-  % Background W1 [0,30]
-  \node[win, fill=orange!20, minimum width={30*\sc cm}] (c1)
-       at ({(0+30)/2*\sc - 0.5*50*\sc}, -1.6) {$W_{1}^{\mathrm{ov}}=[0,30]M$};
-  % Background W2 [20,50]
-  \node[win, fill=blue!15,   minimum width={30*\sc cm}] (c2)
-       at ({(20+50)/2*\sc - 0.5*50*\sc}, -2.4) {$W_{2}^{\mathrm{ov}}=[20,50]M$};
-  % Overlap band marker
-  \node[ovl, minimum width={10*\sc cm}] (cov)
-       at ({(20+30)/2*\sc - 0.5*50*\sc}, -3.2) {overlap $[20,30]M$};
-  \draw[arr] (c1.east) |- node[right, font=\scriptsize, pos=0.25]{IC + anchors} (c2.east);
+  % --- Cur-soft: W1 [0,30] (top) and W2 [20,50] (bottom), overlap [20,30] ---
+  \node[font=\small\bfseries, anchor=east] at ({\xo - 0.4}, -1.0) {Cur-soft:};
+  \node[win, fill=orange!20, minimum width={30*\sc cm}, anchor=west] (c1)
+       at ({0*\sc + \xo}, -1.0) {$W_{1}^{\mathrm{ov}}=[0,30]M$};
+  \node[win, fill=blue!15, minimum width={30*\sc cm}, anchor=west] (c2)
+       at ({20*\sc + \xo}, -2.0) {$W_{2}^{\mathrm{ov}}=[20,50]M$};
+  % Highlight overlap band as vertical purple shading spanning both rows
+  \fill[purple!25, opacity=0.55]
+       ({20*\sc + \xo}, -2.5) rectangle ({30*\sc + \xo}, -0.5);
+  \draw[purple!60!black, dashed] ({20*\sc + \xo}, -2.5) -- ({20*\sc + \xo}, -0.5);
+  \draw[purple!60!black, dashed] ({30*\sc + \xo}, -2.5) -- ({30*\sc + \xo}, -0.5);
+  \node[font=\scriptsize, anchor=south, purple!60!black]
+       at ({25*\sc + \xo}, -0.5)
+       {overlap $[20,30]M$: anchors\,+\,blend};
 
   % Time axis (bottom)
-  \draw[->, thick] ({0*\sc - 0.5*50*\sc}, -4.2)
-                -- ({50*\sc - 0.5*50*\sc + 0.4}, -4.2)
+  \draw[->, thick] ({0*\sc + \xo}, -3.0)
+                -- ({50*\sc + \xo + 0.5}, -3.0)
                 node[right]{$t/M$};
-  \foreach \t in {0,10,20,25,30,34,40,50}{
-    \draw ({\t*\sc - 0.5*50*\sc}, -4.2) -- ({\t*\sc - 0.5*50*\sc}, -4.35);
-    \node[tick, below] at ({\t*\sc - 0.5*50*\sc}, -4.35) {\t};
+  \foreach \t in {0,10,17,20,25,30,34,40,50}{
+    \draw ({\t*\sc + \xo}, -3.0) -- ({\t*\sc + \xo}, -3.15);
+    \node[tick, below] at ({\t*\sc + \xo}, -3.15) {\t};
   }
 \end{tikzpicture}
 \caption{Curriculum PINN partitions. Cur-2w (top) splits the
