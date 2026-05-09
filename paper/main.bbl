@@ -1,4 +1,4 @@
-\begin{thebibliography}{37}
+\begin{thebibliography}{39}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
 \expandafter\ifx\csname urlstyle\endcsname\relax
@@ -12,6 +12,13 @@ Atilim~Gunes Baydin, Barak~A. Pearlmutter, Alexey~Andreyevich Radul, and
 \newblock Automatic differentiation in machine learning: a survey.
 \newblock \emph{Journal of Machine Learning Research}, 18\penalty0
   (153):\penalty0 1--43, 2018.
+
+\bibitem[Bengio et~al.(2009)Bengio, Louradour, Collobert, and
+  Weston]{Bengio2009curriculum}
+Yoshua Bengio, J{\'e}r{\^o}me Louradour, Ronan Collobert, and Jason Weston.
+\newblock Curriculum learning.
+\newblock In \emph{Proc.\ 26th Int.\ Conf.\ Machine Learning (ICML)}, pages
+  41--48, 2009.
 
 \bibitem[Berti et~al.(2007)Berti, Cardoso, Gonzalez, and
   Sperhake]{Berti2007prony}
@@ -93,6 +100,15 @@ R.~A. Konoplya.
 R.~A. Konoplya and A.~Zhidenko.
 \newblock Quasinormal modes of black holes: from astrophysics to string theory.
 \newblock \emph{Rev. Mod. Phys.}, 83:\penalty0 793--836, 2011.
+
+\bibitem[Krishnapriyan et~al.(2021)Krishnapriyan, Gholami, Zhe, Kirby, and
+  Mahoney]{Krishnapriyan2021failure}
+Aditi Krishnapriyan, Amir Gholami, Shandian Zhe, Robert Kirby, and Michael~W.
+  Mahoney.
+\newblock Characterizing possible failure modes in physics-informed neural
+  networks.
+\newblock \emph{Adv.\ Neural Inf.\ Process.\ Syst.\ (NeurIPS)}, 34:\penalty0
+  26548--26560, 2021.
 
 \bibitem[Leaver(1985)]{Leaver1985}
 E.~W. Leaver.

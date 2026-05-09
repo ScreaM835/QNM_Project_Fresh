@@ -745,39 +745,146 @@ was tuned for the single-window setup.
 
 \begin{figure}[!htbp]
 \centering
-\begin{minipage}[t]{0.49\textwidth}
+\begin{minipage}[t]{0.32\textwidth}
   \centering
-  \includegraphics[width=\linewidth]{../outputs/pinn/zerilli_l2_curriculum/ringdown_overlay.png}
-  \\{\footnotesize Cur-2w: $[0,25]\cup[25,50]\,M$}
+  \includegraphics[width=\linewidth]{../outputs/pinn/zerilli_l2_curriculum/snapshots.png}\\[0.2em]
+  \includegraphics[width=\linewidth]{../outputs/pinn/zerilli_l2_curriculum/abs_diff_snapshots.png}\\
+  {\footnotesize Cur-2w}
 \end{minipage}\hfill
-\begin{minipage}[t]{0.49\textwidth}
+\begin{minipage}[t]{0.32\textwidth}
   \centering
-  \includegraphics[width=\linewidth]{../outputs/pinn/zerilli_l2_curriculum_3w/ringdown_overlay.png}
-  \\{\footnotesize Cur-3w: $[0,17]\cup[17,34]\cup[34,50]\,M$}
+  \includegraphics[width=\linewidth]{../outputs/pinn/zerilli_l2_curriculum_3w/snapshots.png}\\[0.2em]
+  \includegraphics[width=\linewidth]{../outputs/pinn/zerilli_l2_curriculum_3w/abs_diff_snapshots.png}\\
+  {\footnotesize Cur-3w}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{../outputs/pinn/zerilli_l2_soft_overlap_curriculum/snapshots.png}\\[0.2em]
+  \includegraphics[width=\linewidth]{../outputs/pinn/zerilli_l2_soft_overlap_curriculum/abs_diff_snapshots.png}\\
+  {\footnotesize Cur-soft}
+\end{minipage}
+\caption{Curriculum PINN versus FD reference at the snapshot
+times for all three variants. Top row of each column:
+$\Phi_{\mathrm{cur}}(x,t)$ (solid) overlaid on $\Phi_{\mathrm{FD}}$
+(dashed). Bottom row: pointwise absolute difference
+$|\Phi_{\mathrm{cur}} - \Phi_{\mathrm{FD}}|$. Same axes and
+snapshot times as Figs.~\ref{fig:fwd-field} and \ref{fig:inv-field}
+for direct visual comparison with the single-window baselines.}
+\label{fig:cur-field}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\begin{minipage}[t]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{../outputs/pinn/zerilli_l2_curriculum/error_heatmap.png}\\
+  {\footnotesize Cur-2w}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{../outputs/pinn/zerilli_l2_curriculum_3w/error_heatmap.png}\\
+  {\footnotesize Cur-3w}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{../outputs/pinn/zerilli_l2_soft_overlap_curriculum/error_heatmap.png}\\
+  {\footnotesize Cur-soft}
+\end{minipage}
+\caption{Curriculum PINN global pointwise error. Heatmaps of
+$|\Phi_{\mathrm{cur}} - \Phi_{\mathrm{FD}}|$ on the full training
+domain $x \in [-50,150]\,M$, $t \in [0,50]\,M$ for the three
+curriculum variants. The vertical band of elevated error near
+$t = 25\,M$ in Cur-2w marks the splice between $W_{1}$ and
+$W_{2}$; Cur-3w shows two such bands at $t = 17, 34\,M$;
+Cur-soft shows broad elevated error throughout the overlap
+region $[20,30]\,M$ and beyond, consistent with the higher
+full-domain RMSD of Table~\ref{tab:cur-summary}.}
+\label{fig:cur-heatmap}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\begin{minipage}[t]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{../outputs/pinn/zerilli_l2_curriculum/ringdown_overlay.png}\\
+  {\footnotesize Cur-2w: $[0,25]\cup[25,50]\,M$}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{../outputs/pinn/zerilli_l2_curriculum_3w/ringdown_overlay.png}\\
+  {\footnotesize Cur-3w: $[0,17]\cup[17,34]\cup[34,50]\,M$}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{../outputs/pinn/zerilli_l2_soft_overlap_curriculum/ringdown_overlay.png}\\
+  {\footnotesize Cur-soft: overlap $[20,30]\,M$}
 \end{minipage}
 \caption{Curriculum PINN ringdown at $\xq = 10\,M$. Stitched
-$\Phi_{\mathrm{cur}}(\xq,t)$ overlaid on the FD reference for the
-2-window (left) and 3-window (right) hard-partition variants.
-Both reproduce the full ringdown waveform at the observer; the
-3-window stitch shows visibly larger late-time deviations
-($t \gtrsim 35\,M$), consistent with the per-window RMSD trend
-of Table~\ref{tab:cur-summary}.}
+$\Phi_{\mathrm{cur}}(\xq,t)$ overlaid on the FD reference for
+all three curriculum variants. All three reproduce the full
+ringdown waveform at the observer; Cur-3w shows visibly larger
+late-time deviations ($t \gtrsim 35\,M$), and Cur-soft shows
+visible departures throughout the overlap region, consistent
+with the per-window RMSD trends of Table~\ref{tab:cur-summary}.}
 \label{fig:cur-ringdown}
 \end{figure}
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.92\textwidth]{../outputs/pinn/zerilli_l2_curriculum/error_heatmap.png}
-\caption{Curriculum PINN (Cur-2w) global pointwise error.
-Heatmap of $|\Phi_{\mathrm{cur}} - \Phi_{\mathrm{FD}}|$ on the
-full training domain $x \in [-50,150]\,M$,
-$t \in [0,50]\,M$. The vertical band of elevated error near
-$t = 25\,M$ marks the splice between $W_{1}$ and $W_{2}$, where
-$\Phi_{\theta_{2}}$ is initialised from the interpolated
-$W_{1}$ output. The $W_{2}$ band ($t > 25\,M$) carries roughly
-twice the RMSD of $W_{1}$, consistent with
-Table~\ref{tab:cur-summary}.}
-\label{fig:cur-heatmap}
+\begin{minipage}[t]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{../outputs/qnm/zerilli_l2_curriculum/pinn_method4_stability.png}\\
+  {\footnotesize Cur-2w}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{../outputs/qnm/zerilli_l2_curriculum_3w/pinn_method4_stability.png}\\
+  {\footnotesize Cur-3w}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth]{../outputs/qnm/zerilli_l2_soft_overlap_curriculum/pinn_method4_stability.png}\\
+  {\footnotesize Cur-soft (no plateau)}
+\end{minipage}
+\caption{M4 plateau diagnostic for the three curriculum variants.
+Fitted $M\omega(t_{0})$ and $\tau(t_{0})/M$ on the M4 1-D scan,
+plotted exactly as in Figs.~\ref{fig:fwd-plateau-m4} and
+\ref{fig:inv-plateau-m4}. Cur-2w and Cur-3w both show a clean
+plateau in the early-$t_0$ region; the Cur-2w plateau is
+27$\times$ wider in $\sigma_\omega$ than the single-window
+baseline (Sec.~\ref{sec:res-fwd}). Cur-soft shows no plateau:
+the relative-scatter criterion of Sec.~\ref{sec:plateau} is not
+met by any contiguous block of size $\lfloor N/4 \rfloor$.}
+\label{fig:cur-plateau-m4}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\begin{minipage}[t]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth,keepaspectratio]{../outputs/qnm/zerilli_l2_curriculum/pinn_method5_2d_heatmap.png}\\
+  {\footnotesize Cur-2w}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth,keepaspectratio]{../outputs/qnm/zerilli_l2_curriculum_3w/pinn_method5_2d_heatmap.png}\\
+  {\footnotesize Cur-3w}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.32\textwidth}
+  \centering
+  \includegraphics[width=\linewidth,keepaspectratio]{../outputs/qnm/zerilli_l2_soft_overlap_curriculum/pinn_method5_2d_heatmap.png}\\
+  {\footnotesize Cur-soft}
+\end{minipage}
+\caption{M5 plateau diagnostic for the three curriculum variants.
+Heatmap of $\sigma_\omega/|\bar\omega|$ on the
+$(t_{0},\tend)$ grid, plotted exactly as in
+Figs.~\ref{fig:fwd-plateau-m5} and \ref{fig:inv-plateau-m5}.
+Cur-2w and Cur-3w show a wide low-scatter region in the early
+$t_0$, late $\tend$ corner; Cur-soft retains only a small valid
+2-D plateau ($t_0\in[10,16.7]M$, $\tend\in[30,38]M$) with
+$\sigma_\omega = 4\times 10^{-2}$, two orders of magnitude
+larger than the single-window baseline.}
+\label{fig:cur-plateau-m5}
 \end{figure}
 
 The curriculum strategy therefore meets its narrow design
