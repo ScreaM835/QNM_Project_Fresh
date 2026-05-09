@@ -46,31 +46,37 @@ $5.0\times 10^{-4}$ versus their $1.82\times 10^{-2}$, a factor
 of~$\sim\!36$. We attribute the improvement to the larger number
 of L-BFGS iterations and the greedy adaptive sampling of
 Sec.~\ref{sec:fwd-pinn}; see also the discussion in
-Sec.~\ref{sec:discussion}. The field-accuracy visualisations
-(snapshot overlay, pointwise residual at the snapshot times,
-and full-domain pointwise error heatmap) are collected in
-Fig.~\ref{fig:fwd-field}, and the per-component loss histories
-underlying Eq.~\eqref{eq:fwd-metrics} are shown in
+Sec.~\ref{sec:discussion}. Field accuracy at the snapshot times
+is shown in Fig.~\ref{fig:fwd-field}, the global pointwise error
+in Fig.~\ref{fig:fwd-heatmap}, and the per-component loss
+histories underlying Eq.~\eqref{eq:fwd-metrics} in
 Fig.~\ref{fig:fwd-loss}.
 
-\begin{figure}[!htbp]
+\begin{figure}[H]
 \centering
 \includegraphics[width=0.82\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/snapshots.png}\\[0.4em]
-\includegraphics[width=0.82\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/abs_diff_snapshots.png}\\[0.4em]
-\includegraphics[width=0.82\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/error_heatmap.png}
-\caption{Forward PINN versus FD reference. Top: snapshots of
-$\Phi(x,t)$ at four times $t/M\in\{10,20,30,40\}$ overlaid for
-the PINN and the FD reference; the two curves are visually
-indistinguishable on this scale. Middle: pointwise
-$|\Phi_\theta - \Phi_{\mathrm{FD}}|$ at the same four times,
-concentrated near the potential barrier and remaining below
-$\sim\!5\times 10^{-3}$ throughout. Bottom: full-domain
-heatmap of $|\Phi_\theta - \Phi_{\mathrm{FD}}|$ on
-$x\in[-50,150]\,M$, $t\in[0,50]\,M$.}
+\includegraphics[width=0.82\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/abs_diff_snapshots.png}
+\caption{Forward PINN versus FD reference at the snapshot times.
+Top: snapshots of $\Phi(x,t)$ at four times
+$t/M\in\{10,20,30,40\}$ overlaid for the PINN and the FD
+reference; the two curves are visually indistinguishable on this
+scale. Bottom: pointwise $|\Phi_\theta - \Phi_{\mathrm{FD}}|$
+at the same four times, concentrated near the potential barrier
+and remaining below $\sim\!5\times 10^{-3}$ throughout.}
 \label{fig:fwd-field}
 \end{figure}
 
-\begin{figure}[!htbp]
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/error_heatmap.png}
+\caption{Forward PINN global pointwise error. Heatmap of
+$|\Phi_\theta - \Phi_{\mathrm{FD}}|$ on the full training domain
+$x\in[-50,150]\,M$, $t\in[0,50]\,M$, confirming that the snapshot-time
+bound of Fig.~\ref{fig:fwd-field} holds globally.}
+\label{fig:fwd-heatmap}
+\end{figure}
+
+\begin{figure}[H]
 \centering
 \includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/loss.png}
 \caption{Forward PINN training history. Total loss
@@ -95,13 +101,14 @@ numbers from each method are collected in
 Table~\ref{tab:fwd-qnm}, and the plateau diagnostics that justify
 the M4 and M5 estimates are shown in Figs.~\ref{fig:fwd-plateau-m4} and~\ref{fig:fwd-plateau-m5}.
 
-\begin{figure}[!htbp]
+\begin{figure}[H]
 \centering
 \includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/ringdown_overlay.png}\\[0.6em]
 \includegraphics[width=0.85\textwidth]{../outputs/qnm/zerilli_l2_greedy_f03_lbfgs30k/pinn_ringdown.png}
-\caption{Forward PINN ringdown at $\xq = 10\,M$. Top:
+\caption{Forward PINN ringdown at $\xq = 10\,M$. Top two panels:
 $\Phi_\theta(\xq,t)$ from the forward PINN overlaid on the FD
-reference, showing the prompt burst followed by the
+reference on linear (upper) and logarithmic (lower) vertical
+scales, showing the prompt burst followed by the
 exponentially-damped sinusoidal ringdown. Bottom: the same
 time series isolated from $\Phi_\theta$, on which the five
 extraction methods of Sec.~\ref{sec:qnm-methods} are applied to
@@ -109,7 +116,7 @@ produce the entries of Table~\ref{tab:fwd-qnm}.}
 \label{fig:fwd-ringdown}
 \end{figure}
 
-\begin{table}[t]
+\begin{table}[H]
 \centering
 \caption{Forward PINN QNM extraction. Reference values are the
 Leaver continued-fraction Schwarzschild $\ell = 2$ fundamental
@@ -138,7 +145,7 @@ M5 (2-D plateau)             & $0.3728{\pm}8{\times}10^{-4}$ & $0.23\%$ & $10.80
 \end{tabular}
 \end{table}
 
-\begin{figure}[!htbp]
+\begin{figure}[H]
 \centering
 \includegraphics[width=0.85\textwidth]{../outputs/qnm/zerilli_l2_greedy_f03_lbfgs30k/pinn_method4_stability.png}
 \caption{M4 plateau diagnostic for the forward PINN.
@@ -148,7 +155,7 @@ plateau block ($t_0\in[14,21]\,M$) shaded.}
 \label{fig:fwd-plateau-m4}
 \end{figure}
 
-\begin{figure}[!htbp]
+\begin{figure}[H]
 \centering
 \includegraphics[width=0.75\textwidth,keepaspectratio]{../outputs/qnm/zerilli_l2_greedy_f03_lbfgs30k/pinn_method5_2d_heatmap.png}
 \caption{M5 plateau diagnostic for the forward PINN. Heatmap of
@@ -196,51 +203,41 @@ the field-accuracy metrics on the trained $\Phi_\theta$, the
 recovered mass $M_{\mathrm{learned}}$, the primary single-mode
 QNM estimate $(\omega,\tau)$ obtained from the convention of
 Sec.~\ref{sec:reporting}, and the M4 plateau quality as a
-diagnostic. Numbers are summarised in
-Table~\ref{tab:inv-summary}. The training-time learned template
-parameters are tabulated separately in
-Table~\ref{tab:inv-learned}. The reconstructed field for variant D
-is shown in Fig.~\ref{fig:inv-field}, the corresponding ringdown
-at $\xq = 10\,M$ in Fig.~\ref{fig:inv-ringdown}, and the
-training-time convergence of the five learnable scalars in
-Fig.~\ref{fig:inv-conv}; the $A_{\mathrm{ring}}$--$\tau$
-degeneracy visible in the parameter histories is described in the
-paragraph below, before mass recovery and M4 plateau quality.
+diagnostic. Variant-level numbers are summarised in
+Table~\ref{tab:inv-summary}. For variant D, the best of the six
+runs and the focus of the rest of this subsection, field
+accuracy at the snapshot times is shown in
+Fig.~\ref{fig:inv-field}, the global pointwise error in
+Fig.~\ref{fig:inv-heatmap}, and the training-time convergence
+of the five learnable scalars in Fig.~\ref{fig:inv-conv}.
 
-\begin{figure}[!htbp]
+\begin{figure}[H]
 \centering
 \includegraphics[width=0.82\textwidth]{../outputs/pinn/zerilli_l2_inverse_qnm_combo/snapshots.png}\\[0.4em]
-\includegraphics[width=0.82\textwidth]{../outputs/pinn/zerilli_l2_inverse_qnm_combo/abs_diff_snapshots.png}\\[0.4em]
-\includegraphics[width=0.82\textwidth]{../outputs/pinn/zerilli_l2_inverse_qnm_combo/error_heatmap.png}
-\caption{Inverse PINN versus FD reference for variant D, in the
-same three-panel format as Fig.~\ref{fig:fwd-field}. Top:
-snapshots of $\Phi(x,t)$ at $t/M\in\{10,20,30,40\}$ overlaid for
-the inverse PINN and the FD reference, with $M$ treated as an
-unknown trainable scalar. Middle: pointwise
-$|\Phi_\theta - \Phi_{\mathrm{FD}}|$ at the same four times.
-Bottom: full-domain heatmap of
-$|\Phi_\theta - \Phi_{\mathrm{FD}}|$ on $x\in[-50,150]\,M$,
-$t\in[0,50]\,M$. The field-recovery quality is comparable to
-the forward run while $M$ is simultaneously inferred to $0.34\%$
-of its true value (Table~\ref{tab:inv-summary}).}
+\includegraphics[width=0.82\textwidth]{../outputs/pinn/zerilli_l2_inverse_qnm_combo/abs_diff_snapshots.png}
+\caption{Inverse PINN versus FD reference for variant D at the
+snapshot times, in the same format as Fig.~\ref{fig:fwd-field}.
+Top: snapshots of $\Phi(x,t)$ at $t/M\in\{10,20,30,40\}$ overlaid
+for the inverse PINN and the FD reference, with $M$ treated as
+an unknown trainable scalar. Bottom: pointwise
+$|\Phi_\theta - \Phi_{\mathrm{FD}}|$ at the same four times. The
+field-recovery quality is comparable to the forward run while
+$M$ is simultaneously inferred to $0.34\%$ of its true value
+(Table~\ref{tab:inv-summary}).}
 \label{fig:inv-field}
 \end{figure}
 
-\begin{figure}[!htbp]
+\begin{figure}[H]
 \centering
-\includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_inverse_qnm_combo/ringdown_overlay.png}\\[0.6em]
-\includegraphics[width=0.85\textwidth]{../outputs/qnm/zerilli_l2_inverse_qnm_combo/pinn_ringdown.png}
-\caption{Inverse PINN ringdown at $\xq = 10\,M$ for variant D.
-Top: $\Phi_\theta(\xq,t)$ from the inverse PINN overlaid on the
-FD reference, showing the prompt burst followed by the
-exponentially-damped sinusoidal ringdown. Bottom: the same
-time series isolated from $\Phi_\theta$, on which the five
-extraction methods of Sec.~\ref{sec:qnm-methods} are applied to
-produce the entries of Table~\ref{tab:inv-summary}.}
-\label{fig:inv-ringdown}
+\includegraphics[width=0.92\textwidth]{../outputs/pinn/zerilli_l2_inverse_qnm_combo/error_heatmap.png}
+\caption{Inverse PINN global pointwise error for variant D, in
+the same format as Fig.~\ref{fig:fwd-heatmap}. Heatmap of
+$|\Phi_\theta - \Phi_{\mathrm{FD}}|$ on the full training
+domain $x\in[-50,150]\,M$, $t\in[0,50]\,M$.}
+\label{fig:inv-heatmap}
 \end{figure}
 
-\begin{figure}[!htbp]
+\begin{figure}[H]
 \centering
 \includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_inverse_qnm_combo/param_convergence.png}
 \caption{Inverse PINN training-time parameter convergence for
@@ -257,11 +254,13 @@ converged-network field $\Phi_\theta(\xq,t)$ and the FD truth
 (black); the orange band marks the training window
 $[\tring,\tend] = [18,50]\,M$. Out-of-window template divergence
 is the visual signature of the $A_{\mathrm{ring}}$--$\tau$
-degeneracy.}
+degeneracy quantified at the end of this subsection
+(paragraph on $A_{\mathrm{ring}}$--$\tau$, with
+Tables~\ref{tab:inv-learned} and~\ref{tab:tau-degeneracy}).}
 \label{fig:inv-conv}
 \end{figure}
 
-\begin{table}[!htbp]
+\begin{table}[H]
 \centering
 \caption{Inverse PINN primary results. $M$ is the learned mass.
 $\omega$ is the M4 plateau mean and $\sigma_\omega$ its plateau
@@ -296,19 +295,36 @@ $\ddagger$ Two-mode NLS did not converge to a finite solution on
 any window; M4 returns NaN.
 \end{table}
 
-For variant D, the best of the six runs, we apply the same five
-extraction methods of Sec.~\ref{sec:qnm-methods} to the time
-series $\Phi_\theta(\xq=10\,M,t)$ from the converged inverse
+We now apply the same five extraction methods of
+Sec.~\ref{sec:qnm-methods} to the time series
+$\Phi_\theta(\xq=10\,M,t)$ from the converged variant-D inverse
 PINN, exactly as for the forward PINN of
-Table~\ref{tab:fwd-qnm}. The resulting numbers are collected in
-Table~\ref{tab:inv-qnm}, and the M4 and M5 plateau diagnostics
-are shown in Figs.~\ref{fig:inv-plateau-m4}
+Table~\ref{tab:fwd-qnm}. The extracted ringdown is shown in
+Fig.~\ref{fig:inv-ringdown}, the per-method numbers are
+collected in Table~\ref{tab:inv-qnm}, and the M4 and M5 plateau
+diagnostics are shown in Figs.~\ref{fig:inv-plateau-m4}
 and~\ref{fig:inv-plateau-m5}. M3 is omitted (its dominant
 amplitudes lie at $|c_k|\sim 10^{-23}$, the same ill-conditioning
 behaviour as on the forward problem;
 cf.\ Appendix~\ref{app:esprit}).
 
-\begin{table}[!htbp]
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_inverse_qnm_combo/ringdown_overlay.png}\\[0.6em]
+\includegraphics[width=0.85\textwidth]{../outputs/qnm/zerilli_l2_inverse_qnm_combo/pinn_ringdown.png}
+\caption{Inverse PINN ringdown at $\xq = 10\,M$ for variant D, in
+the same format as Fig.~\ref{fig:fwd-ringdown}. Top two panels:
+$\Phi_\theta(\xq,t)$ from the inverse PINN overlaid on the FD
+reference on linear (upper) and logarithmic (lower) vertical
+scales, showing the prompt burst followed by the
+exponentially-damped sinusoidal ringdown. Bottom: the same time
+series isolated from $\Phi_\theta$, on which the five extraction
+methods of Sec.~\ref{sec:qnm-methods} are applied to produce the
+entries of Table~\ref{tab:inv-qnm}.}
+\label{fig:inv-ringdown}
+\end{figure}
+
+\begin{table}[H]
 \centering
 \caption{Inverse PINN QNM extraction for variant D, structured
 identically to Table~\ref{tab:fwd-qnm}. Reference values, window
@@ -333,7 +349,7 @@ M5 (2-D plateau)             & $0.37485{\pm}3{\times}10^{-5}$ & $0.30\%$ & $9.48
 \end{tabular}
 \end{table}
 
-\begin{figure}[!htbp]
+\begin{figure}[H]
 \centering
 \includegraphics[width=0.85\textwidth]{../outputs/qnm/zerilli_l2_inverse_qnm_combo/pinn_method4_stability.png}
 \caption{M4 plateau diagnostic for the inverse PINN, variant D.
@@ -346,7 +362,7 @@ $\sigma_\omega \sim 2\times 10^{-4}$ of the forward run.}
 \label{fig:inv-plateau-m4}
 \end{figure}
 
-\begin{figure}[!htbp]
+\begin{figure}[H]
 \centering
 \includegraphics[width=0.75\textwidth,keepaspectratio]{../outputs/qnm/zerilli_l2_inverse_qnm_combo/pinn_method5_2d_heatmap.png}
 \caption{M5 plateau diagnostic for the inverse PINN, variant D.
@@ -375,15 +391,14 @@ Fig.~\ref{fig:inv-conv}), while M2 on the wide window recovers
 $11.06\,M$ from the network's own field $\Phi_\theta(\xq,t)$;
 this is the $A_{\mathrm{ring}}$--$\tau$ degeneracy of
 Eq.~\eqref{eq:loss-ring}, discussed quantitatively in the
-paragraph below and visualised in
+paragraph below (with Tables~\ref{tab:inv-learned}
+and~\ref{tab:tau-degeneracy}) and visualised in
 Fig.~\ref{fig:inv-conv}. The reporting convention of
 Sec.~\ref{sec:reporting} therefore takes $\omega$ from M4 and
 $\tau$ from M2-wide, as already used in
 Table~\ref{tab:inv-summary}.
 
-\FloatBarrier
-
-\begin{table}[!htbp]
+\begin{table}[H]
 \centering
 \caption{Inverse PINN learned template parameters at the end of
 training for each
@@ -489,7 +504,7 @@ Table~\ref{tab:tau-degeneracy} compares
 $\tau_{\mathrm{learned}}$ to the post-hoc M2 wide-window fit on
 $\Phi_\theta(\xq,t)$ for all six variants.
 
-\begin{table}[!htbp]
+\begin{table}[H]
 \centering
 \caption{$A_{\mathrm{ring}}$--$\tau$ degeneracy diagnostic. The
 training-time learned $\tau_{\mathrm{learned}}$ is the value of the
