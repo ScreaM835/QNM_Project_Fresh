@@ -21,7 +21,7 @@
 \usepackage{xcolor}
 \usepackage{colortbl}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta, positioning, shapes.geometric, fit, backgrounds}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric, fit, backgrounds, calc}
 
 % ── Macros ───────────────────────────────────────────────────────
 \newcommand{\bh}{black hole}
@@ -82,33 +82,122 @@
   \end{columns}
 \end{frame}
 
-\begin{frame}{The PDE --- Zerilli equation}
-  Linearising Einstein's equations on a Schwarzschild background and
-  separating the angular variables yields the \textbf{1+1D wave equation}
+% ── Theory frame 1: Schwarzschild + linearised perturbations ─────
+\begin{frame}{From Einstein's equations to a 1+1D wave problem}
+  \textbf{Step 1 --- background.} Schwarzschild geometry ($M$ is the \bh{} mass),
+  \[
+    \mathrm{d} s^{2} \;=\; -f(r)\,\mathrm{d} t^{2} + f(r)^{-1}\mathrm{d} r^{2}
+                     + r^{2}\,\mathrm{d}\Omega^{2},
+    \qquad f(r) = 1 - \tfrac{2M}{r}.
+  \]
+
+  \textbf{Step 2 --- linear perturbation.} Write
+  $g_{\mu\nu} = g^{(0)}_{\mu\nu} + h_{\mu\nu}$ with $|h| \ll |g^{(0)}|$ and
+  expand the vacuum Einstein equations to first order:
+  \[
+    \delta R_{\mu\nu}[h] \;=\; 0 .
+  \]
+
+  \textbf{Step 3 --- exploit spherical symmetry.} Decompose $h_{\mu\nu}$ in
+  \emph{tensor spherical harmonics}; under $(\theta,\varphi)\!\to\!(\pi-\theta,\varphi+\pi)$
+  the modes split into two \textbf{decoupled parity sectors}:
+  \medskip
+  \begin{center}\small
+  \begin{tabular}{lll}
+    \toprule
+    Sector & Parity & Master equation \\ \midrule
+    \textbf{Axial} (odd) & $(-1)^{\ell+1}$ & \rw{} \\
+    \textbf{Polar} (even)& $(-1)^{\ell}$   & \zer{} \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+  \medskip
+  Each sector reduces to a single scalar field $\Phi(t,r_{\!*})$ on the
+  \textbf{tortoise coordinate} $\mathrm{d} r_{\!*} = \mathrm{d} r/f(r)$.
+\end{frame}
+
+
+% ── Theory frame 2: the two master equations side by side ────────
+\begin{frame}{The two master equations --- \rw{} and \zer{}}
+  Both sectors obey the \textbf{same 1+1D wave form}
   \[
     -\,\frac{\partial^{2}\Phi}{\partial t^{2}}
-     \;+\; \frac{\partial^{2}\Phi}{\partial r_{\!*}^{\,2}}
-     \;-\; V_{\ell}(r)\,\Phi \;=\; 0
+    \;+\; \frac{\partial^{2}\Phi}{\partial r_{\!*}^{\,2}}
+    \;-\; V_{\ell}(r)\,\Phi \;=\; 0 ,
   \]
-  with the \textbf{Zerilli potential} (even parity, $\ell = 2$),
-  \[
-    V_{\ell}(r) \;=\;
-      \Bigl(1 - \tfrac{2M}{r}\Bigr)
-      \frac{2\bigl[\,n^{2}(n{+}1)r^{3}+3n^{2}Mr^{2}+9nM^{2}r+9M^{3}\bigr]}
-           {r^{3}\,(nr+3M)^{2}},
-    \quad n = \tfrac{1}{2}(\ell-1)(\ell+2),
-  \]
-  on the \textbf{tortoise coordinate} $\mathrm{d} r_{\!*} = \mathrm{d} r/(1-2M/r)$.
+  but with two \emph{different} effective potentials:
+  \medskip
+  \begin{columns}[T]
+    \begin{column}{0.42\textwidth}
+      \centering\textbf{\rw{} (axial)}\par\medskip
+      \[
+        V^{\mathrm{RW}}_{\ell}(r) = f(r)\!\left[\frac{\ell(\ell{+}1)}{r^{2}} - \frac{6M}{r^{3}}\right]
+      \]
+    \end{column}
+    \begin{column}{0.56\textwidth}
+      \centering\textbf{\zer{} (polar)}\par\medskip
+      \[
+        V^{\mathrm{Z}}_{\ell}(r) = f(r)\,\frac{2\bigl[n^{2}(n{+}1)r^{3}+3n^{2}Mr^{2}+9nM^{2}r+9M^{3}\bigr]}{r^{3}(nr+3M)^{2}}
+      \]
+      {\centering\scriptsize $n = \tfrac{1}{2}(\ell-1)(\ell+2)$.\par}
+    \end{column}
+  \end{columns}
+  \vfill
+  \footnotesize
+  Two \emph{different} potentials, one for each parity sector --- but as we
+  will see on the next slide, they encode \emph{the same physics}.
+\end{frame}
 
+
+% ── Theory frame 2b: isospectrality (plot + statement) ───────────
+\begin{frame}{Isospectrality --- one spectrum, two potentials}
+  \begin{columns}[T]
+    \begin{column}{0.55\textwidth}
+      \centering
+      \includegraphics[width=\textwidth]{../outputs/background/rw_vs_zerilli_l2.png}
+    \end{column}
+    \begin{column}{0.43\textwidth}
+      \footnotesize
+      \textbf{Chandrasekhar--Detweiler isospectrality:} the two
+      potentials are \emph{distinct} but share \emph{exactly the same}
+      \qnm{} spectrum $\{\omega_{n}\}$.
+      \medskip
+
+      $\Rightarrow$ Either equation is a valid target for our solver.
+      \medskip
+
+      This work uses the \textbf{\zer{} (polar, $\ell\!=\!2$)} form,
+      matching the reference PINN literature (Patel \emph{et al.}\ 2024)
+      and giving a single, well-defined benchmark to push accuracy
+      against.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+
+% ── Theory frame 3: BCs, IC, reference QNM ───────────────────────
+\begin{frame}{The numerical problem we actually solve}
+  Target: the polar $\ell\!=\!2$ \zer{} equation on
+  $r_{\!*}/M \in [-50,\,150]$, $t/M \in [0,\,50]$.
   \medskip
   \begin{itemize}
-    \item Domain: $r_{\!*}/M \in [-50,\,150]$, $\;t/M \in [0,\,50]$.
-    \item Boundary conditions: outgoing waves at $r_{\!*}\to+\infty$,
-          ingoing at $r_{\!*}\to-\infty$ (horizon).
-    \item Initial condition: localised Gaussian pulse at $t = 0$.
-    \item \textbf{QNM frequency} (Leaver 1985):
-          $M\omega = 0.3737 - 0.0890\,i$ $\;\Rightarrow\;$ $\tau/M = 11.241$.
+    \item \textbf{Initial condition} ($t=0$): localised Gaussian pulse,
+          time-symmetric ($\partial_{t}\Phi = 0$).
+    \item \textbf{Boundary conditions:}
+          \emph{purely outgoing} waves at $r_{\!*}\!\to\!+\infty$
+          (radiation to infinity),
+          \emph{purely ingoing} at $r_{\!*}\!\to\!-\infty$
+          (absorption by the horizon).
+    \item These BCs are precisely what selects the discrete
+          \textbf{\qnm{} spectrum} $\omega_{n}\in\mathbb{C}$.
   \end{itemize}
+  \medskip
+  \textbf{Reference fundamental mode} ($\ell\!=\!2,\,n\!=\!0$, Leaver 1985):
+  \[
+    M\omega \;=\; 0.3737 - 0.0890\,i,
+    \qquad \tau/M \;=\; -1/\Im\omega \;=\; 11.241 .
+  \]
+  Every result in the rest of the talk is benchmarked against this number.
 \end{frame}
 
 \begin{frame}{Three ways to compute \qnms{}}
@@ -159,6 +248,11 @@
     \item \textbf{Inverse PINN:} learn $M,\omega,\tau$ from ringdown data
           in a single training run. Best variant (\textbf{D\_combo}): $M$ to $0.34\%$,
           $\omega$ to $0.31\%$, $\tau$ to $1.6\%$.
+    \medskip
+    \item \textbf{Curriculum PINN:} split $t\!\in\![0,50]M$ into
+          $K$ windows trained sequentially, IC of window $k$ taken
+          from network $k\!-\!1$. Diagnoses where the late-time
+          error of the single-window forward PINN comes from.
     \medskip
     \item \textbf{New extraction methodology --- M3, M4, M5:}
           ESPRIT subspace decomposition; two-mode NLS with 1-D and 2-D
@@ -290,7 +384,7 @@
           inside it.
     \item \textbf{Sampling.} Collocation points are re-drawn every
           epoch via the \emph{greedy resampling} scheme described in
-          \S 5.
+          \S 6.
   \end{itemize}
 \end{frame}
 
@@ -363,13 +457,13 @@
   \begin{columns}[T]
     \begin{column}{0.50\textwidth}
       \centering
-      \includegraphics[height=0.70\textheight,keepaspectratio]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/error_heatmap.png}
+      \includegraphics[width=\linewidth,height=0.70\textheight,keepaspectratio]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/error_heatmap.png}
       \\[3pt]{\scriptsize Pointwise error $|\Phi_{\pinn{}}-\Phi_{\fd{}}|$ over the
       full $(x,t)$ domain.}
     \end{column}
     \begin{column}{0.48\textwidth}
       \centering
-      \includegraphics[height=0.70\textheight,keepaspectratio]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/ringdown_overlay.png}
+      \includegraphics[width=\linewidth,height=0.70\textheight,keepaspectratio]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/ringdown_overlay.png}
       \\[3pt]{\scriptsize Ringdown overlay at $x_{q}\!=\!10\,M$: PINN (solid)
       vs.\ FD (dashed). Greedy resampling, $f\!=\!0.3$, $+$ L-BFGS 30k.}
     \end{column}
@@ -677,7 +771,236 @@
 
 
 % ══════════════════════════════════════════════════════════════════
-\section{4. Extraction methods M3, M4, M5}
+\section{4. Curriculum PINN}
+% ══════════════════════════════════════════════════════════════════
+
+\begin{frame}{Curriculum PINN --- problem statement}
+  \textbf{Diagnosis.} The forward PINN's pointwise error grows
+  monotonically with $t$: the late-time band $t\!\in\![37.5,50]M$
+  contributes $\sim\!41\%$ of the full-domain RMSD, despite spanning
+  only a quarter of the temporal domain.
+  \medskip
+
+  \textbf{Idea.} Replace the single-window forward PINN with a
+  \emph{curriculum} [Bengio et al.\ 2009; Krishnapriyan et al.\ 2021]:
+  split $t\!\in\![0,50]M$ into $K$ contiguous windows
+  $W_{k}=[t_{k-1},t_{k}]$ and train an \emph{independent} PINN
+  $\Phi_{\theta_{k}}$ on each, with the network of window $k$ supplying
+  the initial conditions of window $k\!+\!1$:
+  \[
+    \Phi^{\mathrm{IC}}_{k}(x) = \Phi_{\theta_{k-1}}(x,t_{k-1}),\qquad
+    \partial_{t}\Phi^{\mathrm{IC}}_{k}(x)
+       = \partial_{t}\Phi_{\theta_{k-1}}(x,t_{k-1}).
+  \]
+  \medskip
+
+  \textbf{Trade-off.}
+  \begin{itemize}\small
+    \item \textcolor{darkgreen}{\textbf{Pro:}} smaller temporal sub-domain $\Rightarrow$
+          easier optimisation landscape per window.
+    \item \textcolor{darkred}{\textbf{Con:}} every window after the first inherits
+          the residual error of its predecessor through its IC.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Curriculum PINN --- three partitions}
+  \centering
+  \resizebox{0.95\textwidth}{!}{%
+  \begin{tikzpicture}[
+    every node/.style={font=\small},
+    win/.style={draw, rounded corners=2pt, minimum height=8mm,
+                inner sep=2pt, font=\small},
+    arr/.style={->, >=stealth, thick, gray!50!black},
+    tick/.style={font=\scriptsize, gray!50!black},
+  ]
+    \def\sc{0.30}
+    \def\xo{-0.5*50*\sc}
+
+    % Cur-2w
+    \node[font=\small\bfseries, anchor=east] at ({\xo - 0.4}, 2.4) {Cur-2w:};
+    \node[win, fill=orange!20, minimum width={25*\sc cm}, anchor=west] (a1)
+         at ({0*\sc + \xo}, 2.4) {$W_{1}=[0,25]M$};
+    \node[win, fill=blue!15, minimum width={25*\sc cm}, anchor=west] (a2)
+         at ({25*\sc + \xo}, 2.4) {$W_{2}=[25,50]M$};
+    \draw[arr] ($(a1.north)!0.85!(a1.north east)$)
+            .. controls +(0.2,0.5) and +(-0.2,0.5) ..
+               ($(a2.north)!0.15!(a2.north west)$);
+    \node[font=\scriptsize, anchor=south]
+         at ({25*\sc + \xo}, 3.35) {IC at $t{=}25M$};
+
+    % Cur-3w
+    \node[font=\small\bfseries, anchor=east] at ({\xo - 0.4}, 0.6) {Cur-3w:};
+    \node[win, fill=orange!20, minimum width={17*\sc cm}, anchor=west] (b1)
+         at ({0*\sc + \xo}, 0.6) {$[0,17]M$};
+    \node[win, fill=blue!15,   minimum width={17*\sc cm}, anchor=west] (b2)
+         at ({17*\sc + \xo}, 0.6) {$[17,34]M$};
+    \node[win, fill=green!15,  minimum width={16*\sc cm}, anchor=west] (b3)
+         at ({34*\sc + \xo}, 0.6) {$[34,50]M$};
+    \draw[arr] ($(b1.north)!0.85!(b1.north east)$)
+            .. controls +(0.15,0.45) and +(-0.15,0.45) ..
+               ($(b2.north)!0.15!(b2.north west)$);
+    \draw[arr] ($(b2.north)!0.85!(b2.north east)$)
+            .. controls +(0.15,0.45) and +(-0.15,0.45) ..
+               ($(b3.north)!0.15!(b3.north west)$);
+    \node[font=\scriptsize, anchor=south] at ({17*\sc + \xo}, 1.55) {IC};
+    \node[font=\scriptsize, anchor=south] at ({34*\sc + \xo}, 1.55) {IC};
+
+    % Cur-soft: two staggered rows + overlap band
+    \node[font=\small\bfseries, anchor=east] at ({\xo - 0.4}, -1.0) {Cur-soft:};
+    \node[win, fill=orange!20, minimum width={30*\sc cm}, anchor=west] (c1)
+         at ({0*\sc + \xo}, -1.0) {$W_{1}^{\mathrm{ov}}=[0,30]M$};
+    \node[win, fill=blue!15, minimum width={30*\sc cm}, anchor=west] (c2)
+         at ({20*\sc + \xo}, -2.0) {$W_{2}^{\mathrm{ov}}=[20,50]M$};
+    \fill[purple!25, opacity=0.55]
+         ({20*\sc + \xo}, -2.45) rectangle ({30*\sc + \xo}, -0.55);
+    \draw[purple!60!black, dashed] ({20*\sc + \xo}, -2.45) -- ({20*\sc + \xo}, -0.55);
+    \draw[purple!60!black, dashed] ({30*\sc + \xo}, -2.45) -- ({30*\sc + \xo}, -0.55);
+    \node[font=\scriptsize, anchor=south, purple!60!black]
+         at ({25*\sc + \xo}, -0.55)
+         {overlap $[20,30]M$: anchors\,+\,smoothstep blend};
+
+    % Time axis
+    \draw[->, thick] ({0*\sc + \xo}, -3.0)
+                  -- ({50*\sc + \xo + 0.5}, -3.0) node[right]{$t/M$};
+    \foreach \t in {0,10,17,20,25,30,34,40,50}{
+      \draw ({\t*\sc + \xo}, -3.0) -- ({\t*\sc + \xo}, -3.13);
+      \node[tick, below] at ({\t*\sc + \xo}, -3.13) {\t};
+    }
+  \end{tikzpicture}}
+  \\[6pt]
+  \begin{minipage}{0.92\textwidth}
+    \centering\scriptsize
+    \textbf{Cur-2w} and \textbf{Cur-3w}: hard partition --- IC of each window
+    extracted from the previous network at the splice time.
+    \textbf{Cur-soft}: overlapping windows with continuity anchors and a
+    smoothstep blend on the overlap band (next slide).
+  \end{minipage}
+\end{frame}
+
+\begin{frame}{Curriculum PINN --- loss per window}
+  \footnotesize
+  Each window $W_{k}$ minimises the \textbf{same seven-term forward loss}
+  as the forward PINN, evaluated on $W_{k}$ only:
+  \[
+    \mathcal{L}_{\mathrm{cur},k}
+    \;=\;
+    \underbrace{\textcolor{darkred}{\lambda_{r}\mathcal{L}_{r}^{(k)}
+      + \lambda_{r_{x}}\mathcal{L}_{r_{x}}^{(k)}
+      + \lambda_{r_{t}}\mathcal{L}_{r_{t}}^{(k)}}}_{\text{PDE residual + gPINN on }W_{k}}
+    \;+\;
+    \underbrace{\textcolor{darkgreen}{\lambda_{\mathrm{ic}}\mathcal{L}_{\mathrm{ic}}^{(k)}
+      + \lambda_{\mathrm{iv}}\mathcal{L}_{\mathrm{iv}}^{(k)}}}_{\text{IC at }t=t_{k-1}}
+    \;+\;
+    \underbrace{\textcolor{blue}{\lambda_{\mathrm{bl}}\mathcal{L}_{\mathrm{bl}}^{(k)}
+      + \lambda_{\mathrm{br}}\mathcal{L}_{\mathrm{br}}^{(k)}}}_{\text{boundary conditions}}
+  \]
+  \medskip
+
+  \textcolor{darkgreen}{\textbf{Initial condition losses}} differ by window:
+  \begin{itemize}
+    \item \textbf{Window 1} ($k\!=\!1$): same analytic Gaussian-pulse IC as
+          the forward PINN,
+          $\mathcal{L}_{\mathrm{ic}}^{(1)} \!=\! \frac{1}{N_{\mathrm{ic}}}
+          \sum_j[\Phi_{\theta_{1}}(x_j,0) - \Phi_{0}(x_j)]^{2}$,
+          $\;\mathcal{L}_{\mathrm{iv}}^{(1)} \!=\! \frac{1}{N_{\mathrm{ic}}}
+          \sum_j[\partial_t\Phi_{\theta_{1}}(x_j,0)]^{2}$.
+
+    \item \textbf{Window $k\!\ge\!2$}: IC extracted from the \emph{trained}
+          previous network $\Phi_{\theta_{k-1}}$ at the splice time $t_{k-1}$:
+          \[
+            \textcolor{darkgreen}{\mathcal{L}_{\mathrm{ic}}^{(k)}}
+            = \frac{1}{N_{\mathrm{ic}}}\sum_{j}
+              \bigl[\Phi_{\theta_{k}}(x_{j},t_{k-1})
+                    - \Phi_{\theta_{k-1}}(x_{j},t_{k-1})\bigr]^{2}
+          \]
+          \[
+            \textcolor{darkgreen}{\mathcal{L}_{\mathrm{iv}}^{(k)}}
+            = \frac{1}{N_{\mathrm{ic}}}\sum_{j}
+              \bigl[\partial_{t}\Phi_{\theta_{k}}(x_{j},t_{k-1})
+                    - \partial_{t}\Phi_{\theta_{k-1}}(x_{j},t_{k-1})\bigr]^{2}
+          \]
+  \end{itemize}
+  All weights $\boldsymbol{\lambda}$ and the (Adam $10{,}000$ + L-BFGS $30{,}000$)
+  schedule are identical to the forward PINN, applied independently per window.
+\end{frame}
+
+\begin{frame}{Curriculum PINN --- soft-overlap variant}
+  \footnotesize
+  Two windows share an overlap band of width $\Delta_{\mathrm{ov}}$
+  centred on $t_{\mathrm{split}}$:
+  \[
+    W_{1}^{\mathrm{ov}}=[t_{\min},t_{\mathrm{split}}+\Delta_{\mathrm{ov}}/2],\quad
+    W_{2}^{\mathrm{ov}}=[t_{\mathrm{split}}-\Delta_{\mathrm{ov}}/2,t_{\max}].
+  \]
+  \medskip
+
+  \textcolor{purple}{\textbf{Continuity-anchor loss}} on a fixed
+  $n_{x}\!\times\!n_{t}$ grid spanning the overlap rectangle:
+  \[
+    \textcolor{purple}{\mathcal{L}_{\mathrm{cont}}}
+    = \frac{\lambda_{\mathrm{cont}}}{n_{x} n_{t}}
+      \sum_{i,j}\bigl(\Phi_{\theta_{2}}(x_{i},t_{j})-\Phi_{\theta_{1}}(x_{i},t_{j})\bigr)^{2},
+  \]
+  added to $\Phi_{\theta_{2}}$'s loss; pulls window 2 towards the
+  already-trained window 1 across the entire overlap rather than
+  at the splice time alone.
+  \medskip
+
+  \textcolor{darkgreen}{\textbf{Smoothstep blend}} on the overlap band:
+  \[
+    \Phi_{\mathrm{cur}}^{\mathrm{ov}}(x,t)
+    = \bigl(1-s(\xi)\bigr)\,\Phi_{\theta_{1}} + s(\xi)\,\Phi_{\theta_{2}},
+    \quad s(\xi)=\xi^{2}(3-2\xi),\quad
+    \xi=\frac{t-t_{\mathrm{ov}}^{-}}{\Delta_{\mathrm{ov}}}.
+  \]
+  $s$ is $C^{1}$ with $s(0)\!=\!0$, $s(1)\!=\!1$, $s'(0)\!=\!s'(1)\!=\!0$
+  $\Rightarrow$ stitched field is continuously differentiable across the
+  overlap edges.
+  \medskip
+
+  \textbf{Settings.} $\Delta_{\mathrm{ov}}\!=\!10M$,
+  $n_{x}\!\times\!n_{t}\!=\!201\!\times\!11$,
+  $\lambda_{\mathrm{cont}}\!=\!10$.
+\end{frame}
+
+\begin{frame}{Curriculum PINN --- variants and results}
+  \centering\scriptsize
+  \renewcommand{\arraystretch}{1.05}
+  \begin{tabular}{@{}lcccc@{}}
+    \toprule
+    \textbf{Variant} & \textbf{Full-domain RMSD} & $W_{1}$ \textbf{RMSD}
+                     & $W_{2}$ \textbf{RMSD} & $W_{3}$/overlap \textbf{RMSD} \\
+                     & ($\times 10^{-3}$) & ($\times 10^{-3}$) & ($\times 10^{-3}$) & ($\times 10^{-3}$) \\
+    \midrule
+    Baseline (single window) & \textbf{0.817} & --- & --- & --- \\
+    \midrule
+    Cur-2w   & 0.845 & \textbf{0.516} & 1.077 & --- \\
+    Cur-3w   & 0.976 & 0.554          & 0.920 & 1.322 \\
+    Cur-soft & 3.155 & 1.739          & 3.932 & 2.394 (overlap) \\
+    \bottomrule
+  \end{tabular}
+  \vspace{2mm}
+
+  \begin{itemize}\scriptsize
+    \item \textbf{Cur-2w ties baseline} on full domain ($+3\%$); $W_{1}$ alone
+          reaches $5.16\!\times\!10^{-4}$ ($-37\%$ vs.\ baseline on the same
+          sub-domain) --- the predicted local benefit \emph{is} delivered.
+    \item \textbf{Cur-3w}: per-window RMSD grows monotonically
+          ($5.5\!\to\!9.2\!\to\!13.2$); each splice adds IC error.
+          Full-domain $+19\%$.
+    \item \textbf{Cur-soft fails:} $\sim\!4\times$ baseline RMSD; M4 plateau
+          scan finds no contiguous block satisfying the relative-scatter criterion.
+  \end{itemize}
+
+  \fbox{\parbox{0.92\textwidth}{\centering\scriptsize
+    \textbf{Take-away.} Curriculum buys local accuracy on $W_{1}$ but pays
+    it back through IC-transfer error on later windows; no net gain over
+    the single-window forward PINN.}}
+\end{frame}
+
+
+% ══════════════════════════════════════════════════════════════════
+\section{5. Extraction methods M3, M4, M5}
 % ══════════════════════════════════════════════════════════════════
 
 \begin{frame}{Why we need new extraction methods}
@@ -902,7 +1225,7 @@
 
 
 % ══════════════════════════════════════════════════════════════════
-\section{5. Greedy adaptive resampling}
+\section{6. Greedy adaptive resampling}
 % ══════════════════════════════════════════════════════════════════
 
 \begin{frame}{Why adaptive sampling matters}
@@ -1006,7 +1329,7 @@
     \end{column}
     \begin{column}{0.48\textwidth}
       \centering
-      \includegraphics[width=\textwidth,height=0.72\textheight,keepaspectratio]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/error_heatmap.png}
+      \includegraphics[width=\textwidth,height=0.72\textheight,keepaspectratio]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/error_heatmap_compare.png}
       \\[2pt]{\scriptsize Greedy $f\!=\!0.3$ + L-BFGS 30k: same colour scale,
       pointwise error reduced by an order of magnitude in the wavefront band.}
     \end{column}
@@ -1015,7 +1338,7 @@
 
 
 % ══════════════════════════════════════════════════════════════════
-\section{6. Summary}
+\section{7. Summary}
 % ══════════════════════════════════════════════════════════════════
 
 \begin{frame}{Summary of the project}
@@ -1124,7 +1447,7 @@
 
 \begin{frame}{Appendix --- M5 2-D heatmap, inverse PINN}
   \begin{center}
-    \includegraphics[height=0.82\textheight,keepaspectratio]{../outputs/qnm/zerilli_l2_inverse_qnm_combo/pinn_method5_2d_heatmap.png}
+    \includegraphics[width=\textwidth,height=0.82\textheight,keepaspectratio]{../outputs/qnm/zerilli_l2_inverse_qnm_combo/pinn_method5_2d_heatmap.png}
     \\{\footnotesize Variant D inverse PINN: M5 confirms a wide stable
     rectangle in the $(t_{0}, t_{\text{end}})$ plane.}
   \end{center}
@@ -1139,7 +1462,7 @@
     \end{column}
     \begin{column}{0.48\textwidth}
       \centering
-      \includegraphics[width=\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/error_heatmap.png}
+      \includegraphics[width=\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/error_heatmap_compare.png}
       \\{\footnotesize Greedy $f\!=\!0.3$ + L-BFGS 30k (best).}
     \end{column}
   \end{columns}

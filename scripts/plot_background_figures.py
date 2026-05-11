@@ -89,7 +89,37 @@ def plot_tortoise_map() -> None:
     plt.close(fig)
 
 
+def rw_V(r: np.ndarray, ell: int) -> np.ndarray:
+    return f_metric(r) * (ell * (ell + 1) / r**2 - 6.0 * M / r**3)
+
+
+def plot_rw_vs_zerilli_l2() -> None:
+    """Side-by-side Regge-Wheeler vs Zerilli potential at l=2."""
+    x_grid = np.linspace(-30.0, 60.0, 1200)
+    r_grid = np.array([r_of_x(xi) for xi in x_grid])
+
+    fig, ax = plt.subplots(figsize=(6.0, 3.6))
+    ax.plot(x_grid, rw_V(r_grid, 2), "-", lw=2.0, color="C3",
+            label=r"Regge--Wheeler $V^{\mathrm{RW}}_{\ell=2}$ (axial)")
+    ax.plot(x_grid, zerilli_V(r_grid, 2), "--", lw=2.0, color="C0",
+            label=r"Zerilli $V^{\mathrm{Z}}_{\ell=2}$ (polar)")
+    ax.axhline(0.0, color="k", lw=0.5, alpha=0.4)
+    ax.axvline(0.0, color="k", lw=0.5, alpha=0.2)
+    ax.set_xlabel(r"tortoise coordinate $x/M$")
+    ax.set_ylabel(r"$V_\ell(r(x))\,M^2$")
+    ax.set_title(r"Two parity sectors share the same QNM spectrum, $\ell=2,\ M=1$")
+    ax.set_xlim(-30, 60)
+    ax.set_ylim(-0.02, 0.22)
+    ax.legend(frameon=False, loc="upper right")
+    ax.grid(True, alpha=0.25)
+    fig.tight_layout()
+    fig.savefig(OUT / "rw_vs_zerilli_l2.png", dpi=200)
+    fig.savefig(OUT / "rw_vs_zerilli_l2.pdf")
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     plot_potential()
     plot_tortoise_map()
+    plot_rw_vs_zerilli_l2()
     print(f"wrote figures to {OUT}")

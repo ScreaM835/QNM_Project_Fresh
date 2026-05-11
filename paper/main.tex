@@ -1591,8 +1591,302 @@ correspond to mass and angular-momentum perturbations, gauged
 away to give shifts in the asymptotic mass and Kerr-like
 rotation \citep{Zerilli1970}) and are excluded from what follows.
 
+Equation~\eqref{eq:rw-gauge} is stated here as a result; the
+explicit construction of the gauge generators in each parity
+sector, the action of those generators on the seven scalar
+amplitudes, and the resulting RW-gauge matrix forms of
+$h_{\mu\nu}$ are deferred to the subsections in which they are
+used, namely Sec.~\ref{sec:rw-axial-derivation} for the axial
+sector and Sec.~\ref{sec:rw-polar-derivation} for the polar
+sector. The remainder of the present subsection records only the
+angular harmonic basis on $S^{2}$ that both constructions share,
+and the single divergence identity that fixes the asymmetry
+between the two sectors.
+
+\paragraph{Angular harmonic basis on $S^{2}$.}
+Indices $A,B \in \{\theta,\phi\}$ run over the two-sphere, with
+unit-sphere metric $\hat g_{AB} = \mathrm{diag}(1,\sin^{2}\theta)$,
+covariant derivative $\hat\nabla_{A}$, and Levi--Civita tensor
+$\epsilon_{AB} = \sqrt{\det\hat g}\,[AB] = \sin\theta\,[AB]$ where
+$[AB]$ is the antisymmetric symbol with $[\theta\phi]=1$. Under
+the antipodal parity map $(\theta,\phi)\to(\pi-\theta,\phi+\pi)$
+the scalar harmonics transform as $Y_{\ell m}\to(-1)^{\ell}Y_{\ell m}$
+and the volume form $\epsilon_{AB}$ flips sign because the map
+reverses the orientation of $S^{2}$. A tensor field on $S^{2}$ is
+called \emph{polar} (\emph{even}-parity) if it transforms with the
+same sign as $Y_{\ell m}$, and \emph{axial} (\emph{odd}-parity) if
+it acquires an extra minus sign relative to $Y_{\ell m}$. We now
+classify all the rank-0, rank-1 and rank-2 building blocks needed
+for $h_{\mu\nu}$ by parity.
+
+\subparagraph{Rank 0 (scalar block).}
+At each multipole the only scalar harmonic is $Y_{\ell m}$ itself,
+which has parity $(-1)^{\ell}$ and is therefore polar. There is no
+odd-parity scalar harmonic at fixed $\ell$, hence no axial scalar
+amplitude. This already implies that the entire scalar block
+$\{(t,t),(t,r),(r,r)\}$ of $h_{\mu\nu}$ vanishes in the axial
+sector.
+
+\subparagraph{Rank 1 (vector block, the Hodge--Helmholtz
+decomposition).}
+By the Hodge decomposition theorem, every smooth vector field
+$V_{A}$ on a closed $2$-manifold can be written uniquely as the
+sum of an exact and a co-exact piece (the harmonic piece is absent
+on $S^{2}$ because $H^{1}(S^{2})=0$):
+\begin{equation}
+  V_{A}(\theta,\phi) \;=\; \underbrace{\hat\nabla_{A} f}_{\text{polar}}
+                          \,+\, \underbrace{\epsilon_{A}{}^{B}\hat\nabla_{B} g}_{\text{axial}},
+  \label{eq:helmholtz}
+\end{equation}
+for two scalar potentials $f, g$ on $S^{2}$. Expanding $f, g$ in
+spherical harmonics, the contribution at fixed $(\ell,m)$ uses
+the two vector harmonics
+\begin{equation}
+  \underbrace{\partial_{A}Y_{\ell m}}_{\text{polar (gradient of }Y\text{)}},
+  \qquad
+  \underbrace{X_{A}\equiv\epsilon_{A}{}^{B}\partial_{B}Y_{\ell m}}_{\text{axial (curl of }Y\text{)}},
+  \label{eq:vec-harmonics}
+\end{equation}
+with explicit components on $S^{2}$
+\begin{equation}
+  X_{A} \;=\; \bigl(-\csc\theta\,\partial_{\phi}Y_{\ell m},\;
+                     \sin\theta\,\partial_{\theta}Y_{\ell m}\bigr).
+  \label{eq:X-components}
+\end{equation}
+Their parities are
+\begin{equation}
+  \partial_{A}Y_{\ell m} \;\to\; (-1)^{\ell}\,\partial_{A}Y_{\ell m},
+  \qquad
+  X_{A} \;\to\; (-1)^{\ell+1}\,X_{A},
+  \label{eq:vec-harmonics-parity}
+\end{equation}
+the extra minus on $X_{A}$ coming from $\epsilon_{AB}\to-\epsilon_{AB}$
+under the orientation-reversing antipodal map.
+Eq.~\eqref{eq:helmholtz} is therefore the rank-1 statement that the
+two parity sectors are spanned by these two vector harmonics and
+nothing else. The mixed blocks $h_{tA}, h_{rA}$ of $h_{\mu\nu}$
+are vector fields on $S^{2}$ at each fixed $(t,r)$, so each must
+take the form
+\begin{equation}
+  h_{aA}^{\mathrm{ax}} \;=\; h_{a}(t,r)\,X_{A},
+  \qquad
+  h_{aA}^{\mathrm{pol}} \;=\; h_{a}^{\mathrm{e}}(t,r)\,\partial_{A}Y_{\ell m},
+  \qquad a\in\{t,r\},
+  \label{eq:vec-block-decomp}
+\end{equation}
+which gives the two axial amplitudes $h_{0}\equiv h_{t}, h_{1}\equiv h_{r}$
+and the two polar amplitudes $h_{0}^{\mathrm{e}}, h_{1}^{\mathrm{e}}$
+of the Regge--Wheeler parametrisation directly.
+
+\subparagraph{Rank 2 (symmetric tensor block, traceless plus trace).}
+A symmetric $(0,2)$ tensor on $S^{2}$ at fixed $(\ell,m)$ has
+three independent components, which split as one trace plus a
+two-component traceless symmetric piece. By the same Hodge
+argument applied at rank 2, every symmetric traceless tensor
+$S_{AB}$ on $S^{2}$ decomposes into an exact and a co-exact part:
+\begin{equation}
+  S_{AB} \;=\; \underbrace{T_{AB}}_{\text{polar}}
+              \,+\, \underbrace{\Sigma_{AB}}_{\text{axial}},
+  \label{eq:tensor-helmholtz}
+\end{equation}
+with the basis tensor harmonics
+\begin{equation}
+  T_{AB} \equiv
+   \hat\nabla_{A}\partial_{B}Y_{\ell m}
+   + \tfrac{1}{2}\ell(\ell+1)\hat g_{AB}\,Y_{\ell m},
+  \qquad
+  \Sigma_{AB} \equiv
+   \tfrac{1}{2}\bigl(\epsilon_{A}{}^{C}\hat\nabla_{C}\partial_{B}Y_{\ell m}
+                    +\epsilon_{B}{}^{C}\hat\nabla_{C}\partial_{A}Y_{\ell m}\bigr).
+  \label{eq:ten-harmonics}
+\end{equation}
+$T_{AB}$ is the symmetric traceless gradient of the polar vector
+harmonic $\partial_{A}Y_{\ell m}$ (the additive
+$\tfrac{1}{2}\ell(\ell+1)\hat g_{AB}Y$ piece is what removes the
+trace, using $\hat\nabla^{A}\partial_{A}Y = -\ell(\ell+1)Y$).
+$\Sigma_{AB}$ is the symmetrised gradient of the axial vector
+harmonic $X_{A}$; the dummy index $C$ is needed to contract the
+antisymmetric $\epsilon_{A}{}^{C}$ with the covariant derivative
+so that the construction yields a $(0,2)$ tensor in $A,B$. Their
+parities follow from those of $\partial_{A}Y$ and $X_{A}$:
+$T_{AB}\to(-1)^{\ell}T_{AB}$ (polar),
+$\Sigma_{AB}\to(-1)^{\ell+1}\Sigma_{AB}$ (axial). The trace piece
+is $\hat g_{AB}\,Y_{\ell m}$, which is polar. Putting the trace
+back in, the most general symmetric rank-2 tensor on $S^{2}$ at
+fixed $(\ell,m)$ is therefore spanned by
+\begin{equation}
+  \underbrace{\bigl\{\,\hat g_{AB}\,Y_{\ell m},\; T_{AB}\,\bigr\}}_{\text{polar (2 amplitudes)}},
+  \qquad
+  \underbrace{\bigl\{\,\Sigma_{AB}\,\bigr\}}_{\text{axial (1 amplitude)}}.
+  \label{eq:tensor-basis}
+\end{equation}
+Applied to the angular block $h_{AB}$ of the metric perturbation,
+this gives the polar amplitudes $K(t,r), G(t,r)$ multiplying the
+trace and traceless polar harmonics, and the single axial
+amplitude $h_{2}(t,r)$ multiplying $\Sigma_{AB}$.
+
+\subparagraph{Counting summary.}
+Tabulating the polar/axial decomposition block by block:
+\begin{equation}
+\begin{array}{l|cc}
+\text{block of }h_{\mu\nu} & \text{polar amplitudes} & \text{axial amplitudes}\\\hline
+\{(t,t),(t,r),(r,r)\}\text{ (3 scalars)} & H_{0},H_{1},H_{2} & 0\\
+\{(t,A),(r,A)\}\text{ (2 vectors)}       & h_{0}^{\mathrm{e}},h_{1}^{\mathrm{e}} & h_{0},h_{1}\\
+\{(A,B)\}\text{ (1 sym.\ tensor)}         & K,G & h_{2}\\\hline
+\text{total}                              & 7 & 3
+\end{array}
+\label{eq:hmunu-count}
+\end{equation}
+matching the Regge--Wheeler counts $\{3,2,2\}$ in the polar sector
+$(H_{0},H_{1},H_{2}; h_{0}^{\mathrm{e}},h_{1}^{\mathrm{e}}; K,G)$ and
+$\{0,2,1\}$ in the axial sector $(0; h_{0},h_{1}; h_{2})$, with
+totals $7$ and $3$ respectively. This counting is the explicit
+content of the matrices Eqs.~\eqref{eq:axial-matrix-pre} and
+\eqref{eq:polar-matrix-pre} of the per-sector subsections below.
+
+\subparagraph{Divergence identity used in the gauge fixing.}
+The single fact about Eqs.~\eqref{eq:vec-harmonics} that drives
+the asymmetric gauge count between the two parity sectors is
+\begin{equation}
+  \boxed{\;
+  \hat\nabla^{A}\partial_{A}Y_{\ell m}
+   = -\ell(\ell+1)\,Y_{\ell m} \;\neq\; 0,
+  \qquad
+  \hat\nabla^{A} X_{A}
+   = \epsilon^{AB}\hat\nabla_{A}\partial_{B}Y_{\ell m} \;=\; 0,
+  \;}
+  \label{eq:Xdiv-Ydiv}
+\end{equation}
+where the second equality follows from contracting the symmetric
+tensor $\hat\nabla_{A}\partial_{B}Y$ with the antisymmetric
+$\epsilon^{AB}$. The polar gradient $\partial_{A}Y$ is
+divergence-rich on $S^{2}$, the axial curl $X_{A}$ is
+divergence-free; this single difference is what makes the gauge
+fixing one-condition in the axial sector and three-condition in
+the polar sector, as we now record.
+
+\paragraph{Why one condition in the axial sector and three in the
+polar sector.}
+The gauge-generator $\xi_{\mu}$ has one axial scalar component
+($\Lambda$, multiplying $X_{A}$) and three polar scalar components
+($\xi^{t},\xi^{r}$ multiplying $Y$, and $\xi^{\mathrm{e}}$
+multiplying $\partial_{A}Y$). Combined with
+Eq.~\eqref{eq:Xdiv-Ydiv}, this gives the bookkeeping:
+\begin{itemize}\itemsep1pt
+  \item Axial sector: $1$ gauge generator vs $3$ axial amplitudes
+        $\{h_{0},h_{1},h_{2}\}$, so exactly one gauge condition
+        can be imposed. The single attainable condition is
+        $h_{2}=0$, because the action of $\nabla\xi$ on the axial
+        vector $\Lambda X_{A}$ has zero divergence on $S^{2}$
+        (Eq.~\eqref{eq:Xdiv-Ydiv}, second identity), so $\Lambda$
+        cannot reach $h_{0}$ or $h_{1}$.
+  \item Polar sector: $3$ gauge generators vs $7$ polar amplitudes,
+        so exactly three gauge conditions can be imposed. The
+        choice $G=h_{0}^{\mathrm{e}}=h_{1}^{\mathrm{e}}=0$ is
+        attainable because the action of $\nabla\xi$ on the polar
+        gradient $\xi^{\mathrm{e}}\partial_{A}Y$ has nonzero
+        divergence (Eq.~\eqref{eq:Xdiv-Ydiv}, first identity), so
+        the three polar gauge functions reach all three target
+        components.
+\end{itemize}
+The asymmetry $1$ vs $3$ in the gauge-fixing count is therefore
+not arbitrary: it is dictated by the count of independent
+spherical-harmonic generators in each parity sector and made
+operative by Eq.~\eqref{eq:Xdiv-Ydiv}. The explicit matrix forms
+of $h_{\mu\nu}$ before and after Eq.~\eqref{eq:rw-gauge}, and the
+componentwise action of the gauge generators that achieves the
+fixing in each sector, are recorded in
+Secs.~\ref{sec:rw-axial-derivation} and
+\ref{sec:rw-polar-derivation} where they are used. The further
+reduction from $2$ to $1$ axial degree of freedom and from $4$ to
+$1$ polar degree of freedom is the work of the linearised Einstein
+equations and is carried out there.
+
 \subsection{Axial sector: Regge--Wheeler equation}
 \label{sec:rw-axial-derivation}
+
+\paragraph{Axial perturbation matrix.}
+Writing the three Regge--Wheeler axial scalars as
+$h_{0}, h_{1}, h_{2}$, the most general axial perturbation is
+\begin{equation}
+  h_{\mu\nu}^{\mathrm{ax}} \;=\;
+  \!\left(\begin{array}{cccc}
+    0 & 0
+       & h_{0}\,X_{\theta}
+       & h_{0}\,X_{\phi}\\[2pt]
+    0 & 0
+       & h_{1}\,X_{\theta}
+       & h_{1}\,X_{\phi}\\[2pt]
+    h_{0}\,X_{\theta}
+       & h_{1}\,X_{\theta}
+       & h_{2}\,\Sigma_{\theta\theta}
+       & h_{2}\,\Sigma_{\theta\phi}\\[2pt]
+    h_{0}\,X_{\phi}
+       & h_{1}\,X_{\phi}
+       & h_{2}\,\Sigma_{\theta\phi}
+       & h_{2}\,\Sigma_{\phi\phi}
+  \end{array}\right)\!
+  \label{eq:axial-matrix-pre}
+\end{equation}
+in coordinates $(t,r,\theta,\phi)$. The $(t,t),(t,r),(r,r)$ block
+is identically zero because there are no axial scalar harmonics,
+and there is no axial scalar piece of $\xi^{\mu}$ that could
+populate it.
+
+\emph{Axial gauge generator.}
+The axial part of $\xi_{\mu}$ is a single function $\Lambda(t,r)$
+multiplying $X_{A}$, namely $\xi_{A}^{\mathrm{ax}} = \Lambda\,X_{A}$
+and $\xi_{t} = \xi_{r} = 0$. Substituting into
+Eq.~\eqref{eq:gauge-transf} and projecting onto the axial bases
+gives
+\begin{equation}
+  h_{0}\to h_{0} - \dot\Lambda,
+  \qquad
+  h_{1}\to h_{1} - \Lambda' + \tfrac{2}{r}\Lambda,
+  \qquad
+  h_{2}\to h_{2} - 2\Lambda,
+  \label{eq:axial-gauge-action}
+\end{equation}
+where $\dot{\,} = \partial_{t}$ and $' = \partial_{r}$.
+Choosing $\Lambda = h_{2}/2$ sets $h_{2} = 0$ identically. The
+single axial gauge function is then completely spent: any
+further attempt to use $\Lambda$ would re-introduce a nonzero
+$h_{2}$. The remaining axial functions $h_{0}, h_{1}$ are
+\emph{not} pure gauge and survive into the dynamical equations.
+
+\emph{Axial RW-gauge matrix.}
+Setting $h_{2} = 0$ in Eq.~\eqref{eq:axial-matrix-pre} gives
+\begin{equation}
+  h_{\mu\nu}^{\mathrm{ax,RW}} \;=\;
+  \!\left(\begin{array}{cccc}
+    0 & 0
+       & {-h_{0}\csc\theta\,\partial_{\phi}Y}
+       & h_{0}\sin\theta\,\partial_{\theta}Y\\[2pt]
+    0 & 0
+       & {-h_{1}\csc\theta\,\partial_{\phi}Y}
+       & h_{1}\sin\theta\,\partial_{\theta}Y\\[2pt]
+    {-h_{0}\csc\theta\,\partial_{\phi}Y}
+       & {-h_{1}\csc\theta\,\partial_{\phi}Y}
+       & 0
+       & 0\\[2pt]
+    h_{0}\sin\theta\,\partial_{\theta}Y
+       & h_{1}\sin\theta\,\partial_{\theta}Y
+       & 0
+       & 0
+  \end{array}\right)\!
+  \label{eq:axial-matrix-RW}
+\end{equation}
+which agrees with Eq.~\eqref{eq:axial-components} below. The
+$\csc\theta$ and $\sin\theta$ factors are the components of
+$X_{A}$ from Eq.~\eqref{eq:vec-harmonics}; they are part of the
+definition of the axial vector harmonic and are not removable
+by any further gauge choice. The angular block has been
+emptied; the only nonzero entries are the four mixed
+$h_{aA}$ pieces with $a\in\{t,r\}$, $A\in\{\theta,\phi\}$. The
+same four entries are recorded in component form in
+Eq.~\eqref{eq:axial-components} of the explicit projection that
+follows, where they are used directly in evaluating
+$\delta R_{\mu\nu}$.
 
 \input{sections/axial_projection}
 
@@ -1753,14 +2047,121 @@ consistency check on the reduction.
 \subsection{Polar sector: Zerilli equation}
 \label{sec:rw-polar-derivation}
 
-The polar sector is algebraically heavier because four
-RW-gauge functions $(H_{0}, H_{1}, H_{2}, K)$ are subject to
-seven nontrivial components of $\delta R_{\mu\nu} = 0$, organised
-by \citet{Zerilli1970}. After algebraic elimination using the
-constraint components $\delta R_{tr} = \delta R_{tt} = 0$, the
-system reduces to two coupled first-order partial differential
-equations in $r$ and $t$ for two independent linear combinations
-of $K$ and $H_{1}$. \citet{Moncrief1974} introduced the
+\paragraph{Polar perturbation matrix.}
+Writing the seven polar scalars as
+$H_{0},H_{1},H_{2},h_{0}^{\mathrm{e}},h_{1}^{\mathrm{e}},K,G$, the
+most general polar metric perturbation in coordinates
+$(t,r,\theta,\phi)$ reads
+\begin{equation}
+  h_{\mu\nu}^{\mathrm{pol}} \;=\;
+  \!\left(\begin{array}{cccc}
+    H_{0}\,Y & H_{1}\,Y
+       & h_{0}^{\mathrm{e}}\,\partial_{\theta}Y
+       & h_{0}^{\mathrm{e}}\,\partial_{\phi}Y\\[2pt]
+    H_{1}\,Y & H_{2}\,Y
+       & h_{1}^{\mathrm{e}}\,\partial_{\theta}Y
+       & h_{1}^{\mathrm{e}}\,\partial_{\phi}Y\\[2pt]
+    h_{0}^{\mathrm{e}}\,\partial_{\theta}Y
+       & h_{1}^{\mathrm{e}}\,\partial_{\theta}Y
+       & r^{2}\!\bigl(KY + G\,T_{\theta\theta}\bigr)
+       & r^{2} G\,T_{\theta\phi}\\[2pt]
+    h_{0}^{\mathrm{e}}\,\partial_{\phi}Y
+       & h_{1}^{\mathrm{e}}\,\partial_{\phi}Y
+       & r^{2} G\,T_{\theta\phi}
+       & r^{2}\!\bigl(K\sin^{2}\!\theta\,Y + G\,T_{\phi\phi}\bigr)
+  \end{array}\right)\!,
+  \label{eq:polar-matrix-pre}
+\end{equation}
+with three independent angular tensor pieces in the
+bottom-right block: $K$ multiplies the trace part $\hat g_{AB}Y$
+and $G$ multiplies the traceless part $T_{AB}$ of
+Eq.~\eqref{eq:ten-harmonics}.
+
+\paragraph{Polar gauge generators and the choice
+$G=h_{0}^{\mathrm{e}}=h_{1}^{\mathrm{e}}=0$.}
+The polar part of $\xi_{\mu}$ has three scalar functions
+$\xi^{t}(t,r),\xi^{r}(t,r),\xi^{\mathrm{e}}(t,r)$, namely
+$\xi_{t}=\xi^{t}Y$, $\xi_{r}=\xi^{r}Y$,
+$\xi_{A}=\xi^{\mathrm{e}}\partial_{A}Y$. Substituting into
+Eq.~\eqref{eq:gauge-transf}, projecting onto the polar bases and
+using Eq.~\eqref{eq:Xdiv-Ydiv}, the seven polar functions
+transform as
+\begin{equation}
+\begin{aligned}
+  H_{0} &\to H_{0} - 2\dot\xi^{t} + \tfrac{Mf}{r^{2}}\xi^{r},
+   \quad &
+  H_{1} &\to H_{1} - \dot\xi^{r} - {\xi^{t}}',
+   \quad &
+  H_{2} &\to H_{2} - 2{\xi^{r}}'
+              - \tfrac{2M}{r^{2}f}\xi^{r},\\
+  h_{0}^{\mathrm{e}} &\to h_{0}^{\mathrm{e}} - \xi^{t}
+                         - \dot\xi^{\mathrm{e}},
+   \quad &
+  h_{1}^{\mathrm{e}} &\to h_{1}^{\mathrm{e}} - \xi^{r}
+                         - {\xi^{\mathrm{e}}}'
+                         + \tfrac{2}{r}\xi^{\mathrm{e}},
+   \quad &
+  G &\to G - \tfrac{2}{r^{2}}\xi^{\mathrm{e}},\\
+  K &\to K - \tfrac{2f}{r}\xi^{r}
+            - \tfrac{2}{r^{2}}\ell(\ell+1)\xi^{\mathrm{e}}.
+   \quad & & & &
+\end{aligned}
+\label{eq:polar-gauge-action}
+\end{equation}
+The expressions for these polar transformations agree with
+\citet[Eqs.~(II.7)--(II.8)]{Zerilli1970} and the review of
+\citet{Berti2009review}. The crucial appearance is the
+$\ell(\ell+1)\xi^{\mathrm{e}}$ contribution to $K$, which comes
+from $\hat\nabla^{A}\partial_{A}Y\neq 0$ (the polar half of
+Eq.~\eqref{eq:Xdiv-Ydiv}); the $\xi^{t},\xi^{r}$ contributions to
+$h_{0}^{\mathrm{e}},h_{1}^{\mathrm{e}}$ likewise require a polar
+harmonic with nonzero divergence on $S^{2}$. Setting
+\begin{equation}
+  \xi^{\mathrm{e}} = \tfrac{r^{2}}{2}G,
+  \qquad
+  \xi^{t} = h_{0}^{\mathrm{e}} - \dot\xi^{\mathrm{e}},
+  \qquad
+  \xi^{r} = h_{1}^{\mathrm{e}} - {\xi^{\mathrm{e}}}'
+            + \tfrac{2}{r}\xi^{\mathrm{e}},
+  \label{eq:polar-gauge-choice}
+\end{equation}
+in that order, kills $G$ first, then $h_{0}^{\mathrm{e}}$ and
+$h_{1}^{\mathrm{e}}$. The three polar gauge functions
+$\{\xi^{t},\xi^{r},\xi^{\mathrm{e}}\}$ are now completely spent;
+no freedom remains to touch $H_{0},H_{1},H_{2},K$.
+
+\paragraph{Polar RW-gauge matrix.}
+Substituting $G=h_{0}^{\mathrm{e}}=h_{1}^{\mathrm{e}}=0$ into
+Eq.~\eqref{eq:polar-matrix-pre} gives the diagonal-block form
+\begin{equation}
+  h_{\mu\nu}^{\mathrm{pol,RW}} \;=\;
+  \!\left(\begin{array}{cccc}
+    H_{0}\,Y & H_{1}\,Y & 0 & 0\\[2pt]
+    H_{1}\,Y & H_{2}\,Y & 0 & 0\\[2pt]
+    0 & 0 & r^{2} K\,Y & 0\\[2pt]
+    0 & 0 & 0 & r^{2}\sin^{2}\!\theta\,K\,Y
+  \end{array}\right)\!,
+  \label{eq:polar-matrix-RW}
+\end{equation}
+in which the entire mixed block is zero, the angular block is
+diagonal, and only the four scalar amplitudes
+$H_{0},H_{1},H_{2},K$ remain.
+
+\paragraph{Reduction to the Zerilli master function.}
+The polar sector is algebraically heavier than the axial one
+because the four surviving RW-gauge functions
+$(H_{0},H_{1},H_{2},K)$ are subject to seven nontrivial components
+of $\delta R_{\mu\nu}=0$, organised by \citet{Zerilli1970}. After
+algebraic elimination using the constraint components
+$\delta R_{tr}=\delta R_{tt}=0$, the system reduces to two coupled
+first-order partial differential equations in $r$ and $t$ for two
+independent linear combinations of $K$ and $H_{1}$. The full
+componentwise projection parallel to the axial calculation in
+Sec.~\ref{sec:rw-axial-derivation} above is straightforward in
+principle but algebraically lengthy; rather than reproduce it, we
+record the gauge-invariant master function and its master
+equation, both of which are independent of the intermediate
+constraint elimination. \citet{Moncrief1974} introduced the
 gauge-invariant combination
 \begin{equation}
   \psi_{\mathrm{Z}}(t,r) \;\equiv\;
@@ -1808,12 +2209,22 @@ under which $V_{\ell}^{\mathrm{RW}}$ and $V_{\ell}^{\mathrm{Z}}$
 are related by a first-order operator \citep{Berti2009review} and
 share the same QNM spectrum.
 
-\subsection{Verification of the potential}
+\subsection{Verification of the Zerilli potential}
 \label{sec:rw-verify}
 
 A non-trivial sanity check on Eq.~\eqref{eq:V-zerilli-app} comes
 from its asymptotic behaviour at the horizon and at infinity, and
-from its $\ell = 2$ specialisation used throughout the paper.
+from its $\ell = 2$ specialisation used throughout the paper. The
+parallel asymptotic check on the Regge--Wheeler potential
+$V_{\ell}^{\mathrm{RW}}$ of Eq.~\eqref{eq:rw-eqn} is immediate
+from inspection: the bracket
+$\ell(\ell+1)/r^{2}-6M/r^{3}$ is bounded and analytic for
+$r\ge 2M$, the prefactor $f(r)$ vanishes linearly at the horizon
+and tends to $1$ at infinity, so $V_{\ell}^{\mathrm{RW}}\to 0$ at
+the horizon and $V_{\ell}^{\mathrm{RW}}\to \ell(\ell+1)/r^{2}$ at
+infinity, in agreement with Eq.~\eqref{eq:V-asymptotic}. The
+remainder of this subsection is dedicated to the analogous,
+slightly less trivial check for the polar potential.
 
 At the horizon, $f(r) \to 0$ as $r \to 2M$, and the rational
 factor in Eq.~\eqref{eq:V-zerilli-app} is regular at $r = 2M$

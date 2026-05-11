@@ -74,6 +74,23 @@ for r, (x, t, err) in err_data.items():
     fig.tight_layout(); fig.savefig(out, dpi=200); plt.close(fig)
     print(f"  wrote {out}")
 
+    # Zoomed variant: same colour mapping (shared log scale, identical vmin/vmax)
+    # but x-axis restricted to the near-barrier region [-20, 60] used in the
+    # paper / talk close-ups.  Identical style to the full-domain heatmap so
+    # the two can be compared at a glance.
+    out_z = os.path.join(ROOT, "outputs", "pinn", r, "error_heatmap_zoomed.png")
+    fig, ax = plt.subplots(figsize=(10, 5))
+    im = ax.pcolormesh(x, t, err_clip, shading="auto", cmap="magma_r",
+                       norm=LogNorm(vmin=vmin, vmax=abs_max))
+    cbar = fig.colorbar(im, ax=ax, pad=0.02)
+    cbar.set_label(r"$|\Phi_{\mathrm{FD}} - \Phi_{\mathrm{PINN}}|$"
+                   f"  (shared log scale, max={abs_max:.2e})")
+    ax.set_xlabel(r"$x_* / M$"); ax.set_ylabel("t / M")
+    ax.set_title(f"Pointwise error  ({r})  --  zoom $x_*/M\\in[-20,60]$")
+    ax.set_xlim(-20.0, 60.0)
+    fig.tight_layout(); fig.savefig(out_z, dpi=200); plt.close(fig)
+    print(f"  wrote {out_z}")
+
 # ---------------- 4. M4 stability plots -----------------------------------
 
 def find_qnm(run: str):
