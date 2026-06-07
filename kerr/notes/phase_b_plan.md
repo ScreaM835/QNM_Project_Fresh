@@ -142,6 +142,15 @@ $\omega_{\rm ref}(a)$ from `qnm`, return the frozen $\lambda(a)$ for the solver.
 $s=-2,\ell=m=2,a/M=0.9$ matches the Berti–Cardoso–Will tabulated
 $\lambda$ (or `qnm`'s own angular eigenvalue) to $10^{-6}$.
 
+**Status: DONE** (`src/spheroidal.py`, `scripts/test_spheroidal.py`, 6/6 pass).
+Verified: $_sA(a{=}0)=4$ exactly and real; $\lambda(a{=}0)=4$ (ties to operator
+$C_0(a{=}0)=-4$); $a/M{=}0.9$ matches `qnm`'s own angular eigenvalue to
+$6\times10^{-15}$ (acceptance only asked $10^{-6}$). Two **literature-independent**
+anchors added so the `qnm` match is not self-referential: real oblateness $c$
+gives a real eigenvalue (exact), and the small-$c$ slope reproduces the analytic
+leading coefficient $-2ms^2/[\ell(\ell+1)] = -8/3$ to $7\times10^{-6}$. Eigenvalue
+converged in the matrix truncation $l_{\max}$ ($|v(\ell{+}6)-v(\ell{+}24)|\sim3\times10^{-15}$).
+
 ---
 
 ## B.4 — Teukolsky operator, complex characteristic form
