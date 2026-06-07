@@ -213,6 +213,30 @@ $M\omega_{220}=0.37367$ bit-for-bit (real inputs ⇒ zero imaginary part); new
 complex unit test: a synthetic $\psi=e^{-i\omega\tau}$, $\omega=0.374-0.089i$,
 recovered to $10^{-6}$.
 
+**Status: DONE** (`src/extractor_m4.py` +`qnm_complex_phase`,
+`scripts/test_complex_evolution_stack.py`, 3/3 pass). **Honest finding:** four
+of the five named modules — `mol_rk4.py`, `dissipation.py`, `observers.py`,
+`initial_data.py` — were already dtype-generic (pure arithmetic, `.copy()`,
+`np.zeros_like`/`np.empty_like` which inherit the input dtype) and so needed
+**no change**; the test *proves* their complex-safety rather than asserting it.
+The only edit is **purely additive** (79 insertions, 0 deletions): a complex
+single-mode estimator `qnm_complex_phase` that fits the $\log|\psi|$ envelope
+($\to\omega_I,\tau$) and the unwrapped phase ($\to\omega_R$) — the natural
+variable for the genuinely-complex Teukolsky field. Because no existing line of
+any module the V.3 driver executes was modified, the float64 V.3 SLURM run
+reproduces $M\omega_{220}=0.373672$ **bit-for-bit by construction** (verified via
+`git diff --numstat`). The miniature equivalence test runs the exact stack
+V.3 uses (`integrate_state`+`rhs_min`+`ko_dissipation`+observers) in both
+float64 and complex128 over $\tau\le20M$ at $N=401$: the imaginary part is
+**identically zero** and the real part matches to **machine precision**
+($2.2\times10^{-16}$, a single ULP — float64-vs-complex128 is *not* literally
+bit-for-bit because complex division/multiply round at ~1 ULP, which is the
+inherent cost of complex arithmetic, not a behavioural change). Synthetic
+$\psi=e^{-i\omega\tau}$ recovered to $1.1\times10^{-16}$ ($\omega_R$), $0$
+($\omega_I,\tau$). **Deferred (honest scope):** complex *multi-mode* extraction
+(ESPRIT on $\psi$, needed for the $n=1$ overtone) is added in B.8 where it is
+actually exercised, per one-acceptance-per-task discipline.
+
 ---
 
 ## B.6 — KV.1 propagation/stability gate (analogue of V.1)

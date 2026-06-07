@@ -129,6 +129,85 @@ def qnm_method_2(t: np.ndarray, y: np.ndarray, t_start: float, t_end: float) -> 
 
 
 # ---------------------------------------------------------------------------
+# Complex single-mode estimator (envelope + phase).
+#
+# The Kerr Teukolsky field psi(tau, r_obs) is genuinely complex: the QNM
+# frequency omega = omega_R - i omega_I is itself complex, so the natural
+# observable is the complex waveform, not a real damped cosine. For a single
+# ringing mode
+#       psi(tau) = A exp(-i omega tau),   omega = omega_R - i omega_I,
+# the modulus and (unwrapped) phase separate into two straight lines
+#       log|psi| = log|A| - omega_I tau           (envelope -> omega_I, tau)
+#       arg psi  = arg A   - omega_R tau           (phase    -> omega_R)
+# so a linear fit of each recovers the full complex frequency directly, with
+# no Hilbert transform or real reduction. This is the complex analogue of
+# Method 1 (FFT + log-envelope) and the building block for the complex
+# multi-mode extraction used later in the Kerr ringdown gates.
+# ---------------------------------------------------------------------------
+
+def qnm_complex_phase(
+    t: np.ndarray,
+    psi: np.ndarray,
+    t_start: float,
+    t_end: float,
+) -> Dict[str, float]:
+    """Single-mode QNM fit of a COMPLEX waveform via envelope + phase slopes.
+
+    Parameters
+    ----------
+    t          : time samples (real, uniform not required).
+    psi        : complex waveform psi(t) (complex128); a real array is accepted
+                 and treated as a zero-imaginary signal.
+    t_start, t_end : fit window in the same units as ``t``.
+
+    Returns
+    -------
+    dict with keys
+      "omega"        : real part omega_R  (= -d arg psi / d tau)
+      "omega_imag"   : imaginary part omega_I > 0 for a decaying mode
+      "tau"          : damping time 1/omega_I (inf if non-decaying)
+      "omega_complex": omega_R - 1j*omega_I (QNM convention)
+      "A", "phi"     : fitted modulus |A| and phase arg A at tau=0
+    """
+    t = np.asarray(t, dtype=float)
+    psi = np.asarray(psi)
+    mask = (t >= t_start) & (t <= t_end)
+    tt = t[mask]
+    pp = psi[mask]
+    if tt.size < 2:
+        return {"omega": float("nan"), "omega_imag": float("nan"),
+                "tau": float("nan"), "omega_complex": complex("nan", "nan"),
+                "A": float("nan"), "phi": float("nan")}
+
+    amp = np.abs(pp)
+    if np.any(amp <= 0.0):
+        return {"omega": float("nan"), "omega_imag": float("nan"),
+                "tau": float("nan"), "omega_complex": complex("nan", "nan"),
+                "A": float("nan"), "phi": float("nan")}
+
+    # Envelope: log|psi| = log|A| - omega_I * tau
+    s_amp = np.polyfit(tt, np.log(amp), 1)
+    omega_I = -float(s_amp[0])
+    A = float(np.exp(s_amp[1]))
+
+    # Phase: unwrap removes 2*pi jumps, then arg psi = arg A - omega_R * tau
+    phase = np.unwrap(np.angle(pp))
+    s_ph = np.polyfit(tt, phase, 1)
+    omega_R = -float(s_ph[0])
+    phi = float(s_ph[1])
+
+    tau = 1.0 / omega_I if omega_I > 0 else float("inf")
+    return {
+        "omega": omega_R,
+        "omega_imag": omega_I,
+        "tau": tau,
+        "omega_complex": complex(omega_R, -omega_I),
+        "A": A,
+        "phi": phi,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Theoretical QNM reference values  (Leaver 1985, l=2 Schwarzschild)
 # 4-digit values as tabulated in Berti, Cardoso & Starinets 2009 Table II;
 # cited in Patel, Laguna & Shoemaker 2024 Table 3.
