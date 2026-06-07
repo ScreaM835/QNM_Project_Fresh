@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.venv/
+venv*/
+outputs/
+*.h5
+*.hdf5
+*.pt
+*.ckpt
+*.log
+*.err
+*.out
+.DS_Store
+.ipynb_checkpoints/

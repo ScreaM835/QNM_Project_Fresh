@@ -1,0 +1,28 @@
+# Phase A canonical run: Teukolsky (s=-2, l=m=2) at a/M = 0.
+# Matches the parent paper's canonical Schwarzschild BH for direct comparison.
+
+a_over_M: 0.0
+M: 1.0
+ell: 2
+m: 2
+s: -2
+
+# Hyperboloidal radial grid.
+sigma_n: 401
+
+# Time evolution.
+t_max: 200.0       # M
+dt: 0.05           # M  (CFL-respecting; reduce if integrator fails)
+cfl_safety: 0.5
+
+# Gaussian initial-data pulse, parameters in tortoise-equivalent coords.
+x0: 4.0            # M
+sigma: 5.0         # M
+A0: 1.0
+
+# Observer locations in tortoise units, for M4 extraction.
+x_obs_M:
+  - 2.0
+  - 10.0
+
+output_dir: outputs/phase_a_a0_canonical
