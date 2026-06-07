@@ -174,6 +174,27 @@ source/potential arrays equal the **Bardeen–Press** reduction (B.2), *not* the
 RW source (Bardeen–Press is isospectral to RW, so the physical $a=0$ check is
 the QNM frequency in B.8, not an RW coefficient match). No time evolution yet.
 
+**Status: DONE** (`src/teukolsky_minimal_gauge.py`,
+`scripts/derive_first_order_system.py`, `scripts/test_teukolsky_minimal_gauge.py`,
+5/5 pass). The full principal part was derived symbolically
+(`derive_first_order_system.py`) extending the B.2 residue machinery; all eight
+closed forms ($\lambda_{\rm out},\lambda_{\rm in},\mu_\pm,\mu_\pm',$ inverse map,
+$c_\Pi,c_\Phi,c_\Psi$) emitted as numpy source and transcribed verbatim into the
+operator. Verified: every coefficient finite at $\sigma\in\{10^{-8},1-10^{-8}\}$
+for $a/M\in\{0,0.5,0.9,0.95\}$; at $a=0$ the characteristic arrays equal
+`build_minimal_gauge_op` to $6\times10^{-17}$; the $a=0$ source equals the
+Bardeen–Press reduction (B.2) to $3\times10^{-17}$ (confirmed $\neq$ RW source);
+transcription matches the symbolic closed forms across all four spins to
+$1\times10^{-16}$. **Subtlety resolved:** the full `rhs_teuk` does *not* reduce
+to Phase A `rhs_min` at $a=0$ — the sources legitimately differ (Bardeen–Press
+vs Regge–Wheeler) — so the wiring test forces the sources equal and confirms the
+principal-part algebra ($\lambda_\pm,\mu_\pm',$ inverse map) is wired identically
+to the validated Phase A path to $3\times10^{-14}$. **$c_\Psi$ horizon stability:**
+the raw emitted denominator carries a $(\sigma-1)$ factor that cancels only when
+$\beta^2=4r_+r_-/(r_+-r_-)^2$ ($m=2$); substituting this before `cancel` removes
+the $0/0$ at the horizon inset (verified the clean denominator does not vanish at
+$\sigma=1$).
+
 ---
 
 ## B.5 — complex-state evolution stack
