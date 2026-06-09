@@ -429,6 +429,69 @@ def qnm_method_3_esprit(
     }
 
 
+def qnm_complex_esprit(
+    t: np.ndarray,
+    psi: np.ndarray,
+    t_start: float,
+    t_end: float,
+    K: int = 2,
+) -> Dict[str, object]:
+    """ESPRIT on the GENUINELY-COMPLEX field psi over [t_start, t_end].
+
+    The Kerr ringdown psi(tau) = sum_n A_n exp(-i omega_n tau) is already a sum
+    of complex exponentials, so ESPRIT applies directly with NO Hilbert
+    transform (unlike ``qnm_method_3_esprit`` which is for real signals). Each
+    physical mode therefore appears exactly once. This is the natural multi-mode
+    estimator for the fundamental + first overtone at a>0, where the two modes
+    have nearly equal Re(omega) but differ ~3x in damping time.
+
+    ``_esprit_core`` uses the model exp((-1/tau + i*omega) tau), whereas the QNM
+    convention is psi ~ exp(-i omega_R tau) exp(-tau/tau_damp); matching gives
+    omega_R = -omega_esprit, tau_damp = tau_esprit.
+
+    Returns dict with:
+        "modes" : list of {omega_R, omega_I, tau, amp} for the K poles,
+                  physical ones (finite tau>0) sorted by DESCENDING tau so
+                  modes[0] is the longest-lived (fundamental candidate) and
+                  modes[1] the next (first-overtone candidate);
+        "dt", "n" : sampling and window length.
+    """
+    t = np.asarray(t, dtype=float)
+    psi = np.asarray(psi, dtype=complex)
+    mask = (t >= t_start) & (t <= t_end)
+    tt = t[mask]
+    pp = psi[mask]
+    if tt.size < max(8, 4 * K):
+        return {"modes": [], "dt": float("nan"), "n": int(tt.size)}
+
+    dts = np.diff(tt)
+    dt = float(dts.mean())
+    if not np.allclose(dts, dt, rtol=1e-6, atol=1e-9):
+        tt_uni = np.linspace(tt[0], tt[-1], tt.size)
+        pp = (np.interp(tt_uni, tt, pp.real)
+              + 1j * np.interp(tt_uni, tt, pp.imag))
+        tt = tt_uni
+        dt = float(tt[1] - tt[0])
+
+    res = _esprit_core(pp, dt=dt, K=K)
+    omega_es = np.asarray(res["omega"])
+    tau = np.asarray(res["tau"])
+    amp = np.abs(np.asarray(res["amp"]))
+
+    modes = []
+    for k in range(omega_es.size):
+        om_R = float(-omega_es[k])           # QNM convention
+        tk = float(tau[k])
+        om_I = (1.0 / tk) if (np.isfinite(tk) and tk > 0) else float("inf")
+        modes.append({"omega_R": om_R, "omega_I": om_I, "tau": tk,
+                      "amp": float(amp[k])})
+
+    phys = [m for m in modes if np.isfinite(m["tau"]) and m["tau"] > 0
+            and m["omega_R"] > 0]
+    phys.sort(key=lambda m: -m["tau"])
+    return {"modes": phys, "all_modes": modes, "dt": dt, "n": int(tt.size)}
+
+
 # ---------------------------------------------------------------------------
 # Method 4: two-mode NLS (fundamental + first overtone) with start-time
 # stability scan. This is the Giesler, Isi, Scheel & Teukolsky (2019) recipe:
@@ -766,3 +829,196 @@ def qnm_method_5_2d_scan(
         "te_plateau_min": float(t_ends[te_idx[0]]),
         "te_plateau_max": float(t_ends[te_idx[-1]]),
     }
+
+
+# ---------------------------------------------------------------------------
+# Single-mode 2D plateau scan (the fundamental's natural estimator).
+#
+# Method 5 above runs a *two-mode* fit at every (t0, te) cell. That is the right
+# tool when two modes genuinely coexist (e.g. the n=1 overtone is still
+# appreciable early in the ringdown). But once the overtone has decayed
+# (tau_overtone ~ tau_fund / 3, so by t ~ 4-5 tau_fund it is e^{-13} below the
+# fundamental) the late ringdown is a CLEAN single mode, and a two-mode fit
+# there is over-parametrised: the second amplitude -> 0, its (omega1, tau1)
+# become unidentifiable, and the bounded NLS can drag the fundamental off by a
+# few percent. The honest estimator for the fundamental on the clean late
+# window is therefore a SINGLE-mode fit, wrapped in the SAME data-driven 2D
+# (t0, te) plateau scan so the window is selected by stability, not hand-pinned.
+#
+# `_scan_2d_plateau` factors out Method 5's plateau-selection machinery so the
+# real (qnm_method_2) and complex (qnm_complex_phase) single-mode fitters share
+# it verbatim.
+# ---------------------------------------------------------------------------
+def _scan_2d_plateau(
+    t: np.ndarray,
+    y: np.ndarray,
+    t_start_min: float,
+    t_start_max: float,
+    t_end_min: float,
+    t_end_max: float,
+    fit_fn,
+    n_starts: int = 10,
+    n_ends: int = 6,
+    plateau_frac_t0: float = 0.5,
+    plateau_frac_te: float = 0.5,
+    min_window: float = 8.0,
+    min_finite_frac: float = 0.6,
+) -> Dict[str, object]:
+    """Generic (t0, te) 2D stability scan.
+
+    ``fit_fn(t, y, t0, te) -> (omega, tau)`` is evaluated on every grid cell
+    with ``te - t0 >= min_window``; exceptions and non-finite returns are
+    recorded as NaN. The plateau is the contiguous (w_te x w_t0) rectangle with
+    the smallest combined relative scatter in (omega, tau), computed nan-aware
+    over its finite cells (a single failed fit does not veto an otherwise tight
+    plateau). Returns the same keys as ``qnm_method_5_2d_scan``.
+    """
+    t_starts = np.linspace(t_start_min, t_start_max, n_starts)
+    t_ends = np.linspace(t_end_min, t_end_max, n_ends)
+
+    omegas_grid = np.full((n_ends, n_starts), np.nan, dtype=float)
+    taus_grid = np.full((n_ends, n_starts), np.nan, dtype=float)
+
+    for j, te in enumerate(t_ends):
+        for i, t0 in enumerate(t_starts):
+            if (te - t0) < min_window:
+                continue
+            try:
+                om, ta = fit_fn(t, y, float(t0), float(te))
+                om = float(om)
+                ta = float(ta)
+            except Exception:
+                om, ta = np.nan, np.nan
+            if np.isfinite(om) and np.isfinite(ta):
+                omegas_grid[j, i] = om
+                taus_grid[j, i] = ta
+
+    w_t0 = max(2, int(round(plateau_frac_t0 * n_starts)))
+    w_te = max(2, int(round(plateau_frac_te * n_ends)))
+    rect_cells = w_te * w_t0
+    min_finite = max(4, int(np.ceil(min_finite_frac * rect_cells)))
+
+    best_score = np.inf
+    best_ij = None
+    for j in range(0, n_ends - w_te + 1):
+        for i in range(0, n_starts - w_t0 + 1):
+            o_blk = omegas_grid[j:j+w_te, i:i+w_t0]
+            ta_blk = taus_grid[j:j+w_te, i:i+w_t0]
+            finite = np.isfinite(o_blk) & np.isfinite(ta_blk)
+            if int(finite.sum()) < min_finite:
+                continue
+            o_f = o_blk[finite]
+            ta_f = ta_blk[finite]
+            score = (np.std(o_f) / abs(np.mean(o_f))
+                     + np.std(ta_f) / abs(np.mean(ta_f)))
+            if score < best_score:
+                best_score = score
+                best_ij = (j, i)
+
+    base = {
+        "t_starts": t_starts.tolist(), "t_ends": t_ends.tolist(),
+        "omegas_grid": omegas_grid.tolist(), "taus_grid": taus_grid.tolist(),
+    }
+    if best_ij is None:
+        base.update({
+            "omega": float("nan"), "tau": float("nan"),
+            "omega_std": float("nan"), "tau_std": float("nan"),
+            "n_finite_plateau": 0, "plateau_cells": 0,
+            "plateau_t0_idx": [], "plateau_te_idx": [],
+            "t0_plateau_min": float("nan"), "t0_plateau_max": float("nan"),
+            "te_plateau_min": float("nan"), "te_plateau_max": float("nan"),
+        })
+        return base
+
+    j0, i0 = best_ij
+    t0_idx = list(range(i0, i0 + w_t0))
+    te_idx = list(range(j0, j0 + w_te))
+    o_pl = omegas_grid[j0:j0+w_te, i0:i0+w_t0]
+    t_pl = taus_grid[j0:j0+w_te, i0:i0+w_t0]
+    base.update({
+        "omega": float(np.nanmean(o_pl)),
+        "tau": float(np.nanmean(t_pl)),
+        "omega_std": float(np.nanstd(o_pl)),
+        "tau_std": float(np.nanstd(t_pl)),
+        "n_finite_plateau": int(np.sum(np.isfinite(o_pl) & np.isfinite(t_pl))),
+        "plateau_cells": int(o_pl.size),
+        "plateau_t0_idx": t0_idx, "plateau_te_idx": te_idx,
+        "t0_plateau_min": float(t_starts[t0_idx[0]]),
+        "t0_plateau_max": float(t_starts[t0_idx[-1]]),
+        "te_plateau_min": float(t_ends[te_idx[0]]),
+        "te_plateau_max": float(t_ends[te_idx[-1]]),
+    })
+    return base
+
+
+def qnm_method_2_2d_scan(
+    t: np.ndarray,
+    y: np.ndarray,
+    t_start_min: float,
+    t_start_max: float,
+    t_end_min: float,
+    t_end_max: float,
+    n_starts: int = 10,
+    n_ends: int = 6,
+    plateau_frac_t0: float = 0.5,
+    plateau_frac_te: float = 0.5,
+    min_window: float = 8.0,
+    min_finite_frac: float = 0.6,
+) -> Dict[str, object]:
+    """Single-mode REAL damped-cosine 2D plateau scan (fundamental, real field).
+
+    Runs ``qnm_method_2`` (A e^{-t/tau} cos(omega t + phi)) on every (t0, te)
+    cell and plateau-selects. Use for the a=0 reduction where the field is real.
+    """
+    y = np.real(np.asarray(y))
+
+    def fit_fn(tt, yy, t0, te):
+        r = qnm_method_2(tt, yy, t0, te)
+        return abs(r["omega"]), r["tau"]
+
+    return _scan_2d_plateau(
+        t, y, t_start_min, t_start_max, t_end_min, t_end_max, fit_fn,
+        n_starts=n_starts, n_ends=n_ends,
+        plateau_frac_t0=plateau_frac_t0, plateau_frac_te=plateau_frac_te,
+        min_window=min_window, min_finite_frac=min_finite_frac,
+    )
+
+
+def qnm_complex_2d_scan(
+    t: np.ndarray,
+    psi: np.ndarray,
+    t_start_min: float,
+    t_start_max: float,
+    t_end_min: float,
+    t_end_max: float,
+    n_starts: int = 10,
+    n_ends: int = 6,
+    plateau_frac_t0: float = 0.5,
+    plateau_frac_te: float = 0.5,
+    min_window: float = 8.0,
+    min_finite_frac: float = 0.6,
+) -> Dict[str, object]:
+    """Single-mode COMPLEX 2D plateau scan (fundamental, a>0 Kerr field).
+
+    Runs ``qnm_complex_phase`` (envelope slope -> omega_imag, unwrapped phase
+    slope -> omega_R) on every (t0, te) cell and plateau-selects on (omega_R,
+    tau). This is the genuinely-complex analogue of ``qnm_method_2_2d_scan`` and
+    the fundamental's estimator once frame dragging makes psi complex. The
+    plateau-rectangle mean of omega_imag is also returned as ``omega_imag``.
+    """
+    psi = np.asarray(psi, dtype=complex)
+
+    def fit_fn(tt, pp, t0, te):
+        r = qnm_complex_phase(tt, pp, t0, te)
+        return r["omega"], r["tau"]
+
+    out = _scan_2d_plateau(
+        t, psi, t_start_min, t_start_max, t_end_min, t_end_max, fit_fn,
+        n_starts=n_starts, n_ends=n_ends,
+        plateau_frac_t0=plateau_frac_t0, plateau_frac_te=plateau_frac_te,
+        min_window=min_window, min_finite_frac=min_finite_frac,
+    )
+    # tau already encodes omega_imag = 1/tau; expose it explicitly for clarity.
+    tau = out.get("tau", float("nan"))
+    out["omega_imag"] = (1.0 / tau) if (np.isfinite(tau) and tau != 0.0) else float("nan")
+    return out

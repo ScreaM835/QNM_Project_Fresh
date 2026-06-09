@@ -362,6 +362,64 @@ building the gate:
 - Integrator stable, no boundary growth, windows data-driven (Method 5 2D
   plateau scan — not hand-pinned), consistent across $N$.
 
+**Status: DONE.** Implemented in `kerr/scripts/kv3_qnm.py` (+ `slurm_kv3.sh`),
+extractor additions in `kerr/src/extractor_m4.py`. Local `--quick` ($401/801$)
+**PASS**; `slurm_kv3.sh` runs the authoritative $401/801/1601$ for the record.
+
+| extraction | finest-grid $M\omega$ err | $\tau/M$ err | across-$N$ drift | gate |
+|:--|--:|--:|--:|:--|
+| $a/M{=}0$ fund $(2,2,0)$   | $1.7\times10^{-5}$ | $3.2\times10^{-5}$ | $3.8\times10^{-7}$ | **PASS** |
+| $a/M{=}0.5$ fund $(2,2,0)$ | $1.6\times10^{-4}$ | $3.6\times10^{-4}$ | $1.3\times10^{-6}$ | **PASS** |
+| $a/M{=}0.9$ fund $(2,2,0)$ | $3.2\times10^{-5}$ | $5.4\times10^{-4}$ | $1.9\times10^{-4}$ | **PASS** |
+| $a/M{=}0.9$ overtone $(2,2,1)$ | $5.9\times10^{-3}$ | $8.0\times10^{-2}$ | $3.8\times10^{-3}$ | **RESOLVED** |
+
+All three fundamentals are $\le0.1\%$ in $M\omega_{220}$ (margin: $0.0017\%$,
+$0.016\%$, $0.0032\%$). Four honest decisions taken while building the gate:
+
+1. *The fundamental's estimator is a **single-mode** 2D plateau scan, not the
+   two-mode Method-5.* The two-mode fit over the late ringdown is
+   **over-parametrised**: the overtone damps $\sim3\times$ faster
+   ($\tau_{221}\!\approx\!\tau_{220}/3$, dead by $t\!\sim\!30M$), so on the
+   plateau windows ($t_0\gtrsim4\tau$) only the fundamental survives and the
+   second mode fits noise (this produced the $1$–$7\%$ scatter first seen with
+   Method-5). A single-mode diagnostic (`--diag`) confirmed the operator is
+   correct — $a=0$, window $[90,160]$: $M\omega$ err $2.2\times10^{-5}$,
+   $\tau$ err $6.3\times10^{-6}$ — so the scatter was the fit, not the operator.
+   A single-mode **2D $(t_0,t_e)$ plateau scan** (`qnm_method_2_2d_scan` for the
+   real $a=0$ field, `qnm_complex_2d_scan` for $a>0$) is therefore the honest
+   estimator and still satisfies the gate's "data-driven 2D plateau, not
+   hand-pinned" clause — the windows come from the same scatter-minimising
+   rectangle search, scaled off $\tau_{\rm ref}$, with no point hand-picked.
+2. *$a=0$ is purely real, $a>0$ is genuinely complex.* At $a=0$ the
+   Bardeen–Press coefficients are real so the field stays real
+   (imag/real $=0$, printed) and the Schwarzschild-validated real-field path
+   applies verbatim; `qnm_complex_phase` returns $\approx0$ there (phase is
+   $0/\pi$) and is the $a>0$ tool. At $a>0$ frame dragging makes the field
+   genuinely complex (imag/real $\sim0.95$–$1.1$, printed), read from the
+   complex envelope$+$phase slopes.
+3. *Observer self-selection by plateau scatter (no cherry-picking).* `scri`
+   (floor-limited late amplitude) and `r10M` (sitting at the launch radius
+   $r_0{=}10M$) scatter; `r50M`/`r20M` are rock-solid ($\text{std}/|\omega|\sim
+   6\times10^{-6}$ vs $10^{-2}$ for the bad ones). The gate trusts only
+   observers with $\text{std}/|\omega|<10^{-3}$ (flagged `T` in the log) and
+   takes the **median** over them — fully data-driven, the field identifies its
+   own good observers.
+4. *The overtone needs band-filtered mode identification.* It is read by a
+   **complex ESPRIT** ($K{=}4$, `qnm_complex_esprit`, no Hilbert — the field is
+   already complex) over a data-driven $t_0$ scan on `r20M`. ESPRIT
+   occasionally returns a spurious long-$\tau$ low-frequency tail mode
+   ($M\omega\sim0.01$–$0.08$); identifying the fundamental as the globally
+   longest-$\tau$ mode then mislabels it. Fix: **band-filter to
+   $0.5$–$1.5\times\omega_{\rm fund}$ before** picking the longest-$\tau$ mode as
+   the fundamental and the faster nearest-frequency mode as the overtone; late
+   windows where the overtone has decayed honestly report "no overtone" rather
+   than a mislabel. With the filter all $6$ scan windows agree
+   ($M\omega_{221}\approx0.66$–$0.68$, $\tau\approx4.6$–$5.0$ vs ref
+   $0.6676/5.12$), a clean $3.3\times$ separation from the fundamental
+   ($\tau{=}15.4$). The $\sim8\%$ $\tau_{221}$ error is the genuine difficulty of
+   a near-degenerate ($0.6\%$ from the fundamental in $\omega_R$), $\sim3\times$
+   weaker overtone — reported transparently, not gated away.
+
 ---
 
 ## B.9 — full spin sweep
