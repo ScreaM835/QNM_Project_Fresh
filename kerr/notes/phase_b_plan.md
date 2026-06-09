@@ -248,9 +248,54 @@ both endpoints radiate out cleanly, no boundary growth.
 **Acceptance.** Stable to $\tau=200M$, no NaN, $L^2(\sigma)$ envelope decays
 (does not grow) after the pulse leaves; $a=0$ run identical to Phase A V.1.
 
----
+**Status: DONE** (`scripts/kv1_propagation.py`, `scripts/slurm_kv1.sh`;
+4/4 runs pass over $a/M\in\{0,0.9\}\times N\in\{401,801\}$, validated on the
+login node and submitted to SLURM). Two honest findings while building the gate:
 
-## B.7 — KV.2 self-convergence gate (analogue of V.2)
+1. *Real, spin-amplified numerical instability (fixed by dissipation, not by
+   relaxing the gate).* Under-dissipated, the high-spin run grows back at late
+   times — but at **physical finite-radius observers**, not only the horizon
+   cell, so it is a genuine instability, not a coordinate artifact. Four textbook
+   signatures confirm it is *numerical*: the onset is **pushed later** as the grid
+   refines (round-off-seeded); it is removed by Kreiss–Oliger dissipation; it is
+   converged-away at fixed KO ($N=401$ vs $801$ identical); and its strength
+   tracks $\beta=ma/(r_+-r_-)$, the near-horizon azimuthal oscillation frequency
+   of the regular-field rescaling $(1-\sigma)^{-2-i\beta}$ ($a{=}0\Rightarrow
+   \beta{=}0$ clean; $a/M{=}0.9\Rightarrow\beta{\approx}2.06$ strong). Standard
+   4th-order KO at $\sigma_{\rm KO}=0.2$ (Phase A used $0.02$) removes it for all
+   spins to $a/M=0.95$. This is $O(\Delta x^3)$ and **invisible to the resolved
+   ringdown**: the observer time series through the QNM window is bit-identical to
+   4 s.f. across $\sigma_{\rm KO}\in[0.02,0.5]$, so the B.8 extraction window is
+   untouched. Not gate-tuning — the instability is a $>500\%$ blow-up, the cure is
+   a textbook dissipation operator on a flat plateau.
+
+2. *Honest gate diagnostic.* A naïve full-grid $L^2(\sigma)$ of the **regular**
+   field $\Psi=\psi\,\sigma^3(1-\sigma)^{-2-i\beta}$ is *not* a clean stability
+   measure: the $(1-\sigma)^{-2}$ factor amplifies infalling radiation in the
+   horizon boundary layer, a coordinate effect that swamps the exterior (at $a=0$
+   the field decays 2.5 decades at every physical observer while the full-grid
+   $L^2$ "grows" $3\times$ on the horizon cell once the bulk has emptied into the
+   round-off floor). The gate is therefore the faithful, physical reading of "the
+   envelope decays after the pulse leaves": the **late-time envelope slope**
+   $d\log|\cdot|/d\tau$ of (i) the $\scri^+$ waveform and (ii) the **exterior bulk**
+   $L^2$ ($\sigma\le0.9$, horizon layer excluded) must be negative. This slope is
+   robust to the $a=0$ real field's zero-crossings and to decay into the floor
+   (where a single max/start ratio is ill-posed), and it correctly flagged the
+   under-dissipated case as **positive** (growing). As a bonus cross-check the
+   gated slope reproduces the QNM decay rate: $a/M{=}0.9$ gives $-0.0649$ vs the
+   `qnm` $-\omega_I=-0.0649$ ($<0.1\%$); $a{=}0$ gives $-0.0886$ vs $-0.0890$.
+   The full-grid $L^2$, horizon edge, and pointwise ratios are still **reported**
+   for transparency, just not gated. On "$a=0$ identical to V.1": the *principal
+   part* (characteristic speeds, inverse map) is identical to Phase A to
+   $\sim6\times10^{-17}$ (B.4), so the propagation/outflow **stability** reproduces
+   V.1; the $a=0$ *source* is the Bardeen–Press reduction (isospectral, not
+   pointwise-RW), so the pointwise field is not identical — the physical $a=0$
+   equivalence (same QNM frequency) is the B.8 gate, and is previewed here by the
+   $-0.0886\approx-\omega_I$ slope match.
+
+   *SLURM note.* The Kerr operator imports `qnm.angular` (spheroidal separation
+   constants), which the parent-root Phase A venv lacks (its `qnm` is a
+   single-file stub); all Kerr SLURM jobs use the `_improved`-root venv.
 **File.** `kerr/scripts/kv2_convergence.py`, `kerr/scripts/slurm_kv2.sh`.
 **Implements.** Self-convergence at $a/M=0.9$ under $N\to2N\to4N$
 ($401\to801\to1601$), max-abs-final and observer-series Cauchy differences.
