@@ -296,12 +296,52 @@ login node and submitted to SLURM). Two honest findings while building the gate:
    *SLURM note.* The Kerr operator imports `qnm.angular` (spheroidal separation
    constants), which the parent-root Phase A venv lacks (its `qnm` is a
    single-file stub); all Kerr SLURM jobs use the `_improved`-root venv.
+
+---
+
+## B.7 — KV.2 self-convergence (analogue of V.2)
 **File.** `kerr/scripts/kv2_convergence.py`, `kerr/scripts/slurm_kv2.sh`.
 **Implements.** Self-convergence at $a/M=0.9$ under $N\to2N\to4N$
 ($401\to801\to1601$), max-abs-final and observer-series Cauchy differences.
 **Acceptance.** Clean 2nd-order ($\sim4\times$ error drop per refinement),
 matching the Phase A convergence quality ($2.0\!\to\!5.0\!\to\!1.3\times10^{-5}$
 ballpark).
+
+**Status: DONE.** Implemented in `kerr/scripts/kv2_convergence.py`
+(+ `slurm_kv2.sh`). A SINGLE shared $dt$ per spin (coarsest-grid CFL,
+safety 0.4 $\Rightarrow$ finest-grid CFL number $0.4\times4=1.6<2.8$, stable on
+all three grids) makes the RK4 time error $O(dt^4)$ identical on every grid so
+it cancels in the differences; what remains is the spatial error. Coincident
+points ($\sigma=$ `linspace(eps,1-eps,N)` nests exactly, verified) are
+differenced as `psi2[::2]`, `psi3[::4]`. Production $\sigma_{\rm KO}=0.2$ (the
+KV.1 value) is used — it is a 4th-difference, $O(d\sigma^4)$, subdominant to the
+$O(d\sigma^2)$ scheme by $\sim(d\sigma)^2\!\sim\!10^{-5}$, so it does not degrade
+the measured order. Local gate **PASS** at the real resolution
+$401\to801\to1601$, $\tau_f=60M$; SLURM via `slurm_kv2.sh` for the record.
+Measured $p=\log_2(\|e_{12}\|/\|e_{23}\|)$ (L2 norm), all $\approx2$:
+
+| $a/M$ | full-field $p$ | bulk-field $p$ | scri$^+$ series $p$ | r=10M series $p$ |
+|------:|---------------:|---------------:|--------------------:|-----------------:|
+| 0.0   | 2.009 ($Q{=}4.03$) | 2.008 | 2.020 | 2.020 |
+| 0.9   | **2.082** ($Q{=}4.23$) | 2.081 | **2.053** | 2.053 |
+
+Gate = full-field **and** scri$^+$ waveform both $p\in[1.7,2.3]$; **PASS** at
+the target $a/M=0.9$. $a=0$ is a reported cross-check (the Bardeen–Press
+reduction is likewise clean 2nd-order). Two honest findings recorded while
+building the gate:
+1. *The convergence ORDER is uniform across the slice.* Unlike KV.1 — where the
+   near-horizon rescaling $(1-\sigma)^{-2}$ made the full-grid $L^2$ *envelope
+   over time* grow (a magnitude effect, gated around) — excluding the horizon
+   layer ($\sigma\le0.9$) changes $p$ by $<0.002$ here. The rescaling inflates
+   the field's magnitude, not its truncation order, so KV.2 gates on the FULL
+   field (no region excluded); the bulk $p$ is reported only as the cross-check
+   that established this.
+2. *Coarse grids are pre-asymptotic (not a bug).* The width-$1M$ launch pulse at
+   $r=10M$ maps to a $\sigma$-width $\sim0.014$; clean 2nd order needs $\gtrsim5$
+   points across it ($N\ge401$). Below that, $p$ rises with resolution:
+   full-field $p=1.50\,(101/201/401)\to1.86\,(201/401/801)\to2.08\,(401/801/1601)$.
+   Hence the gate runs at $401/801/1601$ and the coarser `--smoke` login check is
+   explicitly NOT authoritative.
 
 ---
 
