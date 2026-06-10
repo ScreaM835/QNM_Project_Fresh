@@ -105,18 +105,27 @@ is *not* fed to the net (Phase B's audit showed it is a weak, sub-leading input)
 
 **5. Data design — the missing artefact, built first.** Phase B saved *scalars
 only*; no field corpus exists. C.1/C.2 build it:
-  - **Sweep** $(a/M, r_0, w, A)$ on a Sobol quasi-random grid. Spin
+  - **Sweep** $(a/M, r_0, w)$ on a Sobol quasi-random grid. **Amplitude $A$ is
+    dropped: the Teukolsky equation is linear, so $\psi(2A)=2\psi(A)$ holds to
+    $0.0$ relative error (C.1 spot-check) — $A$ is a redundant axis.** Spin
     $a/M\in[0,0.95]$; initial-pulse params centred on the Phase B-validated pulse
-    ($r_0=10M$, width $=1M$, amp $=1$), widened modestly to give the net
-    something to generalise over (e.g. $r_0\in[8,12]M$, $w\in[0.75,1.5]M$,
-    $A\in[0.5,1.5]$ — final ranges fixed in C.1 after a stability spot-check).
-  - **Per sample, run the Phase B operator twice:** fine ($N=801$, the B.9
-    production grid) and coarse ($N=801/k$, $k\in\{2,4\}$ ablated), **sharing**
-    $\sigma$-grid nesting and $\sigma_{\rm KO}=0.2$. Store both **complex** fields
-    on their grids + the parameter vector + per-sample reference $(M\omega,\tau)$
-    from `qnm`. Upsampling coarse$\to$fine deferred to the data-pipe (matches
-    parent `src/hybrid_data_pipe.py`).
-  - **Counts:** $\sim$1000 train / 100 val / 100 test (proposal §9 Phase 1).
+    ($r_0=10M$, $w=1M$) and widened to **$r_0\in[8,11]M$, $w\in[1.0,1.5]M$** —
+    the box fixed by the spot-check so the **coarsest** grid ($N=201$) keeps
+    $\ge5$ points across $[r_0-w,r_0+w]$ on *every* draw (a narrower $w=0.75$
+    collapses to 3 points at high $r_0$/spin and under-resolves the pulse).
+  - **Per sample, run the Phase B operator three times:** fine ($N=801$, the B.9
+    production grid) and **both** coarse grids — $N=401$ ($k=2$) and $N=201$
+    ($k=4$) — so the $k$-ablation uses *identical* parameter draws and the fine
+    solve is done once. The $\sigma$-grids **nest exactly** (spot-check:
+    $801[::2]\equiv401$, $801[::4]\equiv201$) and share $\sigma_{\rm KO}=0.2$.
+    Store the fine + both coarse **complex** fields + the parameter vector +
+    per-sample reference $(M\omega,\tau)$ from `qnm`. Upsampling coarse$\to$fine
+    deferred to the data-pipe (matches parent `src/hybrid_data_pipe.py`).
+  - **Counts:** 1024 train / 128 val / 128 test (powers of two for Sobol balance;
+    $\approx$ proposal §9 Phase 1's 1000/100/100). Generation is cheap — $111.7$ s
+    per sample for all three grids at the hardest spin ($a/M=0.9$) $\Rightarrow$
+    $\sim$40 core-hours for the 1280-sample corpus, $\sim$1.2 h on 32 `icelake`
+    cores.
   - **Format:** `.npz` (matches all `kerr/outputs/phase_b/*`), gitignored.
   - **Baseline + eval (C.3):** mirror `scripts/eval_hybrid_sw.py` —
     compare **hybrid vs coarse-up vs fine-truth**, report field RMSD/L² *and*
@@ -125,6 +134,16 @@ only*; no field corpus exists. C.1/C.2 build it:
     its worst-case $|\Delta\tau/\tau|$, reported because Phase B showed $\tau$ and
     the weakly-complex low-spin band are the hard cases.
 
+**C.0 addendum — stability spot-check (empirical, 2026-06-10).** Five facts
+measured on the Phase B operator before locking the C.1 ranges: (i) the grids
+nest exactly, $801[::2]\equiv401$ and $801[::4]\equiv201$; (ii) temporal
+resolution is huge on every grid ($\ge1600$ pts/period at $a/M=0.95$), so the
+coarse error is **spatial**, not temporal aliasing; (iii) the box $r_0\in[8,11]$,
+$w\in[1.0,1.5]$ keeps $\ge5$ points across the pulse on the coarsest grid
+($N=201$, worst corner exactly 5); (iv) the field is bit-exactly linear in $A$
+($f(2A)-2f(A)=0$), so $A$ is dropped as a sweep axis; (v) cost is $111.7$ s per
+sample for all three grids $\Rightarrow\sim$1.2 h on 32 cores for 1280 samples.
+
 ---
 
 ### Honest risks (recorded now, not after they bite)
@@ -132,8 +151,11 @@ only*; no field corpus exists. C.1/C.2 build it:
 1. **Residual may not be smoother than the field** (proposal risk 1). If coarse
    FD aliases the ringdown, $\delta$ oscillates at the QNM frequency and is as
    hard to learn as $\psi$ itself — the hybrid then won't beat the pure FNO.
-   *Mitigation:* ablate $k\in\{2,4\}$ in C.2; the coarse grid must keep
-   $\gtrsim10$ pts/period at the highest-spin ringdown or we fall back to $k=2$.
+   *Mitigation:* ablate $k\in\{2,4\}$ in C.2. The spot-check ruled out *temporal*
+   aliasing as the mechanism — even $N=201$ keeps $\sim$1600 pts/period at
+   $a/M=0.95$ — so the coarse error is **spatial** (pulse under-resolution), which
+   is exactly why the C.1 box holds $\ge5$ pts on $N=201$. If $\delta$ is still
+   too rough at $k=4$, fall back to $k=2$.
 2. **Complex doubles the target.** Two channels with a learned phase relation is
    strictly harder than the SW real case; the weakly-complex low-spin band (where
    Phase B already had its largest $0.3\%$ errors) is the likely failure point.
@@ -154,11 +176,12 @@ only*; no field corpus exists. C.1/C.2 build it:
 
 ## C.1 — Kerr coarse/fine dataset generator
 **File.** `kerr/scripts/build_kerr_dataset.py`, `kerr/src/kerr_dataset.py`.
-**Implements.** Sobol sweep over $(a/M, r_0, w, A)$; per sample run the Phase B
-`evolve` twice (fine $N=801$, coarse $N=801/k$), store both **complex** fields,
-parameter vector, and `qnm` reference $(M\omega,\tau)$. Re-uses `kv3_qnm.evolve`
-and `qnm_kerr_reference` verbatim (no new physics path). `--smoke` = a handful
-of samples at low $N$ for a login-node spot-check.
+**Implements.** Sobol sweep over $(a/M, r_0, w)$ (amplitude dropped — linear
+PDE); per sample run the Phase B `evolve` at fine $N=801$ and **both** coarse
+grids $N=401$ ($k=2$) / $N=201$ ($k=4$), store the fine + both coarse **complex**
+fields, parameter vector, and `qnm` reference $(M\omega,\tau)$. Re-uses
+`kv3_qnm.evolve` and `qnm_kerr_reference` verbatim (no new physics path).
+`--smoke` = a handful of samples at low $N$ for a login-node spot-check.
 **Acceptance.** Spot-check $\ge5$ samples: fine field reproduces a direct B.9
 single-spin run to machine precision at matching params; coarse field is finite
 (no NaN/boundary growth) and within sensible $L^2$ of upsampled-to-fine; the
@@ -166,8 +189,10 @@ saved per-sample $(M\omega,\tau)$ matches a fresh `qnm` call. One commit.
 
 ## C.2 — authoritative corpus (SLURM, CPU)
 **File.** `kerr/scripts/slurm_kerr_dataset.sh`, output
-`kerr/outputs/phase_c/dataset_k{2,4}.npz` (gitignored).
-**Implements.** Full $\sim$1200-sample generation at $k\in\{2,4\}$ on `icelake`.
+`kerr/outputs/phase_c/dataset_{train,val,test}.npz` (each holding fine + both
+coarse grids; gitignored).
+**Implements.** Full 1280-sample generation (1024/128/128), fine + both coarse
+($k\in\{2,4\}$) per sample, on `icelake`.
 **Acceptance.** Both `.npz` complete, all samples finite, train/val/test split
 saved with fixed seed; a manifest (counts, ranges, $k$, grids, wall-time)
 printed and committed as a small text/JSON record. One commit.
