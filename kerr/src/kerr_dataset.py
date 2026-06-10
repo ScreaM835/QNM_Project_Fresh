@@ -196,57 +196,118 @@ def reference_qnm(a_over_M: float) -> Tuple[float, float, float]:
     return float(ref.M_omega_R), float(ref.M_omega_I), float(ref.tau_over_M)
 
 
+def _evolve_one(task):
+    """Evolve one sample on every grid; return float32 Re/Im (picklable).
+
+    Module-level so it can run inside a ``multiprocessing`` worker. Returns the
+    fields already split into float32 Re/Im (half the IPC of complex128 and no
+    complex buffer kept in the parent).
+    """
+    i, a, r0, w, ks, t_store, dt_store = task
+    grid_N = {1: FINE_N, **{k: COARSE_N[k] for k in ks}}
+    re: Dict[int, np.ndarray] = {}
+    im: Dict[int, np.ndarray] = {}
+    sig: Dict[int, np.ndarray] = {}
+    scri: Dict[int, int] = {}
+    finite = True
+    for k, Nk in grid_N.items():
+        _t, rec, op, info = evolve_full_field(a, Nk, r0, w, t_store, dt_store)
+        re[k] = rec.real.astype(np.float32)
+        im[k] = rec.imag.astype(np.float32)
+        sig[k] = op.sigma.astype(np.float64)
+        scri[k] = int(info["scri_idx"])
+        finite = finite and bool(info["finite"])
+    qrow = np.asarray(reference_qnm(a), dtype=np.float64)
+    return i, qrow, re, im, sig, scri, finite
+
+
 def generate_split(
     params: Sequence[Sequence[float]],
     ks: Sequence[int] = (2, 4),
     t_store: float = T_STORE,
     dt_store: float = DT_STORE,
     progress_prefix: str = "",
+    workers: int = 1,
 ) -> Tuple[Dict[str, np.ndarray], Grids]:
     """Run fine + every coarse grid for each ``(a/M, r0, w)`` sample.
 
     Returns ``(arrays, grids)`` where ``arrays`` holds float32 Re/Im fields keyed
     by grid (``psi_fine_re``, ``psi_k2_re``, ...), the parameter matrix ``P`` and
     the per-sample ``qnm`` reference matrix.
+
+    The per-sample work is embarrassingly parallel (each sample builds its own
+    operator, no shared state), so ``workers > 1`` fans it out over a process
+    pool. The result is **bit-identical** to ``workers == 1`` because each
+    evolution is deterministic and is written back by sample index; the pool
+    only changes *when* each sample is computed, not *what* is stored. Fields are
+    stored straight into the float32 output arrays (no all-samples complex128
+    buffer), keeping peak memory at the size of the final corpus.
     """
     params = [tuple(float(x) for x in row) for row in params]
     n = len(params)
     tau = canonical_tau(t_store, dt_store)
     ntau = tau.size
+    ks = tuple(int(k) for k in ks)
+    grid_N = {1: FINE_N, **{k: COARSE_N[k] for k in ks}}
 
-    psi: Dict[int, np.ndarray] = {}          # k -> (n, ntau, N_k) complex
+    psi_re: Dict[int, np.ndarray] = {}       # k -> (n, ntau, N_k) float32
+    psi_im: Dict[int, np.ndarray] = {}
+    for k, Nk in grid_N.items():
+        psi_re[k] = np.empty((n, ntau, Nk), dtype=np.float32)
+        psi_im[k] = np.empty((n, ntau, Nk), dtype=np.float32)
     sigma: Dict[int, np.ndarray] = {}
     scri: Dict[int, int] = {}
-    grid_N = {1: FINE_N, **{k: COARSE_N[k] for k in ks}}
-    for k, Nk in grid_N.items():
-        psi[k] = np.empty((n, ntau, Nk), dtype=np.complex128)
-
     P = np.array(params, dtype=np.float32)
     qref = np.empty((n, 3), dtype=np.float64)
 
-    for i, (a, r0, w) in enumerate(params):
-        qref[i] = reference_qnm(a)
-        for k, Nk in grid_N.items():
-            t_i, rec, op, info = evolve_full_field(a, Nk, r0, w, t_store, dt_store)
-            assert t_i.size == ntau, (t_i.size, ntau)
+    def _store(result) -> None:
+        i, qrow, re, im, sig, scri_i, finite = result
+        if not finite:
+            a, r0, w = params[i]
+            raise FloatingPointError(
+                f"non-finite field: sample {i} (a={a:.4f}, r0={r0:.3f}, "
+                f"w={w:.3f})")
+        qref[i] = qrow
+        for k in grid_N:
+            psi_re[k][i] = re[k]
+            psi_im[k][i] = im[k]
             if k not in sigma:
-                sigma[k] = op.sigma.astype(np.float64)
-                scri[k] = info["scri_idx"]
-            psi[k][i] = rec
-            if not info["finite"]:
-                raise FloatingPointError(
-                    f"non-finite field: sample {i} (a={a:.4f}, r0={r0:.3f}, "
-                    f"w={w:.3f}) on grid N={Nk}")
-        if progress_prefix:
-            print(f"  {progress_prefix} {i + 1}/{n}: "
-                  f"a/M={a:.4f} r0={r0:.3f} w={w:.3f}  Mw={qref[i, 0]:.5f}",
-                  flush=True)
+                sigma[k] = sig[k]
+                scri[k] = scri_i[k]
 
-    arrays: Dict[str, np.ndarray] = {"P": P, "qnm": qref.astype(np.float64)}
+    tasks = [(i, a, r0, w, ks, t_store, dt_store)
+             for i, (a, r0, w) in enumerate(params)]
+
+    done = 0
+    if workers and workers > 1:
+        import multiprocessing as mp
+        with mp.Pool(processes=int(workers)) as pool:
+            for result in pool.imap_unordered(_evolve_one, tasks):
+                _store(result)
+                done += 1
+                if progress_prefix:
+                    i = result[0]
+                    a, r0, w = params[i]
+                    print(f"  {progress_prefix} [{done}/{n}] sample {i}: "
+                          f"a/M={a:.4f} r0={r0:.3f} w={w:.3f}  "
+                          f"Mw={qref[i, 0]:.5f}", flush=True)
+    else:
+        for task in tasks:
+            result = _evolve_one(task)
+            _store(result)
+            done += 1
+            if progress_prefix:
+                i = result[0]
+                a, r0, w = params[i]
+                print(f"  {progress_prefix} {done}/{n}: "
+                      f"a/M={a:.4f} r0={r0:.3f} w={w:.3f}  "
+                      f"Mw={qref[i, 0]:.5f}", flush=True)
+
+    arrays: Dict[str, np.ndarray] = {"P": P, "qnm": qref}
     for k in grid_N:
         tag = "fine" if k == 1 else f"k{k}"
-        arrays[f"psi_{tag}_re"] = psi[k].real.astype(np.float32)
-        arrays[f"psi_{tag}_im"] = psi[k].imag.astype(np.float32)
+        arrays[f"psi_{tag}_re"] = psi_re[k]
+        arrays[f"psi_{tag}_im"] = psi_im[k]
     grids = Grids(tau=tau, sigma=sigma, scri_idx=scri)
     return arrays, grids
 
