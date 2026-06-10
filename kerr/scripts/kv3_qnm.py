@@ -51,6 +51,7 @@ from kerr.src.extractor_m4 import (
     qnm_complex_phase,
     qnm_complex_esprit,
     qnm_method_2,
+    envelope_tail_cap,
 )
 from kerr.src.qnm_kerr_reference import kerr_qnm
 
@@ -80,6 +81,25 @@ TE_LO_FAC, TE_HI_FAC = 10.0, 14.0
 MIN_WINDOW_FAC = 3.0        # min (te - t0) in units of tau_ref
 TAU_FINAL_FAC = 14.0        # evolve to ~14 tau_ref ...
 TAU_FINAL_MIN, TAU_FINAL_MAX = 180.0, 220.0   # ... clamped to validated range
+
+# Near-extremal late-time tail cap (a>0 only). The fixed [10,14] tau_ref window
+# assumes the QNM dominates the late ringdown; this holds for a/M <= 0.9 but
+# fails approaching extremality (a/M >= ~0.93), where the slowly-decaying tail
+# and the nearly-degenerate (2,2,1) overtone contaminate the ringdown EARLIER
+# (the QNM->tail crossover moves to a smaller tau-multiple). `envelope_tail_cap`
+# detects, from each field's own envelope, the latest time it still decays at
+# the QNM rate; when that cap falls inside the nominal window the scan is
+# confined to the QNM-clean zone below it. The cap requires the decay to slow
+# *permanently* (a sustained shallow run, not a transient): at low spin the
+# weakly-complex |psi| has near-nodes whose momentary slope dips would otherwise
+# false-trip the cap. For a/M <= 0.9 the cap lands at the evolution end, so the
+# window is unchanged -- no regression; only the near-extremal tail is capped.
+TAIL_CAP_SLOPE_FRAC = 0.7   # cap where envelope decay slows below 0.7x QNM rate
+TAIL_CAP_SMOOTH_FAC = 0.6   # half-width (in tau_ref) of the sliding slope fit
+TAIL_CAP_PERSIST_FRAC = 1.5  # shallow run must last >=1.5 tau_ref to cap (a
+                            # permanent tail, not a weakly-complex near-node dip)
+TAIL_MIN_WINDOW_FAC = 2.0   # min (te - t0) in tau_ref when the cap is active
+TAIL_TE_LO_FAC = 3.0        # te scan low edge = te_cap - 3 tau_ref when capped
 
 # Gate parameters. A per-observer plateau is "trusted" when its relative scatter
 # (omega_std / |omega|) is below STD_TRUST_REL; the gate estimate is the median
@@ -180,8 +200,11 @@ def extract_fundamental(taus, y, is_real, tau_ref, tau_final):
     """Single-mode 2D plateau scan for the fundamental (2,2,0).
 
     a=0 (is_real): real damped-cosine scan on Re(psi).
-    a>0          : complex envelope+phase scan on the full complex psi.
-    Returns the plateau dict (omega, tau, omega_std, tau_std, plateau bounds).
+    a>0          : complex envelope+phase scan on the full complex psi, with a
+                   data-driven late-time tail cap (envelope_tail_cap) that
+                   confines the scan to the QNM-clean zone near extremality.
+    Returns the plateau dict (omega, tau, omega_std, tau_std, plateau bounds);
+    for a>0 it also carries 'te_cap' (the detected QNM->tail transition time).
     """
     t0_lo, t0_hi, te_lo, te_hi, min_w = scan_windows(tau_ref, tau_final)
     if is_real:
@@ -189,10 +212,23 @@ def extract_fundamental(taus, y, is_real, tau_ref, tau_final):
             taus, np.real(y), t0_lo, t0_hi, te_lo, te_hi,
             n_starts=N_STARTS, n_ends=N_ENDS, min_window=min_w,
         )
-    return qnm_complex_2d_scan(
+    te_cap = envelope_tail_cap(
+        taus, y, tau_ref, t_search_start=t0_lo,
+        slope_frac=TAIL_CAP_SLOPE_FRAC, smooth_frac=TAIL_CAP_SMOOTH_FAC,
+        persist_frac=TAIL_CAP_PERSIST_FRAC,
+    )
+    if te_cap < te_hi:   # tail intrudes into the nominal window -> confine to QNM zone
+        te_hi = te_cap
+        min_w = min(min_w, TAIL_MIN_WINDOW_FAC * tau_ref)
+        t0_lo = min(t0_lo, te_cap - min_w - tau_ref)
+        t0_hi = min(t0_hi, te_cap - min_w)
+        te_lo = max(te_cap - TAIL_TE_LO_FAC * tau_ref, t0_lo + min_w)
+    out = qnm_complex_2d_scan(
         taus, y, t0_lo, t0_hi, te_lo, te_hi,
         n_starts=N_STARTS, n_ends=N_ENDS, min_window=min_w,
     )
+    out["te_cap"] = float(te_cap)
+    return out
 
 
 def gate_estimate(per_obs):
@@ -248,13 +284,20 @@ def run_fundamental(a_over_M, resolutions, ref=None):
             per_obs.append((label, om, ta, om_std))
             rel = (om_std / abs(om)) if (np.isfinite(om_std) and np.isfinite(om) and om != 0) else np.nan
             trust = "T" if (np.isfinite(rel) and rel < STD_TRUST_REL) else "."
+            cap_str = ""
+            if not is_real:
+                tc = sm.get("te_cap", float("nan"))
+                if np.isfinite(tc) and tc < te_hi:
+                    cap_str = f" cap={tc:.0f}"
             print(f"  [{label:5s}] {trust} M*omega={om:.6f} (err {err(om, ref.M_omega_R):.2e}) "
                   f"tau/M={ta:.4f} (err {err(ta, ref.tau_over_M):.2e}) "
                   f"std={om_std:.1e} "
                   f"win=t0[{sm.get('t0_plateau_min', float('nan')):.0f},"
                   f"{sm.get('t0_plateau_max', float('nan')):.0f}]"
                   f"te[{sm.get('te_plateau_min', float('nan')):.0f},"
-                  f"{sm.get('te_plateau_max', float('nan')):.0f}]  imag/real={imag_frac:.1e}",
+                  f"{sm.get('te_plateau_max', float('nan')):.0f}]"
+                  f"{cap_str}"
+                  f"  imag/real={imag_frac:.1e}",
                   flush=True)
         om_g, ta_g, used = gate_estimate(per_obs)
         by_N[N] = (om_g, ta_g, used)

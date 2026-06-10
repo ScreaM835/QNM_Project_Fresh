@@ -1022,3 +1022,70 @@ def qnm_complex_2d_scan(
     tau = out.get("tau", float("nan"))
     out["omega_imag"] = (1.0 / tau) if (np.isfinite(tau) and tau != 0.0) else float("nan")
     return out
+
+
+def envelope_tail_cap(
+    t,
+    psi,
+    tau_ref: float,
+    t_search_start: float,
+    slope_frac: float = 0.7,
+    smooth_frac: float = 0.6,
+    persist_frac: float = 1.5,
+) -> float:
+    """Latest time the COMPLEX envelope ``|psi|`` is still decaying at the QNM rate.
+
+    For a single *genuinely complex* quasinormal mode
+    ``psi ~ A exp((-1/tau - i omega) t)`` the magnitude ``|psi| = |A| exp(-t/tau)``
+    is a clean monotonic exponential (the oscillation lives purely in the phase),
+    so its local logarithmic slope equals the QNM rate ``-1/tau``. Once the
+    ringdown gives way to the late-time power-law tail / numerical floor (or, near
+    extremality, to a nearly-degenerate-overtone beat), the envelope's decay
+    *permanently* slows and the slope flattens or reverses. This returns the start
+    of the first such permanent slow-down, searched forward from
+    ``t_search_start`` (set past the initial burst, e.g. the scan's ``t0`` lower
+    bound). If the envelope decays cleanly throughout — the Schwarzschild /
+    low-spin case — it returns the final time, i.e. no cap.
+
+    Persistence is the discriminant between a genuine tail and a spurious dip.
+    When the field is only *weakly* complex (low spin, ``|Im psi| << |Re psi|``)
+    the magnitude still has near-nodes where the dominant real part crosses zero;
+    the local slope swings shallow/positive there but recovers to ``-1/tau`` within
+    half an oscillation. A genuine tail, by contrast, is a permanent regime change.
+    The cap therefore only triggers when the smoothed local slope stays above
+    ``slope_frac`` of ``-1/tau_ref`` *continuously* for at least
+    ``persist_frac * tau_ref`` (longer than any near-node transient, shorter than
+    the post-transition tail); it returns the time that sustained shallow run
+    began. Any steep (QNM-rate) sample resets the run. This makes the cap robust
+    across the whole spin range without a spin-dependent threshold: validated to
+    leave every clean spin ``a/M in [0, 0.9]`` uncapped while still capping the
+    near-extremal ``a/M = 0.95`` tail at ~6.8 tau, for ``persist_frac in [1, 2]``.
+
+    The slope is measured by a sliding linear fit of ``log|psi|`` over a
+    half-width ``smooth_frac * tau_ref``. ``tau_ref`` is the qnm reference damping
+    time, used here purely to set the physical decay scale the field is checked
+    against (the same legitimacy as scaling the scan windows by it); no spin or
+    time is hand-pinned. The returned cap is data-driven from each field's own
+    envelope and is the late edge of the QNM-clean fitting region.
+    """
+    t = np.asarray(t, dtype=float)
+    E = np.abs(np.asarray(psi))
+    lE = np.log(np.maximum(E, 1e-300))
+    s_thr = slope_frac * (-1.0 / tau_ref)
+    hw = smooth_frac * tau_ref
+    t_persist = persist_frac * tau_ref
+    shallow_start = None  # start time of the current uninterrupted shallow run
+    for tt in t[t >= t_search_start]:
+        m = (t >= tt - hw) & (t <= tt + hw)
+        if int(np.count_nonzero(m)) < 5:
+            continue
+        A = np.vstack([t[m], np.ones(int(np.count_nonzero(m)))]).T
+        slope = float(np.linalg.lstsq(A, lE[m], rcond=None)[0][0])
+        if slope > s_thr:  # shallow: less negative than threshold => decay slowed
+            if shallow_start is None:
+                shallow_start = tt
+            elif tt - shallow_start >= t_persist:  # permanent regime change -> cap
+                return float(shallow_start)
+        else:
+            shallow_start = None  # steep QNM-rate decay resumed -> transient dip
+    return float(t[-1])

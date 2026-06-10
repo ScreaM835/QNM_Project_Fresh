@@ -433,6 +433,93 @@ across the full $[0,0.95]$ sweep $\le 0.2\%$; monotonic, no isolated blow-ups
 (any catastrophic draw diagnosed as extractor-window vs operator, exactly as
 the Phase A draw-71 audit).
 
+**Status: DONE.** Implemented in `kerr/scripts/kerr_sweep.py` (+
+`slurm_kerr_sweep.sh`); the tail-cap fix below lives in
+`kerr/src/extractor_m4.py` (`envelope_tail_cap`) and is wired into
+`kerr/scripts/kv3_qnm.py`'s `extract_fundamental`. The authoritative local run
+is 20 spins $a/M\in[0,0.95]$ at $N=801$ (810 s wall); `--quick` does 6 spins at
+$N=401$ as a smoke test.
+
+**B.9 GATE: PASS.** Population-mean $M\omega_{220}$ error $=4.7\times10^{-4}$
+($\le0.2\%$, a $4.3\times$ margin); $M\omega_{220}(a)$ monotonically increasing;
+all 20 finite, no blow-ups; every spin passes its own $\le1\%$ guard.
+
+| $a/M$ | $M\omega_{\rm ref}$ | $M\omega_{220}$ err | $\tau_{220}$ err | $n_{\rm obs}$ |
+|--:|--:|--:|--:|--:|
+| 0.00 | 0.373672 | $1.7\times10^{-5}$ | $3.2\times10^{-5}$ | 2 (real) |
+| 0.05 | 0.380146 | $1.0\times10^{-3}$ | $1.1\times10^{-2}$ | 4 |
+| 0.10 | 0.387018 | $3.1\times10^{-3}$ | $6.0\times10^{-3}$ | 4 |
+| 0.15 | 0.394333 | $2.7\times10^{-3}$ | $6.3\times10^{-3}$ | 4 |
+| 0.20 | 0.402145 | $7.6\times10^{-4}$ | $8.5\times10^{-3}$ | 4 |
+| 0.25 | 0.410518 | $2.0\times10^{-4}$ | $5.7\times10^{-3}$ | 4 |
+| 0.30 | 0.419527 | $3.9\times10^{-4}$ | $2.4\times10^{-3}$ | 4 |
+| 0.35 | 0.429264 | $2.2\times10^{-4}$ | $3.8\times10^{-4}$ | 4 |
+| 0.40 | 0.439842 | $2.0\times10^{-6}$ | $3.9\times10^{-4}$ | 4 |
+| 0.45 | 0.451402 | $1.3\times10^{-4}$ | $4.4\times10^{-4}$ | 4 |
+| 0.50 | 0.464123 | $1.6\times10^{-4}$ | $3.6\times10^{-4}$ | 4 |
+| 0.55 | 0.478235 | $1.1\times10^{-4}$ | $3.7\times10^{-4}$ | 4 |
+| 0.60 | 0.494045 | $1.1\times10^{-4}$ | $9.0\times10^{-4}$ | 4 |
+| 0.65 | 0.511969 | $1.8\times10^{-4}$ | $4.9\times10^{-5}$ | 4 |
+| 0.70 | 0.532600 | $5.1\times10^{-5}$ | $1.2\times10^{-3}$ | 4 |
+| 0.75 | 0.556817 | $1.0\times10^{-4}$ | $8.6\times10^{-4}$ | 4 |
+| 0.80 | 0.586017 | $3.9\times10^{-5}$ | $7.3\times10^{-4}$ | 4 |
+| 0.85 | 0.622635 | $4.4\times10^{-5}$ | $2.2\times10^{-4}$ | 4 |
+| 0.90 | 0.671614 | $3.2\times10^{-5}$ | $5.4\times10^{-4}$ | 4 |
+| 0.95 | 0.746320 | $3.0\times10^{-5}$ | $3.4\times10^{-5}$ | 4 |
+
+Two honest findings while building the sweep, both following the README's
+"diagnose any catastrophic draw as extractor-window vs operator" instruction:
+
+1. *Catastrophic draw at $a/M=0.95$ — extractor-window, not operator.* The first
+   full sweep was $19/20$ excellent ($10^{-6}$–$10^{-3}$) but $a/M=0.95$ returned
+   $M\omega=0.261$ ($65\%$ error), $\tau=99.9$ vs ref $18.8$. Audited exactly as
+   the Phase A draw-71 case, three independent checks place the fault in the
+   **fitting window, not the operator**: (i) the evolution is finite and stable
+   (`finite=True`, no boundary growth); (ii) the adjacent $a/M=0.9$ extracts to
+   $3\times10^{-5}$ — an operator bug near extremality could not spare $0.9$ and
+   strike only $0.95$; (iii) a manual window ladder recovers the fundamental
+   *cleanly* from the very same evolution — $M\omega$ err $9.1\times10^{-4}$ on
+   $[60,130]$, $1.3\times10^{-3}$ on $[55,120]$ — while windows starting
+   $\gtrsim70$ march the estimate $0.62\!\to\!0.43\!\to\!0.28\!\to\!0.07$ into the
+   tail. Root cause: the production end-window $t_e\in[10,14]\tau=[188,210]$
+   ($\tau=18.8$) sits **entirely past the QNM$\to$tail crossover**, which near
+   extremality moves in to $\sim6.7\tau\approx130$ (the slowly-decaying tail and
+   the nearly-degenerate $(2,2,1)$ overtone contaminate the ringdown far earlier
+   than at moderate spin). A log-envelope slope map confirms it: at $a/M=0.9$ the
+   decay holds the QNM rate to $13\tau$; at $0.95$ it collapses at $6.1\tau$
+   (slope$/s_{\rm QNM}$: $1.0\!\to\!0.61$ at $t{=}130\!\to\!0.07$ at $t{=}145$,
+   then reverses, the field on a $\sim1\%$-of-peak tail floor).
+
+2. *The fix is a data-driven envelope tail cap; getting its discriminant right
+   took a second pass.* `envelope_tail_cap` finds the latest time each field's
+   own $|\psi|$ still decays at $\ge0.7\times$ the QNM rate $-1/\tau_{\rm ref}$
+   (sliding log-slope fit, half-width $0.6\tau_{\rm ref}$); when that cap falls
+   inside the nominal window the complex scan is confined below it. Applied to
+   the $a>0$ branch only — the $a=0$ field is purely real and keeps the
+   Schwarzschild path verbatim. The **first** version (trip on two consecutive
+   shallow samples) recovered $0.95$ ($0.65\!\to\!1.8\times10^{-4}$) but a full
+   re-sweep exposed a **regression it introduced**: $a/M=0.05,0.10,0.15$ went to
+   `NaN` (all four observers capped at $\sim4.3\tau$, no window left). Diagnosed
+   honestly: at low spin the field is only *weakly* complex (imag/real
+   $0.2$–$0.64$), so $|\psi|$ still carries near-nodes from its dominant real
+   part; the local slope dips shallow at each node and the naive guard tripped on
+   a transient. `imag/real` is **not** a clean discriminant either ($a/M=0.3$–$0.4$
+   reach imag/real $\sim1.18$ yet partial-trip, while the genuine $0.95$ tail sits
+   at $0.97$). The physical discriminant is **persistence**: a near-node dip is
+   transient (steep QNM decay resumes within half a period) whereas a real tail is
+   a *permanent* regime change. The cap now triggers only when the shallow run is
+   sustained for $\ge1.5\,\tau_{\rm ref}$ (any steep sample resets it). Swept over
+   the whole grid this is decisive and threshold-insensitive: for
+   `persist_frac` $\in\{1,1.5,2\}$ **every** clean spin $a/M\in[0.05,0.90]$ is
+   left uncapped ($0/4$ trips) while $a/M=0.95$ still caps at $6.7$–$7.0\tau$
+   ($4/4$). Post-fix, $a/M=0.95$ extracts to $3.0\times10^{-5}$ and the three
+   low-spin fields are fully restored, with no change to the committed B.8 spins
+   ($a/M=0,0.5,0.9$ stay byte-identical — their caps land at the evolution end —
+   and KV.3 re-runs **PASS**). The residual largest per-spin errors (up to
+   $0.31\%$ at $a/M=0.10$) sit in this weakly-complex low-spin band, the genuinely
+   hardest regime for a complex envelope$+$phase fit; they are reported
+   transparently and remain far inside the population-mean gate ($0.047\%$).
+
 ---
 
 ## B.10 — paper integration (deferred to write-up phase)
