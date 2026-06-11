@@ -140,6 +140,86 @@ larger), but **not loosened** — consistent with the README's "do not soften".
 training+tuning effort: ship Phase A+B (classical solver) only; the neural solver
 becomes future work. No open-ended architecture grind.
 
+### Prior art, positioning & framework decision (literature review 2026-06-11)
+
+A focused review of the top-journal PINN/QNM and PINN-training literature was done
+**before writing any C.3 code** to confirm the approach. Findings:
+
+**1. Where the field is — and the gap we fill.** Essentially *all* prior PINN work
+on black-hole QNMs solves the **frequency-domain eigenvalue** problem (the radial,
+or 2-D radial+angular, Teukolsky ODE) and reads the complex frequency directly:
+- Luna, Calderón Bustillo, Seoane, Torres-Forné & Font, *PRD* **107**, 064025
+  (2023), "Solving the Teukolsky equation with PINNs" — Kerr QNMs, PyTorch, ≲1%.
+  The closest prior work; **frequency domain**.
+- Cornell, Ncube & Harmsen, *PRD* **106**, 124047 (2022) — eigenvalue solver,
+  <0.01%, but explicitly *"not recommended when considering overall performance"*
+  (slower than a continued fraction).
+- Cornell, Herbst, Ncube & Noshad (2024, arXiv:2402.11343) — RW + Teukolsky,
+  supervised vs unsupervised; **errors grow with spin $a$ and overtone $n$**.
+- Pombo & Pizzuti (2025, arXiv:2511.15796) "Teukolsky by Design / SpectralPINN" —
+  Chebyshev activations, separated + joint 2-D, hard Leaver normalisation, ~0.001%.
+- Gu et al. (2026, arXiv:2604.23625) "DeepOPiraKAN" — physics-informed *operator*
+  learning of the parameter-dependent Kerr spectrum: a **single** net spans the
+  full spin range, overtones to $n=7$, $\mathcal{O}(10^{-6})$.
+- Modified-gravity / higher-D variants (Luna et al. *PRD* **109**, 124064 (2024);
+  Ncube 2021; dRGT 2023; Lobos 2024; Ahmad 2026) — all frequency-domain.
+
+  **Our approach is different and, as far as this review found, novel: we solve the
+  TIME-DOMAIN ringdown waveform on a hyperboloidal slice and extract the QNM from
+  the waveform** (as the SW pipeline did). No prior work combines hyperboloidal
+  slicing with a PINN (the `hyperboloidal`+`neural network` search returns only
+  unrelated "hyperbolic-geometry" networks). This is a deliberate, harder choice:
+  the frequency-domain shortcut is easier and more accurate, **but it does not
+  produce a waveform and does not generalise** to the higher-dimensional,
+  non-separable evolution solver that is the project's second goal. The
+  time-domain route uniquely serves *both* stated goals — at the cost of landing
+  in the known-hard PINN regime (oscillatory, long-time, transport).
+
+**2. Framework: DeepXDE first (user-confirmed), pure-PyTorch deferred.** The
+parent SW PINN (`src/pinn.py`) is a DeepXDE harness that *already* implements the
+exact literature-standard mitigations for this hard regime; reusing it (swap in
+the Kerr complex residual + IC, drop the BCs) is the lowest-risk way to get an
+honest go/no-go. A clean-room PyTorch core is deferred to *if/when* DeepXDE works
+and we push to higher-D (where DeepXDE's low-D geometry machinery becomes the
+limiter). Proving the method in DeepXDE first does not block the package — we port
+a *working* method later, not a guess.
+
+**3. The literature-mandated ingredients (all but one already in `src/pinn.py`):**
+- **Temporal causality weighting** — Wang, Sankaran & Perdikaris (2022,
+  arXiv:2203.07404, "Respecting causality is all you need"). *Have it* (`CausalWeighter`).
+- **Curriculum / expanding time-windows (≈ sequence-to-sequence)** — Krishnapriyan,
+  Gholami, Zhe, Kirby & Mahoney, *NeurIPS* 2021 ("Characterizing possible failure
+  modes in PINNs"). *Have it* (curriculum windows).
+- **Gradient/loss balancing** — Wang, Teng & Perdikaris (2021, gradient
+  pathologies). *Have it* (`GradientBalancing`).
+- **Residual-adaptive resampling (RAD/R3)** — Wu et al. 2023; Daw et al. 2023.
+  *Have it* (`ResidualAdaptiveResampler`).
+- **Fourier-feature input embedding — REQUIRED, must ADD.** This is the single
+  highest-leverage missing piece for the oscillatory ringdown: Tancik et al. 2020;
+  and, directly on-point, Ding et al. (2024, arXiv:2409.03536) use Fourier-feature
+  PINNs for **time-domain wave** simulation precisely to beat spectral bias on
+  high-frequency propagation. The SW `pinn.py` did **not** have RFF; C.3 adds it.
+- **FP64 throughout — MANDATE.** Xu et al. (2025, arXiv:2505.10949, "FP64 is All
+  You Need") show FP32 + L-BFGS *prematurely* satisfies its convergence test and
+  freezes the net in a spurious "failure mode"; FP64 removes it. Our config is
+  already `dtype: float64`; C.3 keeps it and the gate treats FP32 as out of spec.
+
+**4. Documented fallback architecture (bounds the one-architecture abort policy).**
+If a plain MLP + Fourier-features + causal weighting stalls at C.3, the *single*
+pre-registered alternative is a spectral/operator backbone shown to handle wave
+equations: **NeuSA** (Neuro-Spectral Architectures, *NeurIPS* 2025,
+arXiv:2509.04966 — spectral basis + Neural-ODE, explicitly for linear/nonlinear
+wave equations, overcomes spectral bias and enforces causality) or **PINNsFormer**
+(2023). Naming it here keeps the abort policy honest: at most one fallback, not an
+open-ended grind.
+
+**5. Value-proposition correction (honesty).** Per Cornell 2022, a **single-config**
+PINN is *slower* than one FD/Leaver solve — so **C.3 is an accuracy go/no-go, not a
+speed claim**. The genuine speed win is **amortised** and only claimed at C.4/C.5:
+train once, evaluate any spin cheaply (viability shown by Gu 2026's single-net
+spin sweep and the P²INN parametric scheme, Cho et al. 2024, arXiv:2408.09446).
+C.5 must benchmark PINN inference against *many* FD solves, never one.
+
 ---
 
 ## C.0 (SUPERSEDED by C.0′ — historical hybrid record, no model code)
@@ -340,25 +420,33 @@ the PINN never trains on the fields, so "train/val/test" here just labels which
 spins/IDs are used to *grade* generalisation.
 
 ## C.3 — Teukolsky residual module + single-config PINN proof (CPU)
-**File.** `kerr/src/teukolsky_residual.py` (torch), `kerr/src/kerr_pinn.py`
-(network + training loop), `kerr/scripts/train_kerr_pinn.py`.
+**File.** `kerr/src/teukolsky_residual.py` (torch coefficient/residual module),
+`kerr/src/kerr_pinn.py` (DeepXDE model builder: net + IC + residual wiring),
+`kerr/scripts/train_kerr_pinn.py`. **Framework: DeepXDE** (reuse the SW harness in
+`src/pinn.py` — copy to `kerr/src/pinn.py` — for the proven causal/grad-balance/
+resampler/curriculum machinery; a clean-room PyTorch core is deferred per C.0′ §
+"framework decision").
 **Implements.** (a) A torch module that evaluates the closed-form coefficients
 $\lambda_{\rm in},\lambda_{\rm out},c_\Pi,c_\Phi,c_\Psi$ at arbitrary
 $(\sigma,a/M)$ — **ported verbatim** from `build_teukolsky_op` (validated forms),
 unit-tested to match it to $\le10^{-10}$ on the corpus grid. (b) The complex
-second-order residual $\mathcal{R}[\Psi]$ via autodiff (two real channels),
-plus the time-symmetric Gaussian IC loss; **no BC term** (hyperboloidal outflow),
-**no FD field in the loss**. (c) A **single-config** PINN (one fixed
-$(a/M,r_0,w)$) with Fourier-feature embedding + causal weighting (ported from
-`src/pinn.py`), Adam→L-BFGS. Prove it at $a/M=0$ (real field, sanity) and
-$a/M=0.7$ (genuinely complex).
-**Acceptance.** For each of the two configs, the PINN's scri waveform matches the
-corresponding **FD corpus sample** to field rel-$L^2 \le 5\%$, **and** the QNM
-extracted from the PINN waveform (Phase B extractor) matches `qnm`/Leaver
-($M\omega \le 1\%$). Coefficient module matches `build_teukolsky_op` to
-$\le10^{-10}$. Written to `kerr/outputs/phase_c/pinn_single_{a0,a07}.json`. One
+second-order residual $\mathcal{R}[\Psi]$ via autodiff (two real channels:
+$p,q$), plus the time-symmetric Gaussian IC loss; **no BC term** (hyperboloidal
+outflow), **no FD field in the loss**. (c) A **single-config** PINN (one fixed
+$(a/M,r_0,w)$) with **Fourier-feature input embedding (REQUIRED — Tancik 2020 /
+Ding 2024 for time-domain waves; the SW harness lacks it, add it)** + causal
+weighting (Wang 2022) + curriculum windows (Krishnapriyan 2021), Adam→L-BFGS, and
+**FP64 throughout (mandate — Xu 2025; FP32 is out of spec)**. Prove it at $a/M=0$
+(real field, sanity) and $a/M=0.7$ (genuinely complex).
+**Acceptance (accuracy go/no-go, NOT speed — a single config is expected slower
+than one FD solve, Cornell 2022).** For each of the two configs, the PINN's scri
+waveform matches the corresponding **FD corpus sample** to field rel-$L^2 \le 5\%$,
+**and** the QNM extracted from the PINN waveform (Phase B extractor) matches
+`qnm`/Leaver ($M\omega \le 1\%$). Coefficient module matches `build_teukolsky_op`
+to $\le10^{-10}$. Written to `kerr/outputs/phase_c/pinn_single_{a0,a07}.json`. One
 commit. **This is the CPU go/no-go before any GPU spend** — if a single config
-cannot be solved by a PINN, stop and reconsider.
+cannot be solved by a PINN, stop and reconsider (then the pre-registered fallback
+in C.0′ §4, NeuSA/PINNsFormer, before abort).
 
 ## C.4 — parametric PINN across spin (GPU)
 **File.** `kerr/scripts/train_kerr_pinn.py` (extended), config
