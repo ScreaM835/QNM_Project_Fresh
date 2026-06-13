@@ -1,0 +1,49 @@
+# Label-free physics-refinement of the SW hybrid (k4 prior, 16x cheaper).
+#
+# Same FNO + coarse-prior input as hybrid_sw_train_k4.yaml, but the loss DROPS
+# the fine-FD supervised MSE and uses ONLY the Zerilli PDE residual of the
+# reconstructed field u = coarse_prior + delta, plus a small ||delta||^2 anchor.
+# This is the label-free "physics-informed super-resolution" recipe (PINO-style)
+# that transfers to higher dimensions where fine FD cannot be generated.
+#
+#   loss = data_weight*MSE(delta vs fineFD)         # 0.0 -> label-free
+#        + physics_weight*||Zerilli residual(u)||^2 # the physics signal
+#        + anchor_weight*||delta||^2                # keep u near the cheap prior
+#
+# NB: the residual uses a 2nd-order stencil on the FINE grid, which is CONSISTENT
+# with matching the fine-FD reference (its ~1% time-discretization sets the
+# floor). Upgrade to the high-order DRP7 stencil only if we later need to beat
+# fine FD. Eval (field rel-L2 vs fine FD + M1-M5 QNM) is unchanged.
+
+experiment:
+  name: hybrid_sw_physics_k4
+
+dataset:
+  path: outputs/hybrid/dataset_sw_k4.npz
+
+fno:
+  modes_t: 16
+  modes_x: 32
+  hidden_channels: 32
+  n_layers: 4
+  domain_padding: 0.10
+  positional_embedding: grid
+
+train:
+  batch_size: 8
+  epochs_adam: 100
+  lr_adam: 1.0e-3
+  weight_decay: 1.0e-6
+  epochs_lbfgs: 30
+  lbfgs_max_iter: 20
+  lbfgs_chunk_size: 8
+  seed: 1234
+  device: cuda
+  loss:
+    data_weight: 0.0        # LABEL-FREE: no fine-FD supervision
+    physics_weight: 1.0     # Zerilli PDE residual of u = prior + delta
+    anchor_weight: 0.1      # ||delta||^2 keeps u near the cheap coarse prior
+
+logging:
+  log_every: 10
+  out_dir: outputs/hybrid/fno_sw_physics_k4
