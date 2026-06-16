@@ -142,8 +142,8 @@ forecast for next-generation detectors \citep{Berti2007ringdown},
 at which point the forward--inverse precision gap will become
 a quantitative limiting factor.
 
-Six limitations of this study fall into two groups: three are scope
-choices, three are substantive. The scope choices are the fixed Schwarzschild background, the
+Six limitations of this study fall into two groups, three
+scope choices and three substantive. The scope choices are the fixed Schwarzschild background, the
 single-channel quadrupole wavefunction $\Phi(\xq,t)$, and the
 single noise realisation per variant. Each lifts to a known
 extension. Kerr follows by substituting the Teukolsky operator for the
@@ -163,6 +163,32 @@ ill-conditioning of ESPRIT (M3) on a $\Phi_\theta(\xq,t)$ whose
 dominant component is already a clean damped sinusoid, which
 prevents M3 from contributing to the primary numbers and which
 we report in Appendix~\ref{app:esprit} only.
+
+A related scope point concerns the overtone itself.
+The M4 template of Eq.~\eqref{eq:two-mode} fits the fundamental
+and the first overtone simultaneously, and we credit this
+two-mode structure for the sub-percent fundamental-mode accuracy
+quoted in Sec.~\ref{sec:res-fwd} (the Giesler-style mechanism: the
+overtone slot absorbs $n=1$ contamination that would otherwise
+bias a single-mode template; see \citet{Giesler2019overtones}).
+Reporting $(M\omega_1,\tau_1/M)$ as a separate result, however,
+is not warranted in the present setup: applied across all
+forward, inverse and curriculum variants, the M4 plateau-mean
+overtone recovers $M\omega_1$ no better than $\sim\!20\%$ in
+the most favourable window choice, regardless of estimator
+hyperparameters. The proximate cause is that our
+Gaussian wave-packet initial data of Sec.~\ref{sec:fwd-problem}
+excites $n=1$ at far lower amplitude than the
+numerical-relativity merger remnants on which the Giesler
+recipe was demonstrated. Reproducing Giesler-style overtone
+resolution would therefore require initial data
+chosen to excite higher overtones (or a binary-merger-conditioned
+training distribution), which is a natural target for
+follow-up work and is outside the scope of the present
+methods-paper benchmark. The currently active controversy over
+whether the GW150914 overtone constitutes a genuine detection
+\citep{Cotesta2022overtones,Isi2021priors} provides additional
+motivation for treating quoted overtone parameters with care.
 
 A natural next step is to recast the inverse problem as a
 Bayesian posterior over $(M,\omega,\tau)$ with the trained PINN
@@ -189,3 +215,111 @@ which the network must resolve the early-time pulse before the
 late-time decay can be trusted; and the soft Sommerfeld boundary
 enforcement of Sec.~\ref{sec:fwd-pinn} could be replaced by the
 hard output-transform construction of \citet{Luna2022teukolskypinn}.
+
+The Fourier neural operator surrogate of
+Sec.~\ref{sec:res-fno} differs from the three PINN modalities
+in the unit of work that the network amortises. Each PINN
+trains on one Zerilli problem and feeds its converged field
+into the post-hoc QNM extractors. The FNO trains once on
+$1{,}000$ initial-data draws and then predicts the full
+spacetime field for any in-distribution draw with a single
+forward pass, after which the same extractors of
+Sec.~\ref{sec:qnm-methods} apply unchanged. On the canonical
+BH the v4 FNO recovers $\omega$ to $0.11\%$ and $\tau$ to
+$0.10\%$, a factor of $\sim\!6$ in $\omega$ and $\sim\!20$ in
+$\tau$ larger than the FD reference's own extraction error
+($0.019\%$ and $0.005\%$ respectively); the residual gap is
+set by the bulk $9.30\times 10^{-4}$ field RMSD of the
+surrogate, not by the M4 algorithm. On the $100$-BH
+in-distribution population the FNO and the FD reference are
+statistically indistinguishable at median $\omega$ error
+$0.343\%$ versus $0.335\%$ and median $\tau$ error $0.940\%$
+versus $0.661\%$, separated by less than the binomial standard
+error on $n \approx 60$ valid draws. At the larger observer
+position $\xq = 10\,M$ neither source returns a valid M4
+plateau, locating the extraction failure in the joint
+window--observer geometry rather than in the surrogate. The
+five modalities therefore sit at distinct points on a
+precision--amortisation plane. The forward PINN reaches
+$0.04\%$ in $\omega$ at the cost of one bespoke L-BFGS run per
+BH, the inverse PINN reaches $0.30\%$ while simultaneously
+recovering $M$, the curriculum PINN improves the per-window
+error on the earliest sub-domain by $\sim\!37\%$ without
+improving the global extraction, the end-to-end FNO reaches
+$0.34\%$ on the population median with a single forward pass
+per BH, and the hybrid coarse-FD + neural-residual surrogate
+matches the FD reference's own M4 plateau floor at the
+$\xq = 2\,M$ observer at a smaller per-event inference cost
+than the end-to-end FNO and with a network almost two orders of
+magnitude smaller.
+The end-to-end FNO matches the inverse-PINN observation-noise
+floor of $1\%$ Gaussian noise at a per-BH cost two to three
+orders of magnitude smaller than any per-BH PINN.
+
+The hybrid coarse-FD + neural-residual surrogate of
+Sec.~\ref{sec:hyb-method} occupies a third position distinct
+from both the per-BH PINNs and the end-to-end FNO. The classical
+coarse-FD solve on $(\Delta x,\Delta t)_{\mathrm{c}} = (0.8,0.4)\,M$
+at refinement ratio $k = 4$ --- one sixty-fourth of the fine-FD
+cost --- carries the wave propagation, and the 2-D FNO
+$\mathcal{H}_{\theta}$ predicts only the discretisation residual
+of this deliberately weak prior, trained from a label-free
+Richardson extrapolation of two coarse solves rather than from
+the fine-FD field and gated to the under-resolved wavefronts by
+a parameter-free gradient gate. This lets a $1.13\times 10^{6}$
+parameter network (almost two orders of magnitude smaller than the
+end-to-end FNO of Sec.~\ref{sec:fno-method}) cut the canonical-BH
+bulk-field RMSD from $6.95\times 10^{-3}$ on the coarse-up
+baseline to $6.85\times 10^{-4}$, and the population MSE across
+the 100-BH test set by a factor of $\sim\!79$. The gain is
+structural rather than incidental: the coarse-prior error is
+strongly correlated with the prior gradient (log--log Pearson
+$r = 0.917$), so the gradient gate routes the network's capacity
+onto the wavefronts where the prior fails --- a $12\times$ error
+reduction in the top gradient decile --- while holding its
+residual speckle in the smooth interior and causal exterior to
+the $10^{-6}$ level, three orders of magnitude below the
+correction. The QNM-extraction story at the observer
+$\xq = 2\,M$ is the
+opposite of the field story. All three sources --- hybrid,
+coarse-up baseline, and fine FD reference --- hit the same M4
+plateau floor on the canonical BH and on the median of the
+100-BH population (median $|\Delta\omega/\omega| \approx 0.05\%$
+on both hybrid and baseline, against $0.014\%$ on the fine FD
+reference), so the hybrid
+is not the median winner and shows no QNM benefit at this
+observer; the off-floor outliers in the population are
+ill-conditioned single-window fits that appear on the fine FD
+reference as well, not a hybrid effect. The hybrid surrogate
+therefore sits at the inference-fastest, smallest-network corner
+of the precision--amortisation plane, and its field-RMSD gain
+over the coarse-up baseline does not translate into a median QNM
+gain at this observer because the coarse-up extraction is
+already at the M4 plateau floor.
+
+The v4 FNO ablation of Sec.~\ref{sec:res-fno} also yields a
+methodological observation transferable to the operator-learning
+literature on hyperbolic PDEs. The bulk-field RMSD across the
+three versions of the surrogate (Table~\ref{tab:fno-versions})
+is not monotone with the QNM extraction accuracy. The v2
+configuration with the shortest training window has the lowest
+bulk RMSD but the worst QNM fit, and the v4 configuration has
+a slightly higher bulk RMSD than v3 but two orders of magnitude
+better canonical-BH QNM accuracy. The two new v4 loss terms are
+what convert v3 into v4. They are direct $L^{2}$ supervision on
+the 1-D observer slice $\Phi(\xq,t)$ that the QNM extractor
+reads, and a ramp-weighted field $L^{2}$ that puts $\sim 50\times$
+more pressure on the ringdown tail than on the prompt pulse.
+They make plain that the figure of merit for an
+operator surrogate trained for ringdown spectroscopy is not the
+gridwise RMSD but the downstream estimator accuracy on the slice
+that the post-processing pipeline consumes. A natural extension
+is to fold the inverse problem of Sec.~\ref{sec:res-inv} into
+the operator setting itself: a network that learns the inverse
+operator $\mathcal{G}^{-1}_{\theta}\colon \Phi(\xq,t) \mapsto M$
+on the same training distribution would amortise the per-event
+inverse PINN training cost in the same way that the v4 forward
+FNO amortises the per-event forward PINN training cost, and the
+plateau diagnostic of Sec.~\ref{sec:plateau} would carry over
+to give an a-posteriori estimate of the population-level
+systematic uncertainty on $M$.

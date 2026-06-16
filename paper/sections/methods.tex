@@ -787,6 +787,26 @@ landscape; the price is that the initial conditions of every
 window after the first are themselves PINN outputs, and so
 inherit the residual error of the previous window.
 
+\paragraph{Relation to causal training.} The hard-window
+curriculum used here is the discrete limit of the continuous
+causal-training scheme of \citet{Wang2022causal}, in which the
+PDE-residual loss is reweighted by a soft causal envelope
+$w(t) = \exp\!\bigl(-\varepsilon \int_{t_{\min}}^{t}
+\mathcal{R}(\tau)\,d\tau\bigr)$ that suppresses gradient flow
+from time $t$ until the residual $\mathcal{R}$ at all earlier
+times has been driven down. Both strategies diagnose the same
+pathology---a vanilla PINN can minimise its total residual by
+fitting the late-time decay before the early-time pulse, in
+violation of the underlying causal structure---and both impose
+an earliest-first ordering on the optimisation. The hard
+partition adopted here trades the continuous reweighting of
+\citet{Wang2022causal} for a discrete handoff between $K$
+independent sub-networks: this couples cleanly to the
+three-window soft-overlap variant of
+Sec.~\ref{sec:res-cur} ($\Delta_{\mathrm{ov}}=10\,M$,
+$\lambda_{\mathrm{cont}}=10$), which sits between the hard
+partition and the fully soft causal envelope.
+
 \paragraph{Hard partition.} The general $K$-window curriculum
 splits the temporal domain at $K-1$ split points
 $t_{\min} < t_{1} < \dots < t_{K-1} < t_{\max}$ into $K$ disjoint
@@ -1014,6 +1034,855 @@ Eq.~\eqref{eq:cur-blend} is applied to the final stitched field.}
 \end{figure}
 
 % --------------------------------------------------------------
+\subsection{Fourier neural operator surrogate}
+\label{sec:fno-method}
+
+The forward, inverse and curriculum PINNs of
+Secs.~\ref{sec:fwd-pinn}--\ref{sec:cur-pinn} each train a network
+that solves a \emph{single} instance of the Zerilli problem,
+parametrised by one mass $M$ and one Gaussian initial pulse
+$(x_{0},\sigma)$. A new initial pulse, or a different mass,
+requires a new $\mathcal{O}(10^{4})$-iteration L-BFGS run from a
+fresh random initialisation. The Fourier neural operator
+\citep{Li2021fno,Kovachki2023neuralop}, henceforth FNO, instead
+trains a single network once on a population of $1{,}000$
+$(M,x_{0},\sigma)$ draws and then predicts $\Phi(x,t)$ on the
+full spacetime grid for an unseen draw with one forward pass.
+This subsection describes the surrogate as a fourth modality
+that produces the same field $\Phi(\xq,t)$ on which the
+QNM extractors of Secs.~\ref{sec:qnm-methods}--\ref{sec:plateau}
+operate, and the reporting convention of
+Sec.~\ref{sec:reporting} applies unchanged. The architecture and
+loss pipeline are summarised in Fig.~\ref{fig:fno-arch}.
+
+\begin{figure}[!htbp]
+\centering
+\resizebox{0.68\textwidth}{!}{%
+\begin{tikzpicture}[
+  every node/.style={font=\small},
+  inp/.style={rectangle, draw, fill=blue!10, rounded corners=2pt,
+              minimum height=7mm, minimum width=88mm, inner sep=3pt,
+              align=center, font=\small},
+  stack/.style={rectangle, draw=none, fill=none,
+                inner sep=2pt, align=center, font=\small},
+  stackbg/.style={rectangle, draw, fill=blue!5, rounded corners=3pt,
+                  inner sep=4pt},
+  sconv/.style={rectangle, draw, fill=gray!16, rounded corners=2pt,
+                minimum height=9mm, minimum width=96mm, inner sep=3pt,
+                align=center, font=\small},
+  sconvhdr/.style={rectangle, draw=none, fill=none,
+                   inner sep=2pt, align=center},
+  sconvbg/.style={rectangle, draw, fill=gray!18, rounded corners=3pt,
+                  inner sep=5pt},
+  outn/.style={rectangle, draw, fill=orange!22, rounded corners=2pt,
+               minimum height=8mm, minimum width=68mm, inner sep=3pt,
+               align=center, font=\small},
+  loss/.style={rectangle, draw, fill=green!12, rounded corners=2pt,
+               minimum height=6mm, minimum width=88mm, inner sep=2pt,
+               align=center, font=\footnotesize},
+  lossbg/.style={rectangle, draw, fill=green!5, rounded corners=3pt,
+                 inner sep=4pt},
+  ltot/.style={rectangle, draw, fill=green!28, rounded corners=2pt,
+               minimum height=9mm, minimum width=68mm, inner sep=3pt,
+               align=center, font=\small},
+  arr/.style={->, >=stealth, thick, black!75},
+  arrm/.style={->, >=stealth, thin, gray!75},
+  arrt/.style={->, >=stealth, thick, gray!55!black, dashed},
+]
+  % ============ four-channel input stack ============
+  \node[stack] (stackhdr) {%
+    \textbf{four-channel input on fine grid}\;
+    $X\in\mathbb{R}^{4\times N_{t}\times N_{x}}$};
+  \node[inp, below=2mm of stackhdr]
+        (c0) {ch~0: $\Phi(x,0)$ broadcast in $t$};
+  \node[inp, below=1mm of c0]
+        (c1) {ch~1: $\partial_{t}\Phi(x,0)$ broadcast in $t$};
+  \node[inp, below=1mm of c1]
+        (c2) {ch~2: $V_{\ell}(x;M)$ broadcast in $t$};
+  \node[inp, below=1mm of c2]
+        (c3) {ch~3: $M$ broadcast over $(x,t)$};
+  \begin{scope}[on background layer]
+    \node[stackbg, fit=(stackhdr)(c0)(c3)] (stackbg) {};
+  \end{scope}
+
+  % ============ FNO operator ============
+  \node[sconvhdr, below=8mm of stackbg.south] (sconvhdrn) {%
+    \begin{minipage}{96mm}
+      \centering
+      \textbf{neural solution operator $\mathcal{G}_{\theta}$ — four-layer 2-D FNO}\\[1mm]
+      hidden channels $h=96$,\;
+      Fourier modes $(K_{t},K_{x})=(64,64)$
+    \end{minipage}};
+  \node[sconv, below=3mm of sconvhdrn]
+        (lift)  {lift $1{\times}1$ conv: $4{\to}96$ channels};
+  \node[sconv, below=2mm of lift]
+        (sb)    {$L=4 \times$ spectral block\\
+                 $v^{(\ell+1)}=\mathrm{GELU}\bigl(
+                  \mathcal{F}^{-1}[R^{(\ell)}{\odot}\mathcal{F}v^{(\ell)}]
+                  + W^{(\ell)}v^{(\ell)}\bigr)$};
+  \node[sconv, below=2mm of sb]
+        (proj)  {projection $1{\times}1$ conv: $96{\to}1$ channel};
+  \draw[arr] (lift) -- (sb);
+  \draw[arr] (sb) -- (proj);
+  \begin{scope}[on background layer]
+    \node[sconvbg, fit=(sconvhdrn)(lift)(proj)] (fnoall) {};
+  \end{scope}
+
+  \draw[arr] (stackbg.south) -- (fnoall.north);
+
+  % ============ output field ============
+  \node[outn, below=8mm of fnoall.south, fill=orange!45]
+        (phi) {$\Phi_{\theta}(x,t)$ — predicted field on $(N_{t}{\times}N_{x})$ fine grid};
+  \draw[arr] (fnoall.south) -- (phi.north);
+
+    % ============ six loss terms (training only) ============
+    \node[stack, below=8mm of phi] (losshdr) {%
+      \textbf{six weighted loss terms}\\[-0.5mm]
+      training only};
+    \node[loss, below=2mm of losshdr] (lf)
+      {$\mathcal{L}_{\mathrm{field}}$ — relative $L^{2}$ on $\Phi$};
+    \node[loss, below=1mm of lf] (lh1)
+      {$\mathcal{L}_{H^{1}}$ — gradients $(\partial_{t}\Phi,\partial_{x}\Phi)$};
+    \node[loss, below=1mm of lh1] (lring)
+      {$\mathcal{L}_{\mathrm{ring}}$ — ringdown window $t\ge\tring$};
+    \node[loss, below=1mm of lring] (lobs)
+      {$\mathcal{L}_{\mathrm{obs}}$ — observer column $x=\xq$};
+    \node[loss, below=1mm of lobs] (ltw)
+      {$\mathcal{L}_{\mathrm{tw}}$ — time-window ramp $w(t)$};
+    \node[loss, below=1mm of ltw] (lpde)
+      {$\mathcal{L}_{\mathrm{pde}}$ — FD residual of the wave eq.};
+    \begin{scope}[on background layer]
+      \node[lossbg, fit=(losshdr)(lf)(lpde)] (lossall) {};
+    \end{scope}
+
+    \draw[arrt] (phi.south) -- (lossall.north);
+
+    % aggregator below the loss stack
+    \node[ltot, below=8mm of lossall.south]
+        (lt) {$\mathcal{L}_{\mathrm{FNO}}
+              =\sum_{k} \lambda_{k}\,\mathcal{L}_{k}$
+              \quad (Eq.~\eqref{eq:fno-loss})};
+    \draw[arrt] (lossall.south) -- (lt.north);
+\end{tikzpicture}%
+}
+\caption{FNO surrogate architecture used in this work. The
+four-channel input stack
+$(\Phi(x,0), \partial_{t}\Phi(x,0), V_{\ell}(x;M), M)$ is lifted
+to $96$ channels by a $1{\times}1$ convolution and passed through
+four spectral-convolution blocks, each retaining
+$64{\times}64$ Fourier modes along $(x,t)$ and combined with a
+$1{\times}1$ skip convolution and a GELU nonlinearity, before a
+$1{\times}1$ projection back to the single output channel
+$\Phi_{\theta}(x,t)$. The output field feeds six weighted loss
+terms summed into $\mathcal{L}_{\mathrm{FNO}}$
+(Eq.~\eqref{eq:fno-loss}), of which $\mathcal{L}_{\mathrm{obs}}$
+and $\mathcal{L}_{\mathrm{tw}}$ are the QNM-targeted terms
+introduced in the v4 configuration of
+Sec.~\ref{sec:res-fno}. The total parameter count is
+$\sim\!7.8\times 10^{7}$.}
+\label{fig:fno-arch}
+\end{figure}
+
+\paragraph{Operator and discretisation.} We learn the parametric
+solution operator
+\begin{equation}
+  \mathcal{G}_{\theta}\colon\;
+  \bigl(\Phi(\cdot,0),\,\partial_{t}\Phi(\cdot,0),\,
+        V_{\ell}(\cdot\,;M),\,M\bigr)
+  \;\longmapsto\;
+  \Phi(x,t),
+  \label{eq:fno-operator}
+\end{equation}
+discretised on a uniform $N_{x}\times N_{t} = 401\times 401$
+grid with $\Delta x = 0.5\,M$ and $\Delta t = 0.25\,M$, covering
+$x \in [-50,150]\,M$ and $t \in [0,100]\,M$. The input is a
+four-channel rank-3 tensor stacked along the channel axis: the
+field initial condition $\Phi(x,0)$, the outgoing initial
+velocity $\partial_{t}\Phi(x,0) = -\partial_{x}\Phi(x,0)$, the
+Zerilli potential $V_{\ell}(x;M)$ of Eq.~\eqref{eq:V-zerilli}
+broadcast in $t$, and the scalar mass $M$ broadcast across the
+full $(x,t)$ grid. The output is the single-channel field
+$\Phi(x,t)$ on the same grid.
+
+\paragraph{Architecture.} The configuration adopted for the
+primary numbers (denoted \texttt{v4} in
+Sec.~\ref{sec:res-fno}) is a four-layer 2-D FNO with
+$96$ hidden channels, $64$ retained Fourier modes along $t$,
+$64$ retained Fourier modes along $x$, GELU activations, a
+domain-padding fraction of $0.10$, and grid positional
+embeddings, for $\sim\!7.8\times 10^{7}$ trainable parameters.
+The discretisation-invariance of the FNO
+\citep{Li2021fno,Kovachki2023neuralop} means that the trained
+operator can in principle be evaluated on a finer grid than the
+training resolution; we exercise this property in
+Sec.~\ref{sec:res-fno} on grids ranging from $201^{2}$ to
+$801^{2}$ over the same physical box.
+
+\paragraph{Why FNO and not DeepONet?} The other widely used
+neural-operator architecture is DeepONet
+\citep{Lu2021deeponet}, which factorises the operator into a
+branch network acting on the input function sampled at a fixed
+set of sensor points and a trunk network acting on the output
+query coordinates. For Zerilli ringdown the relevant input is
+the full initial-data pair $(\Phi(\cdot,0),\partial_{t}\Phi(\cdot,0))$
+plus the potential $V_{\ell}(\cdot;M)$, all of which are
+naturally functions of $x$ on a regular grid: a 2-D spectral
+operator exploits this structure directly through FFTs and
+benefits from the discretisation invariance demonstrated in
+Sec.~\ref{sec:res-fno}, whereas a DeepONet would commit at
+training time to a fixed sensor grid and would have to learn
+the ringdown decay through pointwise trunk evaluations rather
+than through global spectral truncation. The two architectures
+are comparable in expressive power on benchmark PDE problems
+\citep{Kovachki2023neuralop,Lu2021deeponet}; we therefore make
+the practical choice of FNO and leave a DeepONet comparison
+on the same Zerilli population to future work.
+
+\paragraph{Training distribution.} The training distribution
+covers $M \sim \mathrm{Unif}[0.8,\,1.2]$,
+$x_{0} \sim \mathrm{Unif}[-10,\,30]\,M$, and
+$\sigma \sim \mathrm{Unif}[3,\,8]\,M$. We draw $1{,}000$ training,
+$100$ validation and $100$ test triples with seed $1234$; for
+each draw the target field is the same RK4 method-of-lines
+solver of Appendix~\ref{app:fd} that supplies the FD reference
+to the PINNs, run on the same $401\times 401$ grid as the FNO
+input--output. The canonical evaluation BH used for the
+single-instance diagnostics below is $(M, x_{0}, \sigma) = (1,4,5)$.
+
+\paragraph{Loss.} The training loss combines five terms,
+\begin{equation}
+  \mathcal{L}_{\mathrm{FNO}}
+  = \lambda_{f}\,\mathcal{L}_{\mathrm{field}}
+  + \lambda_{H^{1}}\,\mathcal{L}_{H^{1}}
+  + \lambda_{\mathrm{ring}}\,\mathcal{L}_{\mathrm{ring}}
+  + \lambda_{\mathrm{obs}}\,\mathcal{L}_{\mathrm{obs}}
+  + \lambda_{\mathrm{tw}}\,\mathcal{L}_{\mathrm{tw}}
+  + \lambda_{\mathrm{pde}}\,\mathcal{L}_{\mathrm{pde}},
+  \label{eq:fno-loss}
+\end{equation}
+with $\mathcal{L}_{\mathrm{field}}$ the relative $L^{2}$ field
+error, $\mathcal{L}_{H^{1}}$ the analogous $H^{1}$ seminorm
+penalising mis-resolved spatial and temporal derivatives,
+$\mathcal{L}_{\mathrm{ring}}$ the field $L^{2}$ restricted to
+the ringdown window $t \in [\tring,\,t_{\max}]$ with
+$\tring = 18\,M$, $\mathcal{L}_{\mathrm{obs}}$ the 1-D
+$L^{2}$ along the observer slice $x = \xq = 2\,M$ that the QNM
+extractors actually read, $\mathcal{L}_{\mathrm{tw}}$ the
+field $L^{2}$ weighted by a smooth ramp
+$w(t) = 1 + \beta\,\mathrm{ramp}(t;\,t_{a},t_{b})$ that grows
+from $1$ at $t \le t_{a} = 10\,M$ to $1 + \beta$ at
+$t \ge t_{b} = 15\,M$ with $\beta = 50$, and
+$\mathcal{L}_{\mathrm{pde}}$ a soft Zerilli residual evaluated
+by central finite differences on the output grid. The weights
+$(\lambda_{f},\lambda_{H^{1}},\lambda_{\mathrm{ring}},
+  \lambda_{\mathrm{obs}},\lambda_{\mathrm{tw}},
+  \lambda_{\mathrm{pde}})
+  = (1,\,0.20,\,10,\,5,\,1,\,0.05)$
+are the v4 values; the prior configurations differ from this
+choice by one or two terms as set out in
+Table~\ref{tab:fno-versions} of Sec.~\ref{sec:res-fno}. The
+observer slice loss $\mathcal{L}_{\mathrm{obs}}$ and the
+time-weighted loss $\mathcal{L}_{\mathrm{tw}}$ are the two
+terms introduced in v4 specifically to target QNM extraction
+fidelity; the empirical effect of their addition is reported in
+the ablation of Sec.~\ref{sec:res-fno}.
+
+\paragraph{Optimiser.} Training uses Adam with learning rate
+$10^{-3}$, weight decay $10^{-6}$, batch size $4$,
+cosine-annealed for $300$ epochs, with gradient clipping at $1.0$
+and \texttt{float32} precision. The Adam-only schedule is
+standard for FNO training
+\citep{Li2021fno,Kovachki2023neuralop}; we do not follow with
+an L-BFGS phase because the memory and wall-clock cost of
+L-BFGS on $\sim\!7.8\times 10^{7}$ parameters is prohibitive
+on a single A100 (per-iteration activation requirement scales
+as the chunk size times the full spatio-temporal grid).
+
+\paragraph{Observer location.} All FNO numbers in
+Sec.~\ref{sec:res-fno} are reported at $\xq = 2\,M$, in
+contrast to the $\xq = 10\,M$ adopted throughout the PINN
+results of Secs.~\ref{sec:res-fwd}--\ref{sec:res-inv}. The
+choice is forced by the joint window $t \in [10,100]\,M$ used
+for FNO QNM extraction. At $\xq = 10\,M$ the ringdown amplitude
+$\propto e^{-(t-t_{\mathrm{peak}})/\tau_{0}}$ is below the
+field-error floor of both the FNO surrogate and the FD
+reference itself for most of the window, so the M4 plateau scan
+of Sec.~\ref{sec:plateau} returns no plateau for the FD ground
+truth as well as for the FNO. We demonstrate this shared
+failure mode in Sec.~\ref{sec:res-fno} as part of the
+$\xq$-sweep diagnostic. At $\xq = 2\,M$ the same M4 scan
+returns a clean plateau for the FD reference and an
+adjacent plateau for the FNO, and the two damping-time
+estimates lie within the FD reference's own fit-window
+systematic.
+
+% --------------------------------------------------------------
+\subsection{Hybrid coarse-FD + neural-residual surrogate}
+\label{sec:hyb-method}
+
+The FNO surrogate of Sec.~\ref{sec:fno-method} predicts
+$\Phi(x,t)$ end-to-end from initial data and so commits the
+network to learning the entire wave-propagation operator. An
+alternative is to keep a cheap classical solver as the workhorse
+and ask the network only for the part the classical solver
+cannot resolve. The hybrid surrogate described here runs a
+single inexpensive coarse-grid FD solve, upsamples it to the
+fine grid, and trains a 2-D FNO to predict the pointwise
+discretisation residual that a label-free Richardson
+extrapolation of two coarse solves estimates against that
+upsample. The network is never shown the fine-grid FD field in
+its loss: its training target is built entirely from coarse
+solves, so the surrogate is self-supervised in the sense that it
+requires no fine-grid ground truth to train. A parameter-free
+gradient gate confines the learned correction to the
+under-resolved wavefronts, where the coarse prior carries its
+dispersion error, and hands the smooth interior and the causal
+exterior back to the prior unchanged. The neural component
+therefore sees only the truncation error of the classical
+solver, which is smaller and structurally simpler than the field
+itself; inference cost is dominated by the single coarse-grid FD
+solve plus one forward pass on the fine grid. The same post-hoc
+QNM extractors and reporting convention of
+Secs.~\ref{sec:qnm-methods}--\ref{sec:reporting} apply unchanged
+to the hybrid prediction. The full pipeline is summarised in
+Fig.~\ref{fig:hyb-arch}.
+
+\begin{figure}[!htbp]
+\centering
+\resizebox{0.78\textwidth}{!}{%
+\begin{tikzpicture}[
+  every node/.style={font=\small},
+  ic/.style={rectangle, draw, fill=yellow!18, rounded corners=2pt,
+             minimum height=8mm, minimum width=42mm, inner sep=3pt,
+             align=center},
+  fd/.style={rectangle, draw, fill=red!12, rounded corners=2pt,
+             minimum height=11mm, minimum width=58mm, inner sep=3pt,
+             align=center},
+  up/.style={rectangle, draw, fill=red!6, rounded corners=2pt,
+             minimum height=10mm, minimum width=58mm, inner sep=3pt,
+             align=center},
+  inp/.style={rectangle, draw, fill=blue!10, rounded corners=2pt,
+              minimum height=7mm, minimum width=88mm, inner sep=3pt,
+              align=center, font=\small},
+  stack/.style={rectangle, draw=none, fill=none,
+                inner sep=2pt, align=center, font=\small},
+  stackbg/.style={rectangle, draw, fill=blue!5, rounded corners=3pt,
+                  inner sep=4pt},
+  fnobox/.style={rectangle, draw, fill=gray!12, rounded corners=2pt,
+                 minimum height=14mm, minimum width=58mm, inner sep=3pt,
+                 align=center},
+  fnoblock/.style={rectangle, draw=none, fill=none,
+                   inner sep=2pt, align=center},
+  fnobg/.style={rectangle, draw, fill=gray!18, rounded corners=3pt,
+                inner sep=5pt},
+  outn/.style={rectangle, draw, fill=orange!25, rounded corners=2pt,
+               minimum height=10mm, minimum width=58mm, inner sep=3pt,
+               align=center},
+  sum/.style={circle, draw, fill=green!20, inner sep=0pt,
+              minimum size=9mm, font=\large},
+  loss/.style={rectangle, draw, fill=green!12, rounded corners=2pt,
+               minimum height=10mm, minimum width=68mm, inner sep=3pt,
+               align=center},
+  arr/.style={->, >=stealth, thick, black},
+  arrs/.style={->, >=stealth, thick, blue!55!black, dashed},
+  arrt/.style={->, >=stealth, thick, gray!55!black, dashed},
+  sec/.style={font=\footnotesize\itshape, gray!55!black, anchor=west},
+]
+  % ============ classical solver path ============
+  \node[ic]   (icbox) {initial data $(M,\,x_{0},\,\sigma)$};
+  \node[fd, below=4mm of icbox]
+        (cfd)   {coarse RK4 method-of-lines, 2nd-order stencil\\
+                 $(\Delta x,\Delta t)_{\mathrm{c}}=(0.8,0.4)\,M$ \\
+                 grid $251\times 126$ ($k=4$)};
+  \node[up, below=4mm of cfd]
+        (upbox) {quintic-spline upsample $\mathcal{U}$ in $(t,x)$\\
+                 (Eq.~\eqref{eq:hyb-upsample}, fine grid $1001\times 501$)};
+
+  \draw[arr] (icbox) -- (cfd);
+  \draw[arr] (cfd) -- (upbox);
+
+  % ============ five-channel input stack ============
+  \node[stack, below=6mm of upbox] (stackhdr) {%
+    \textbf{five-channel input on fine grid}\;
+    $X\in\mathbb{R}^{5\times N_{t}\times N_{x}}$};
+  \node[inp, below=2mm of stackhdr]
+        (c0) {ch~0: $\mathcal{U}\Phi^{\mathrm{c}}(x,t)$ — quintic-upsampled $k{=}4$ prior};
+  \node[inp, below=1mm of c0]
+        (c1) {ch~1: $\Phi^{\mathrm{c}}(x,0)$ broadcast in $t$};
+  \node[inp, below=1mm of c1]
+        (c2) {ch~2: $V_{\ell}(x;M)$ broadcast in $t$};
+  \node[inp, below=1mm of c2]
+        (c3) {ch~3: $M$ broadcast over $(x,t)$};
+  \node[inp, below=1mm of c3]
+        (c4) {ch~4: $\Pi^{\mathrm{c}}_{0}(x)$ broadcast in $t$
+              (Eq.~\eqref{eq:hyb-pi0})};
+  \begin{scope}[on background layer]
+    \node[stackbg, fit=(stackhdr)(c0)(c4)] (stackbg) {};
+  \end{scope}
+
+  \draw[arr] (upbox) -- (stackbg.north);
+
+  % ============ FNO residual operator ============
+  \node[fnoblock, below=8mm of stackbg.south] (fnohdr) {%
+    \begin{minipage}{96mm}
+      \centering
+      \textbf{neural residual operator $\mathcal{H}_{\theta}$ — four-layer 2-D FNO}\\[1mm]
+      hidden channels $h=32$,\;
+      Fourier modes $(K_{t},K_{x})=(16,32)$,\;
+      domain padding $0.10$
+    \end{minipage}};
+
+  \node[fnobox, below=3mm of fnohdr]
+        (lift)  {lift $1{\times}1$ conv: $5{\to}32$ channels};
+  \node[fnobox, below=2mm of lift]
+        (sb)    {$L=4 \times$ spectral block\\
+                 $v^{(\ell+1)}=\mathrm{GELU}\bigl(
+                  \mathcal{F}^{-1}[R^{(\ell)}{\odot}\mathcal{F}v^{(\ell)}]
+                  + W^{(\ell)}v^{(\ell)}\bigr)$};
+  \node[fnobox, below=2mm of sb]
+        (proj)  {projection $1{\times}1$ conv: $32{\to}1$ channel};
+
+  \draw[arr] (lift) -- (sb);
+  \draw[arr] (sb) -- (proj);
+  \begin{scope}[on background layer]
+    \node[fnobg, fit=(fnohdr)(lift)(proj)] (fnoall) {};
+  \end{scope}
+
+  \draw[arr] (stackbg.south) -- (fnoall.north);
+
+  % ============ output residual + reconstruction ============
+  \node[outn, below=8mm of fnoall.south]
+        (delta) {$g\,\delta\Phi_{\theta}(x,t)$ — gated residual\\
+                 $g=|\nabla\mathcal{U}\Phi^{\mathrm{c}}|/
+                 (|\nabla\mathcal{U}\Phi^{\mathrm{c}}|+s),\;s{=}10^{-3}$\\
+                 (Eq.~\eqref{eq:hyb-gate})};
+  \draw[arr] (fnoall.south) -- (delta.north);
+
+  % sum node and Phi_hybrid
+  \node[sum, below=8mm of delta] (sumn) {$+$};
+  \node[outn, fill=orange!45, below=4mm of sumn]
+        (phih)  {$\Phi^{\mathrm{hyb}}(x,t)
+                 =\mathcal{U}\Phi^{\mathrm{c}}+g\,\delta\Phi_{\theta}$\\
+                 (Eq.~\eqref{eq:hyb-reconstruct})};
+  \draw[arr] (delta) -- (sumn);
+  \draw[arr] (sumn) -- (phih);
+
+  % skip connection from upsample (long curve down the left)
+  \draw[arrs] (upbox.west) -- ++(-3.6,0) |-
+              node[pos=0.10, anchor=south, rotate=90, font=\scriptsize, blue!55!black, yshift=2pt]
+                   {skip: $\mathcal{U}\Phi^{\mathrm{c}}$ (physics prior)}
+              (sumn.west);
+
+  % training-only target + loss (right side, dashed)
+  \node[outn, fill=red!18, right=22mm of delta]
+        (target){label-free Richardson target\\
+                 $\delta\Phi_{\mathrm{R}}=\Phi^{\mathrm{R}}-\mathcal{U}\Phi^{\mathrm{c}}$\\
+                 (Eqs.~\eqref{eq:hyb-richardson},\eqref{eq:hyb-residual})};
+  \node[loss, below=4mm of target]
+        (lhyb)  {$\mathcal{L}_{\mathrm{hyb}}
+                 =\mathrm{MSE}\bigl(g\,\delta\Phi_{\theta},\,\delta\Phi_{\mathrm{R}}\bigr)$\\
+                 (Eq.~\eqref{eq:hyb-loss})};
+  \draw[arrt] (delta.east) --
+              node[pos=0.35, above, font=\scriptsize, gray!55!black] {training only}
+              (target.west);
+  \draw[arr]  (target) -- (lhyb);
+
+  % gradient backflow from loss to FNO (training only)
+  \draw[arrt, gray!65!black] (lhyb.east) -- ++(0.5,0) |-
+              node[pos=0.25, anchor=south, rotate=90, font=\scriptsize, gray!55!black, yshift=2pt]
+                   {gradient $\nabla_{\theta}\mathcal{L}_{\mathrm{hyb}}$}
+              (fnoall.east);
+\end{tikzpicture}
+}
+\caption{Hybrid surrogate pipeline of Sec.~\ref{sec:hyb-method},
+shown as a top-to-bottom flow. The classical RK4
+method-of-lines solver of Appendix~\ref{app:fd} produces the
+coarse field $\Phi^{\mathrm{c}}$ on
+$(\Delta x,\Delta t)_{\mathrm{c}} = (0.8,0.4)\,M$ ($k=4$), which
+is quintic-spline upsampled in $(t,x)$ onto the fine grid by the
+operator $\mathcal{U}$ of Eq.~\eqref{eq:hyb-upsample}. The
+five-channel input stack combines this prior
+$\mathcal{U}\Phi^{\mathrm{c}}$ with the initial displacement
+$\Phi^{\mathrm{c}}(x,0)$, initial velocity
+$\Pi^{\mathrm{c}}_{0}(x)$ (Eq.~\eqref{eq:hyb-pi0}), Zerilli
+potential $V_{\ell}(x;M)$ and broadcast mass $M$. A four-layer
+2-D FNO $\mathcal{H}_{\theta}$ with hidden channel count
+$h = 32$ and retained Fourier modes $(K_{t},K_{x}) = (16,32)$
+predicts an additive correction, which is multiplied by the
+parameter-free gradient gate
+$g=|\nabla\mathcal{U}\Phi^{\mathrm{c}}|/
+(|\nabla\mathcal{U}\Phi^{\mathrm{c}}|+s)$
+(Eq.~\eqref{eq:hyb-gate}, $s = 10^{-3}$, a deterministic
+function of the prior) before being added back; the hybrid
+prediction Eq.~\eqref{eq:hyb-reconstruct} adds the
+quintic-upsampled coarse field as a hard skip (blue dashed),
+and the gate confines the correction to the under-resolved
+wavefronts. The dashed grey path on the right depicts the
+training-only, label-free Richardson target
+$\delta\Phi_{\mathrm{R}} = \Phi^{\mathrm{R}} -
+\mathcal{U}\Phi^{\mathrm{c}}$
+(Eqs.~\eqref{eq:hyb-richardson},\eqref{eq:hyb-residual}), built
+from $k = 4$ and $k = 2$ coarse solves alone, and the MSE loss
+Eq.~\eqref{eq:hyb-loss} against which $\mathcal{H}_{\theta}$ is
+fitted; at inference time the right-hand path is detached and
+only the single $k = 4$ coarse solve and the left-hand
+reconstruction path are evaluated. Total trainable parameters:
+$1.13\times 10^{6}$.}
+\label{fig:hyb-arch}
+\end{figure}
+
+\paragraph{Discretisation and grids.} The fine grid is
+$(\Delta x, \Delta t)_{\mathrm{f}} = (0.2, 0.1)\,M$ on
+$x \in [-50, 150]\,M$ and $t \in [0, 50]\,M$, giving
+$(N_{x}, N_{t})_{\mathrm{f}} = (1001, 501)$. The coarse grid
+adopts a single coarsening factor $k$ along both axes,
+$(\Delta x, \Delta t)_{\mathrm{c}} = (k\Delta x, k\Delta
+t)_{\mathrm{f}}$, on the same physical box. The deployment prior
+uses $k = 4$, so $(\Delta x, \Delta t)_{\mathrm{c}} = (0.8,
+0.4)\,M$ and $(N_{x}, N_{t})_{\mathrm{c}} = (251, 126)$; the
+label-construction solve described below additionally uses
+$k = 2$ ($(N_{x}, N_{t}) = (501, 251)$). All grids advance in
+time with the RK4 method-of-lines scheme of
+Appendix~\ref{app:fd} and use the same default second-order
+centred difference for $\partial_x^2$ on both the coarse and the
+fine grids; the coarse prior is deliberately under-resolved
+rather than carrying a higher-order stencil, and the
+leading-order error it incurs is removed instead by the
+Richardson extrapolation of the next paragraph. Quadrupling
+$\Delta x$ and $\Delta t$ together reduces FD work per draw by a
+factor of $k^{3} = 64$ (volume of $(x, t)$ samples times the
+$1/\Delta t$ step count), so the cost of the classical component
+of one deployed hybrid prediction is $\tfrac{1}{64}$ of the fine
+FD solve; the FNO forward pass adds a fixed
+$\mathcal{O}(N_{x} N_{t} \log N_{x} N_{t})$ cost that is small
+compared to RK4-MOL on the fine grid and is quantified
+empirically in Sec.~\ref{sec:res-hyb}.
+
+\paragraph{Label-free Richardson target.} The coarsening factor
+$k$ sets how many fine-grid points the cheap prior discards; at
+$k = 4$ the coarse solve is deliberately under-resolved, and its
+default second-order centred stencil leaves a large
+$\mathcal{O}(\Delta x_{\mathrm{c}}^{2})$ dispersion error --- the
+upsampled coarse field misses the fine reference by a relative
+$L^{2}$ error of $6.1\%$ on the canonical draw
+(Sec.~\ref{sec:res-hyb}). Rather than invest in a more accurate
+stencil, we keep the cheap second-order prior and construct the
+training target by Richardson extrapolation, which removes the
+leading discretisation error using only coarse solves and so
+needs no fine-grid ground truth. We run the same problem at two
+coarsenings, $k = 4$ and $k = 2$, upsample both to the fine grid
+with the operator $\mathcal{U}$ of Eq.~\eqref{eq:hyb-upsample},
+and form
+\begin{equation}
+  \Phi^{\mathrm{R}}
+  \;=\; \frac{4\,\mathcal{U}\Phi^{\mathrm{c}}_{2}
+              - \mathcal{U}\Phi^{\mathrm{c}}}{3},
+  \label{eq:hyb-richardson}
+\end{equation}
+the standard $p = 2$ Richardson combination, in which the
+$\mathcal{O}(\Delta x_{\mathrm{c}}^{2})$ terms of the two solves
+cancel and $\Phi^{\mathrm{R}}$ is accurate to
+$\mathcal{O}(\Delta x_{\mathrm{c}}^{4})$. Here
+$\mathcal{U}\Phi^{\mathrm{c}}$ is the quintic upsample of the
+$k = 4$ prior --- the deployment prior and channel~0 of the
+input stack --- and $\mathcal{U}\Phi^{\mathrm{c}}_{2}$ is the
+quintic upsample of the $k = 2$ solve, used only to build the
+label. The network is trained to predict the
+Richardson-estimated residual
+$\delta\Phi_{\mathrm{R}} = \Phi^{\mathrm{R}} -
+\mathcal{U}\Phi^{\mathrm{c}}$, so its loss never sees the
+fine-grid FD field: the entire supervision signal is built from
+coarse solves. At inference only the single $k = 4$ solve is
+required --- the $k = 2$ solve and $\Phi^{\mathrm{R}}$ are
+label-construction artefacts of the training set, not inputs to
+the deployed surrogate --- so the classical component of one
+hybrid prediction costs $k^{-3} = 1/64$ of a fine FD solve. This
+weak-prior-plus-Richardson design is the opposite of investing
+in a strong classical stencil: it keeps the cheapest possible
+solver and asks the network to do correspondingly more, which is
+the regime in which the $k^{d+1}$ work saving of a coarse prior
+is largest and which is the operative lever for scaling the
+construction to higher-dimensional problems.
+
+\paragraph{Discretisation-error decomposition.} For a smooth
+solution $\Phi(x, t)$ of the Zerilli equation, the fine-grid
+RK4-MOL solution satisfies
+$\Phi^{\mathrm{f}} = \Phi + \mathcal{O}(\Delta x_{\mathrm{f}}^{2},
+\Delta t_{\mathrm{f}}^{4})$ and is taken as the ground truth at
+this resolution, used only to \emph{evaluate} the surrogate. The
+$k = 4$ coarse solve carries a second-order error,
+$\Phi^{\mathrm{c}} = \Phi + \mathcal{O}(\Delta x_{\mathrm{c}}^{2})$,
+whose leading term the Richardson combination
+Eq.~\eqref{eq:hyb-richardson} cancels, leaving
+$\Phi^{\mathrm{R}} = \Phi + \mathcal{O}(\Delta x_{\mathrm{c}}^{4})$
+up to the quintic-interpolation error of the upsample. The
+quantity the network learns,
+\begin{equation}
+  \delta\Phi_{\mathrm{R}}(x, t)
+  \;=\; \Phi^{\mathrm{R}}(x, t) - \mathcal{U}\Phi^{\mathrm{c}}(x, t),
+  \label{eq:hyb-residual}
+\end{equation}
+is therefore a label-free estimate of the coarse-prior
+discretisation error, agreeing with the true error
+$\Phi^{\mathrm{f}} - \mathcal{U}\Phi^{\mathrm{c}}$ to
+$\mathcal{O}(\Delta x_{\mathrm{c}}^{4})$; both vanish as
+$k \to 1$. The target is dominated by the coarse spatial
+truncation: it is largest on the under-resolved wavefronts,
+where the second-order stencil dephases the high-wavenumber
+content of the prompt burst, and is near zero in the smooth
+interior and the causal exterior where the coarse solve is
+already accurate. This strong spatial localisation of the target
+is exactly what the gradient gate of Eq.~\eqref{eq:hyb-gate}
+exploits. Against a typical $|\Phi^{\mathrm{f}}|_{\max} \approx 1$
+the upsampled $k = 4$ prior already carries a $6.1\%$ relative
+$L^{2}$ error (Sec.~\ref{sec:res-hyb}), so unlike the end-to-end
+FNO of Sec.~\ref{sec:fno-method} --- which must synthesise the
+full field --- the network here only repairs this bounded,
+spatially-localised residual.
+
+\paragraph{Upsample operator.} The operator $\mathcal{U}$ used
+in Eqs.~\eqref{eq:hyb-richardson}--\eqref{eq:hyb-residual} and as
+the channel-0 prior is a separable degree-five (quintic)
+tensor-product spline on the rectangular grid:
+\begin{equation}
+  (\mathcal{U}\Phi^{\mathrm{c}})(x, t)
+  \;=\; \sum_{i, j} c_{ij}\,
+        B_{5}\!\Bigl(\tfrac{t - t_{i}}{\Delta t_{\mathrm{c}}}\Bigr)\,
+        B_{5}\!\Bigl(\tfrac{x - x_{j}}{\Delta x_{\mathrm{c}}}\Bigr),
+  \label{eq:hyb-upsample}
+\end{equation}
+with $B_{5}$ the quintic B-spline basis and coefficients
+$\{c_{ij}\}$ fixed by collocation at the coarse-grid nodes
+$\{(t_{i}, x_{j})\}$. The quintic spline is preferred to a cubic
+because its $\mathcal{O}(\Delta x_{\mathrm{c}}^{6})$
+interpolation error stays comfortably below the
+$\mathcal{O}(\Delta x_{\mathrm{c}}^{4})$ Richardson signal, so
+the upsample does not contaminate the extrapolated target. The
+same operator is applied to both the $k = 4$ and $k = 2$ coarse
+solves in Eq.~\eqref{eq:hyb-richardson}. Out-of-domain queries
+are clamped to zero amplitude. The upsample is performed once
+per sample during dataset assembly at $\mathcal{O}(N_{x} N_{t})$
+cost.
+
+\paragraph{Input stack.} The network input is a tensor
+$X \in \mathbb{R}^{5\times N_{t}\times N_{x}}$ whose five
+channels are listed in Fig.~\ref{fig:hyb-arch} and described
+here in full. Channel~0 is the quintic-upsampled $k = 4$ coarse
+field $\mathcal{U}\Phi^{\mathrm{c}}(x, t)$ --- the deployment
+prior --- which carries the bulk of the dynamical content the
+network is asked to repair.
+Channel~1 is the initial-displacement profile
+$\Phi^{\mathrm{c}}(x, 0)$ broadcast across $t$, giving the
+network unambiguous access to the unperturbed initial datum
+without having to extract it from the noisy upsampled prior at
+$t = 0$. Channel~2 is the per-sample Zerilli potential
+$V_{\ell}(x; M)$ of Eq.~\eqref{eq:V-zerilli} broadcast across
+$t$, which encodes the BH mass dependence in a form the
+spectral layers can exploit through their $x$-convolution.
+Channel~3 is the scalar mass $M$ broadcast across the full
+$(x, t)$ grid, redundant with the potential channel but
+inexpensive and empirically helpful for the
+spline-upsample-conditioned residual at the prompt-burst edge.
+Channel~4 is the initial velocity
+\begin{equation}
+  \Pi^{\mathrm{c}}_{0}(x)
+  \;=\; \frac{\Phi^{\mathrm{c}}(x, \Delta t_{\mathrm{c}}) -
+              \Phi^{\mathrm{c}}(x, 0)}{\Delta t_{\mathrm{c}}}
+  \label{eq:hyb-pi0}
+\end{equation}
+computed by a forward Euler differencing of the coarse field at
+$t = 0$ and then linearly resampled from the coarse $x$-grid
+onto the fine $x$-grid, broadcast across $t$. The first-order
+truncation of Eq.~\eqref{eq:hyb-pi0} is acceptable here because
+the channel is auxiliary: it informs the network of the prompt
+velocity sign and amplitude in a form that does not require
+recovery from the upsampled prior.
+
+\paragraph{Residual operator, gradient gate, and reconstruction.}
+The neural residual operator
+\begin{equation}
+  \mathcal{H}_{\theta}\colon\;
+  X = \bigl[\mathcal{U}\Phi^{\mathrm{c}},\,\Phi^{\mathrm{c}}(\cdot, 0),\,
+            V_{\ell}(\cdot; M),\,M,\,\Pi^{\mathrm{c}}_{0}\bigr]
+  \;\longmapsto\;
+  \delta\Phi_{\theta}(x, t)
+  \label{eq:hyb-operator}
+\end{equation}
+is modulated by a parameter-free gradient gate before it is
+added to the prior. The gate
+\begin{equation}
+  g(x, t)
+  \;=\; \frac{|\nabla\mathcal{U}\Phi^{\mathrm{c}}(x, t)|}
+             {|\nabla\mathcal{U}\Phi^{\mathrm{c}}(x, t)| + s},
+  \qquad
+  |\nabla\mathcal{U}\Phi^{\mathrm{c}}|
+  = \sqrt{(\partial_{t}\mathcal{U}\Phi^{\mathrm{c}})^{2}
+          + (\partial_{x}\mathcal{U}\Phi^{\mathrm{c}})^{2}},
+  \label{eq:hyb-gate}
+\end{equation}
+is a deterministic function of the prior alone --- it adds no
+trainable parameters and needs no extra data at inference ---
+with a single scale hyperparameter $s = 10^{-3}$, whose
+principled, label-free selection from the prior gradient
+distribution is derived in App.~\ref{app:gate-scale}. It rises
+to $g \to 1$ on the
+high-gradient wavefronts, where the coarse prior carries its
+dispersion error, and falls to $g \to 0$ in the smooth interior
+and the causal exterior, where the prior is already accurate and
+$|\nabla\mathcal{U}\Phi^{\mathrm{c}}| \ll s$. The hybrid
+prediction is the gated additive skip
+\begin{equation}
+  \Phi^{\mathrm{hyb}}(x, t)
+  \;=\; \mathcal{U}\Phi^{\mathrm{c}}(x, t)
+         + g(x, t)\,\mathcal{H}_{\theta}(X)(x, t),
+  \label{eq:hyb-reconstruct}
+\end{equation}
+so the network correction is confined by construction to the
+under-resolved regions and cannot inject error into the parts of
+the domain the coarse solver already resolves. The gate is also
+the prior$\leftrightarrow$network stitch: $g$ is a smooth convex
+blend between the pure coarse prior ($g = 0$) and the
+fully-corrected field ($g = 1$). With $\mathcal{H}_{\theta}
+\equiv 0$, or wherever $g = 0$, the hybrid reduces to the
+coarse-up baseline. This is the key structural difference from
+the end-to-end FNO of Sec.~\ref{sec:fno-method}: the network is
+in series with a classical solver that already produces a good
+guess, and so inherits the stability and
+discretisation-invariance of the underlying numerical scheme as
+a hard prior.
+
+\paragraph{FNO architecture.} The residual operator
+$\mathcal{H}_{\theta}$ is a 2-D Fourier neural operator
+\citep{Li2021fno,Kovachki2023neuralop} on the fine
+$(t, x)$ grid. A $1\times 1$ \emph{lift} convolution maps the
+$5$-channel input to $h = 32$ hidden channels, and a $1\times 1$
+\emph{projection} maps back to the single output channel. In
+between sit $L = 4$ Fourier layers, each of the form
+\begin{equation}
+  v^{(\ell+1)}(x, t)
+  \;=\; \mathrm{GELU}\!\Bigl(
+         \mathcal{F}^{-1}\bigl[R^{(\ell)} \odot
+         \mathcal{F}\,v^{(\ell)}\bigr](x, t)
+         \;+\; W^{(\ell)}\,v^{(\ell)}(x, t)
+       \Bigr),
+  \label{eq:hyb-fno-layer}
+\end{equation}
+where $\mathcal{F}$ is the 2-D discrete Fourier transform along
+$(t, x)$, $R^{(\ell)} \in \mathbb{C}^{h\times h\times K_{t}\times
+K_{x}}$ is a complex spectral-weight tensor truncated to the
+lowest $K_{t}$ frequencies along $t$ and the lowest $K_{x}$
+along $x$, $\odot$ is mode-by-mode matrix multiplication
+across the channel axis, and $W^{(\ell)}$ is a pointwise
+$1\times 1$ convolution acting as a local residual path. We use
+$(K_{t}, K_{x}) = (16, 32)$, which matches the natural mode
+ratio of the discrete grid ($N_{x} = 2 N_{t}$) and represents
+all spatial frequencies below $k_{x,\max} = 2\pi \cdot 32 / 200
+\approx 1.0\,M^{-1}$ on the fine grid. We pre-pad each axis by
+the fraction $p = 0.10$ before $\mathcal{F}$ and crop the
+output back after $\mathcal{F}^{-1}$, which damps the periodic
+wraparound that would otherwise pollute the spectral
+convolution near the domain boundaries. Positional grid
+encodings $(x, t)$ are concatenated to the lifted features
+before the first spectral block to break the translation
+equivariance that would otherwise prevent the network from
+distinguishing the source region $x \approx x_{0}$ from the
+wave zones. The total trainable parameter count is dominated
+by the spectral weights, $L \cdot h^{2} \cdot 2 K_{t} \cdot
+2 K_{x} = 4\cdot 32^{2}\cdot 32\cdot 64 \approx 8.4\times
+10^{6}$ real degrees of freedom before sparsification, with
+the actual count of $1.13\times 10^{6}$ reduced by the
+\texttt{neuraloperator} library's factorised-tensor
+parametrisation of $R^{(\ell)}$
+\citep{Kovachki2023neuralop}. The smaller hidden width and total
+mode count relative to the end-to-end FNO of
+Sec.~\ref{sec:fno-method}
+($K_{t} = K_{x} = 64$, $h = 96$, $7.8\times 10^{7}$ parameters)
+is afforded by the simpler target $\delta\Phi_{\mathrm{R}}$: the
+residual has narrower spectral support than the full field
+$\Phi^{\mathrm{f}}$ because the wave-propagation operator
+already lives in the upsampled prior $\mathcal{U}\Phi^{\mathrm{c}}$,
+so the network needs only to add a low-rank dispersion correction
+rather than synthesise an outgoing wave from scratch.
+
+\paragraph{Loss.} The training loss is the gridwise mean
+squared error between the gated network output and the
+label-free Richardson residual,
+\begin{equation}
+  \mathcal{L}_{\mathrm{hyb}}(\theta)
+  \;=\; \frac{1}{B}\sum_{b=1}^{B}
+         \frac{1}{N_{t} N_{x}}
+         \sum_{i=1}^{N_{t}}\sum_{j=1}^{N_{x}}
+         \bigl[
+           g^{(b)}_{ij}\,\mathcal{H}_{\theta}(X^{(b)})_{ij}
+           \,-\, \delta\Phi^{(b)}_{\mathrm{R},\,ij}
+         \bigr]^{2},
+  \label{eq:hyb-loss}
+\end{equation}
+averaged across the training batch of size $B$. We do not weight
+by a physical-units factor, do not include a PDE-residual term,
+and do not introduce auxiliary observer-slice or time-weighted
+losses of the kind that the end-to-end FNO of
+Sec.~\ref{sec:fno-method} requires: the target
+$\delta\Phi_{\mathrm{R}}$ is already small, smooth, and
+spatially localised, and the gate $g$ of Eq.~\eqref{eq:hyb-gate}
+has already confined the correction to the wavefronts, so a
+uniform MSE on the gated output is adequate. The empirical
+effect of the loss simplicity and of the gate scale $s$ on the
+field-error, speckle, and QNM-extraction floors is quantified in
+Sec.~\ref{sec:res-hyb}.
+
+\paragraph{Optimiser.} Training is a single phase of Adam with
+learning rate $10^{-3}$, weight decay $10^{-6}$, batch size
+$B = 8$, gradient clipping at unit norm, and \texttt{float32}
+precision, for $N_{\mathrm{adam}} = 100$
+epochs over the $n_{\mathrm{train}} = 1{,}000$ training BHs.
+The network is small ($1.13\times 10^{6}$ parameters) and the
+gated residual target is smooth and spatially localised, so
+$100$ Adam epochs reach the validation floor; we found no
+measurable improvement from a subsequent L-BFGS phase on this
+target and report the Adam-only optimum. The per-epoch
+validation history is shown in Sec.~\ref{sec:res-hyb}.
+
+\paragraph{Training distribution.} A Sobol sequence of $1{,}200$
+$(M, x_{0}, \sigma)$ triples is drawn from
+$M \sim \mathrm{Unif}[0.8, 1.2]$,
+$x_{0} \sim \mathrm{Unif}[2, 6]\,M$, and
+$\sigma \sim \mathrm{Unif}[3, 7]\,M$, then split
+$(n_{\mathrm{train}}, n_{\mathrm{val}}, n_{\mathrm{test}}) =
+(1000, 100, 100)$ with seed $1234$. For each triple the
+fine-grid FD solution and the $k = 4$ and $k = 2$ coarse-grid FD
+solutions are precomputed offline; the quintic upsample
+$\mathcal{U}\Phi^{\mathrm{c}}$ of the $k = 4$ prior and the four
+auxiliary channels of Fig.~\ref{fig:hyb-arch} are assembled
+once and cached to disk, and the label-free Richardson target
+$\delta\Phi_{\mathrm{R}} = \Phi^{\mathrm{R}} -
+\mathcal{U}\Phi^{\mathrm{c}}$ of
+Eqs.~\eqref{eq:hyb-richardson}--\eqref{eq:hyb-residual} is
+stored alongside. The fine-grid FD solution is retained only as
+an evaluation reference and is never used in the training loss.
+The canonical evaluation BH used for the
+single-instance diagnostics in Sec.~\ref{sec:res-hyb} is
+$(M, x_{0}, \sigma) = (1, 4, 5)$. The training distribution
+overlaps but is not identical to the FNO training distribution
+of Sec.~\ref{sec:fno-method}: we contract the $(x_{0},
+\sigma)$ box to keep the prompt-burst region inside the
+$t \in [0, 50]\,M$ window of the hybrid simulation, which is
+shorter than the $t \in [0, 100]\,M$ window used by the
+end-to-end FNO. This is the only intentional difference in
+training distribution between the two surrogates.
+
+\paragraph{Observer location.} Hybrid numbers in
+Sec.~\ref{sec:res-hyb} are reported at $\xq = 2\,M$. The choice
+matches the FNO surrogate of Sec.~\ref{sec:fno-method} for
+direct comparability; the empirical finding from
+Sec.~\ref{sec:res-hyb} that the QNM observable is already at
+the plateau-extractor precision floor on the coarse-up baseline
+at this observer (and not at the hybrid-vs-baseline field-error
+crossover) motivates reporting the hybrid's value through the
+global field-error reduction discussed there rather than
+through the median QNM at $\xq = 2\,M$.
+
+% --------------------------------------------------------------
 \subsection{QNM extraction methods}
 \label{sec:qnm-methods}
 
@@ -1069,8 +1938,15 @@ the Hilbert-analytic signal is ill-conditioned at the SNR of the
 PINN-derived $\Phi(\xq,t)$ in our setup; M3 is reported in
 Appendix~\ref{app:esprit} but is not used in the quoted numbers.
 
-Method 4 (M4) is two-mode NLS with start-time plateau scan.
-A two-mode template,
+Method 4 (M4) is two-mode NLS with start-time plateau scan,
+following the Schwarzschild $\ell=m=2$ overtone-aware ringdown
+recipe of \citet{Giesler2019overtones}: simultaneously fitting the
+fundamental and the first overtone absorbs the
+residual $n=1$ power that would otherwise bias a single-mode
+template at early times, and we shall see below that this is the
+reason M4 attains a fundamental-mode accuracy roughly an order of
+magnitude better than the single-mode M2 estimator on the same
+data. A two-mode template,
 \begin{equation}
   \Phi_{\mathrm{model}}(t) =
   A_0\,e^{-t/\tau_0}\cos(\omega_0 t + \phi_0)
