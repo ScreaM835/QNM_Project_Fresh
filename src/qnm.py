@@ -130,7 +130,8 @@ def qnm_method_2(t: np.ndarray, y: np.ndarray, t_start: float, t_end: float) -> 
 
 # ---------------------------------------------------------------------------
 # Theoretical QNM reference values  (Leaver 1985, l=2 Schwarzschild)
-# These are the same values cited in Patel, Laguna & Shoemaker Table 3.
+# 4-digit values as tabulated in Berti, Cardoso & Starinets 2009 Table II;
+# cited in Patel, Laguna & Shoemaker 2024 Table 3.
 # ---------------------------------------------------------------------------
 THEORY = {
     "zerilli": {2: {"omega": 0.3737, "tau": 11.241}},
@@ -138,10 +139,19 @@ THEORY = {
 }
 
 
+def theory_ref(potential: str = "zerilli", ell: int = 2) -> Optional[Dict[str, float]]:
+    """Return {"omega": M*omega_real, "tau": tau/M} for the fundamental QNM.
+
+    Leaver 1985 / Berti et al. 2009 tabulated values; see ``THEORY``.
+    """
+    return THEORY.get(potential, {}).get(ell)
+
+
 def percentage_errors(
     result: Dict[str, float],
     potential: str = "zerilli",
     ell: int = 2,
+    M: float = 1.0,
 ) -> Dict[str, float]:
     """
     Compute percentage errors of extracted ω and τ relative to theoretical
@@ -149,28 +159,50 @@ def percentage_errors(
 
         % error = |extracted - theory| / theory × 100
 
+    The fit returns ω and τ in physical code units (same time units as ``t``).
+    Theoretical values in ``THEORY`` are dimensionless (M·ω and τ/M). When the
+    underlying spacetime has mass M ≠ 1 (e.g. dataset sweeps over M), the raw
+    fit must be rescaled before comparison:
+
+        ω_dim = ω · M       τ_dim = τ / M
+
     Parameters
     ----------
-    result : dict with keys "omega" and "tau"
+    result : dict with keys "omega" and "tau" (physical / code units)
     potential : "zerilli" or "regge_wheeler"
     ell : angular mode number
+    M : black-hole mass used in the simulation (default 1.0). Pass the actual
+        per-sample mass for operator-learning outputs that sweep over M.
 
     Returns
     -------
-    dict with keys "omega_pct_err", "tau_pct_err", "omega_theory", "tau_theory"
+    dict with keys "omega_pct_err", "tau_pct_err", "omega_theory", "tau_theory",
+    plus "omega_dim", "tau_dim", "M_used" for the rescaled comparison values.
     """
-    ref = THEORY.get(potential, {}).get(ell)
+    ref = theory_ref(potential, ell)
     if ref is None:
         return {"omega_pct_err": float("nan"), "tau_pct_err": float("nan")}
 
-    omega_err = abs(result["omega"] - ref["omega"]) / ref["omega"] * 100.0
-    tau_err = abs(result["tau"] - ref["tau"]) / ref["tau"] * 100.0 if np.isfinite(result.get("tau", float("nan"))) else float("nan")
+    M = float(M)
+    omega_raw = float(result["omega"])
+    tau_raw = float(result.get("tau", float("nan")))
+    omega_dim = omega_raw * M
+    tau_dim = tau_raw / M if np.isfinite(tau_raw) and M > 0 else float("nan")
+
+    omega_err = abs(omega_dim - ref["omega"]) / ref["omega"] * 100.0
+    tau_err = (
+        abs(tau_dim - ref["tau"]) / ref["tau"] * 100.0
+        if np.isfinite(tau_dim) else float("nan")
+    )
 
     return {
         "omega_pct_err": float(omega_err),
         "tau_pct_err": float(tau_err),
         "omega_theory": ref["omega"],
         "tau_theory": ref["tau"],
+        "omega_dim": float(omega_dim),
+        "tau_dim": float(tau_dim),
+        "M_used": M,
     }
 
 
@@ -334,8 +366,9 @@ def _two_mode(
             + A1 * np.exp(-t / tau1) * np.cos(omega1 * t + phi1))
 
 
-# Theoretical first-overtone (n=1) values for Schwarzschild l=2 (Leaver 1985).
-# Used as initial guess only; the fit is free to move away.
+# Theoretical first-overtone (n=1) values for Schwarzschild l=2.
+# Leaver 1985 / Berti et al. 2009 Table II. Used as initial guess only;
+# the fit is free to move away.
 _THEORY_OVERTONE = {
     "zerilli":       {2: {"omega": 0.3467, "tau": 3.651}},
     "regge_wheeler": {2: {"omega": 0.3467, "tau": 3.651}},
@@ -368,13 +401,22 @@ def qnm_method_4_two_mode(
         return {"omega": float("nan"), "tau": float("nan")}
 
     # Initial guess for fundamental: use Method 2's single-mode fit.
-    m2 = qnm_method_2(t, y, t_start, t_end)
-    omega0_g = m2["omega"]
-    tau0_g = m2["tau"] if np.isfinite(m2["tau"]) else 11.0
-    A0_g = m2["A"]
-    phi0_g = m2["phi"]
+    # If it fails (e.g. maxfev hit on a noisy / overtone-heavy window), fall
+    # back to theory values so the two-mode fit can still be attempted.
+    try:
+        m2 = qnm_method_2(t, y, t_start, t_end)
+        omega0_g = m2["omega"]
+        tau0_g = m2["tau"] if np.isfinite(m2["tau"]) else 11.0
+        A0_g = m2["A"]
+        phi0_g = m2["phi"]
+    except Exception:
+        ref = THEORY.get(potential, {}).get(ell)
+        omega0_g = ref["omega"] if ref is not None else 0.37
+        tau0_g = ref["tau"] if ref is not None else 11.0
+        A0_g = float(np.max(np.abs(yy))) or 1.0
+        phi0_g = 0.0
 
-    # Initial guess for overtone: theory values, modest amplitude
+    # Initial guess for overtone: tabulated Leaver values, modest amplitude
     ovt = _THEORY_OVERTONE.get(potential, {}).get(ell)
     if ovt is None:
         omega1_g = 2.0 * omega0_g
@@ -464,6 +506,8 @@ def qnm_method_4_window_scan(
         return {
             "omega": float("nan"), "tau": float("nan"),
             "omega_std": float("nan"), "tau_std": float("nan"),
+            "omega1": float("nan"), "tau1": float("nan"),
+            "omega1_std": float("nan"), "tau1_std": float("nan"),
             "t_starts": t_starts.tolist(),
             "omegas": omegas, "taus": taus,
             "omegas1": omegas1, "taus1": taus1,
@@ -488,11 +532,33 @@ def qnm_method_4_window_scan(
     idx = list(range(best_start, best_start + win))
     o_pl = omegas_a[idx]
     t_pl = taus_a[idx]
+
+    # Overtone (n=1) plateau statistics: evaluated on the SAME plateau
+    # indices selected for the fundamental, so the overtone uncertainty is
+    # the scatter across those windows. This is a Giesler-style two-mode
+    # report; whether (omega1, tau1) actually corresponds to the linear
+    # first overtone in real data is a separate question (see Cotesta+2022
+    # and Isi & Farr 2022 for the GW150914 controversy).
+    omegas1_a = np.asarray(omegas1, dtype=float)
+    taus1_a = np.asarray(taus1, dtype=float)
+    o1_pl = omegas1_a[idx]
+    t1_pl = taus1_a[idx]
+    o1_valid = np.isfinite(o1_pl)
+    t1_valid = np.isfinite(t1_pl)
+    omega1_mean = float(np.mean(o1_pl[o1_valid])) if o1_valid.any() else float("nan")
+    tau1_mean = float(np.mean(t1_pl[t1_valid])) if t1_valid.any() else float("nan")
+    omega1_std = float(np.std(o1_pl[o1_valid])) if o1_valid.any() else float("nan")
+    tau1_std = float(np.std(t1_pl[t1_valid])) if t1_valid.any() else float("nan")
+
     return {
         "omega": float(np.mean(o_pl)),
         "tau": float(np.mean(t_pl)),
         "omega_std": float(np.std(o_pl)),
         "tau_std": float(np.std(t_pl)),
+        "omega1": omega1_mean,
+        "tau1": tau1_mean,
+        "omega1_std": omega1_std,
+        "tau1_std": tau1_std,
         "t_starts": t_starts.tolist(),
         "omegas": omegas, "taus": taus,
         "omegas1": omegas1, "taus1": taus1,

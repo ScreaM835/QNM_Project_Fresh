@@ -1,0 +1,106 @@
+# FNO/PINO experiment v5 — QNM-decoder hypernetwork (Prony-basis tail).
+#
+# Architecture (see src/fno_qnm_head.py):
+#   trunk FNO              -> predicts phi(x, t) on the full grid
+#   QNM-decoder head       -> emits global (omega_n, tau_n) and per-x
+#                             amplitudes A_n(x), phases phi_n(x) for N modes
+#   smooth crossover w(t)  -> trunk dominates for t < t_split, the
+#                             analytic damped-sinusoid tail dominates after.
+#
+# Effect: the ringdown portion CANNOT be anything other than a sum of damped
+# sinusoids by construction.  QNM extraction is a direct readout from the
+# network, not a post-hoc Prony fit.
+experiment:
+  name: fno_zerilli_l2_v5_qnmhead
+
+physics:
+  M: 1.0
+  l: 2
+  potential: zerilli
+  pde_sign: standard
+
+domain:
+  xmin: -50.0
+  xmax: 150.0
+  tmin: 0.0
+  tmax: 100.0
+
+initial_data:
+  A: 1.0
+  x0: 4.0
+  sigma: 5.0
+  velocity_profile: outgoing
+
+fd:
+  dx: 0.5
+  dt: 0.25
+  scheme: rk4_mol
+
+evaluation:
+  xq: 2.0
+
+qnm:
+  t_start: 10.0
+  t_end:   100.0
+
+dataset:
+  seed: 1234
+  n_train: 1000
+  n_val:   100
+  n_test:  100
+  sweep:
+    M_range:     [0.8, 1.2]
+    x0_range:    [-10.0, 30.0]
+    sigma_range: [3.0, 8.0]
+  stride_x: 1
+  stride_t: 1
+
+fno:
+  model_type: qnm_head        # NEW — selects the FNOWithQNMHead wrapper
+  modes_t: 64
+  modes_x: 64
+  hidden_channels: 96
+  n_layers: 4
+  domain_padding: 0.10
+  positional_embedding: grid
+  qnm_head:
+    n_modes: 2                # fundamental + 1 overtone; at t_split=15 overtone has decayed to <2%
+    t_split: 15.0             # crossover time (M units); halfway between qnm.t_start=10 and v5-A's 20
+    crossover_sharpness: 2.0  # ~2M cosine-like ramp
+    ic_embed_dim: 32
+    spatial_hidden: 64
+    omega_init: 0.30          # NOT 0.3737 — deliberately offset so init isn't the answer
+    tau_init:  10.0
+
+training:
+  seed: 1234
+  dtype: float32
+  device: auto
+  batch_size: 4
+  epochs: 500
+  lr: 1.0e-3
+  weight_decay: 1.0e-6
+  scheduler: cosine
+  grad_clip: 1.0
+  loss:
+    # The QNM-head architecture provides the structural prior; the loss
+    # stays a plain composite field-fit.  PINO term kept ON so the
+    # composite (trunk + analytic tail) is pushed toward the wave equation;
+    # this is what ties (A_n(x), phi_n(x), omega, tau) to V(x) physically.
+    lam_field: 1.0
+    lam_h1:    0.20
+    lam_ring:  2.0
+    lam_pde:   0.05           # ON — wave-equation prior on the composite output
+    lam_bc:    0.0
+  log_every: 10
+  ckpt_every: 100
+  data_path: outputs/fno/fno_zerilli_l2_v5_qnmhead/dataset.npz
+  out_dir:   outputs/fno/fno_zerilli_l2_v5_qnmhead
+
+inverse:
+  M_init: 1.05
+  M_true: 1.00
+  noise_sigma: 1.0e-3
+  steps: 500
+  lr: 1.0e-2
+  obs_x: [10.0, 20.0]

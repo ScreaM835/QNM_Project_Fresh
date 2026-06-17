@@ -1,0 +1,45 @@
+# SUPERVISED A/B control for hybrid_sw_richardson.yaml.
+#
+# Byte-identical to the Richardson config EXCEPT target_mode=supervised, so the
+# delta is regressed onto the true fine-FD label (Phi_fine - up4) instead of the
+# label-free Richardson target (Phi_R - up4). Routed through the SAME pipe
+# (quintic k4 prior, same channels, same FNO, same optimiser) so the ONLY
+# difference between the two runs is the target. This is the A/B upper bound:
+# the best the FNO can do WITH fine-FD supervision (M=1 ceiling ~0.07%). The
+# label-free Richardson run is the candidate; the gap to this run is the price
+# of dropping labels.
+
+experiment:
+  name: hybrid_sw_richardson_supervised
+
+dataset:
+  path: outputs/hybrid/dataset_sw_k4.npz      # k4 coarse prior (channel 0)
+  path_k2: outputs/hybrid/dataset_sw_k2.npz   # k2 coarse, sample-aligned
+  target_mode: supervised                     # fine-FD label (A/B upper bound)
+
+fno:
+  modes_t: 16
+  modes_x: 32
+  hidden_channels: 32
+  n_layers: 4
+  domain_padding: 0.10
+  positional_embedding: grid
+
+train:
+  batch_size: 8
+  epochs_adam: 100
+  lr_adam: 1.0e-3
+  weight_decay: 1.0e-6
+  epochs_lbfgs: 30
+  lbfgs_max_iter: 20
+  lbfgs_chunk_size: 8
+  seed: 1234
+  device: cuda
+  loss:
+    data_weight: 1.0
+    physics_weight: 0.0
+    anchor_weight: 0.0
+
+logging:
+  log_every: 10
+  out_dir: outputs/hybrid/fno_sw_richardson_supervised

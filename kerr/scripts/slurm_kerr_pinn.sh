@@ -51,6 +51,19 @@ NDOM=${NDOM:-15000}
 NF=${NF:-64}
 HIDDEN="${HIDDEN:-64 64 64 64}"
 SPINS="${SPINS:-0.0}"
+# FOURIER=1 opts into the Fourier-feature input embedding (Tancik 2020 / Ding
+# 2024); the plain-FNN baseline (FOURIER=0) failed C.3 with spectral bias.
+FOURIER=${FOURIER:-0}
+# SUFFIX is appended to the output JSON name so a Fourier re-run does NOT clobber
+# the committed-area baseline result (kept as failure evidence).
+SUFFIX="${SUFFIX:-}"
+
+FOURIER_FLAG=""
+if [ "${FOURIER}" = "1" ]; then
+    FOURIER_FLAG="--fourier"
+fi
+
+echo "fourier=${FOURIER} (flag='${FOURIER_FLAG}')  suffix='${SUFFIX}'" | tee -a "${LOG}"
 
 for SPIN in ${SPINS}; do
     TAG=$(echo "${SPIN}" | sed 's/\.//')
@@ -59,8 +72,8 @@ for SPIN in ${SPINS}; do
         --spin "${SPIN}" \
         --adam "${ADAM}" --lbfgs "${LBFGS}" \
         --num-domain "${NDOM}" --n-fourier "${NF}" \
-        --hidden ${HIDDEN} \
-        --out "${OUTDIR}/pinn_single_a${TAG}.json" 2>&1 | tee -a "${LOG}"
+        --hidden ${HIDDEN} ${FOURIER_FLAG} \
+        --out "${OUTDIR}/pinn_single_a${TAG}${SUFFIX}.json" 2>&1 | tee -a "${LOG}"
 done
 
 echo "=== done at $(date) ===" | tee -a "${LOG}"

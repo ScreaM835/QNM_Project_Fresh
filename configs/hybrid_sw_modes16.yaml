@@ -1,0 +1,38 @@
+# modes_t SWEEP (16): control = byte-identical to hybrid_sw_richardson.yaml.
+# Single-variable experiment: does raising the FNO temporal Fourier mode count
+# improve the recovered QNM? This is the modes_t=16 control, retrained fresh in
+# its own out_dir so the three sweep points share an identical code path/seed.
+experiment:
+  name: hybrid_sw_modes16
+
+dataset:
+  path: outputs/hybrid/dataset_sw_k4.npz
+  path_k2: outputs/hybrid/dataset_sw_k2.npz
+  target_mode: richardson
+
+fno:
+  modes_t: 16
+  modes_x: 32
+  hidden_channels: 32
+  n_layers: 4
+  domain_padding: 0.10
+  positional_embedding: grid
+
+train:
+  batch_size: 8
+  epochs_adam: 100
+  lr_adam: 1.0e-3
+  weight_decay: 1.0e-6
+  epochs_lbfgs: 30
+  lbfgs_max_iter: 20
+  lbfgs_chunk_size: 8
+  seed: 1234
+  device: cuda
+  loss:
+    data_weight: 1.0
+    physics_weight: 0.0
+    anchor_weight: 0.0
+
+logging:
+  log_every: 10
+  out_dir: outputs/hybrid/fno_sw_modes16

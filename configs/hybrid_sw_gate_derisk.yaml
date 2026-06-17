@@ -1,0 +1,60 @@
+# DE-RISK: structural output gate g(|grad prior|) -- the anti-speckle FIX.
+#
+# Byte-identical to the modes16 control EXCEPT epochs_lbfgs 30 -> 0 (Adam-only
+# de-risk point) and the NEW fno.output_gate. The model returns
+#     field = prior + g * FNO(x),   g = |grad prior| / (|grad prior| + scale)
+# so the correction is confined to high-gradient regions (wavefronts, where the
+# coarse prior carries its dispersion error) and is driven to ~0 in the smooth
+# interior and causal exterior (where the prior is already machine-exact). This
+# attacks the speckle defect at its ROOT: the baseline pointwise-error map and
+# |grad prior| coincide at r=+0.917, yet the ungated FNO sprays ~7e-5 broadband
+# error across the 60% of the domain where the prior is exact (407x worse than
+# the prior there; ~1e8x in the causal exterior). Plain MSE already penalises
+# that speckle and the FNO produces it anyway -- it is a representation failure
+# (global Fourier operator cannot hold a compact-support correction), so the fix
+# must be STRUCTURAL, not a loss weight. g is also the prior<->FNO stitch: a
+# smooth convex blend from pure prior (g=0) to prior+full FNO (g=1).
+#
+# scale=1e-4 places the half-gate at |grad prior|~1e-4 (the ~60th-70th percentile
+# where baseline error first exceeds ~1e-4), keeping the FNO fully active on the
+# top ~40% (the real wavefronts) and suppressing the clean bottom ~60%. It is the
+# single free parameter; sweep if needed. A/B question: does the gate remove the
+# clean-region speckle while preserving field rL2 AND (likely) helping QNM by
+# handing the low-gradient ringdown tail back to the prior?
+
+experiment:
+  name: hybrid_sw_gate_derisk
+
+dataset:
+  path: outputs/hybrid/dataset_sw_k4.npz
+  path_k2: outputs/hybrid/dataset_sw_k2.npz
+  target_mode: richardson
+
+fno:
+  modes_t: 16
+  modes_x: 32
+  hidden_channels: 32
+  n_layers: 4
+  domain_padding: 0.10
+  positional_embedding: grid
+  output_gate:
+    scale: 1.0e-4               # half-gate at |grad prior| ~ 1e-4 (sweepable)
+
+train:
+  batch_size: 8
+  epochs_adam: 100
+  lr_adam: 1.0e-3
+  weight_decay: 1.0e-6
+  epochs_lbfgs: 0               # Adam-only de-risk (A/B vs modes16 / obsloss)
+  lbfgs_max_iter: 20
+  lbfgs_chunk_size: 8
+  seed: 1234
+  device: cuda
+  loss:
+    data_weight: 1.0
+    physics_weight: 0.0
+    anchor_weight: 0.0
+
+logging:
+  log_every: 10
+  out_dir: outputs/hybrid/fno_sw_gate_derisk

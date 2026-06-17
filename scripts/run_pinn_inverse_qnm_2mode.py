@@ -24,7 +24,7 @@ ringdown.overtone_init block:
       phi1_init:   0.0
 
 If overtone_init values are absent, defaults from
-src.qnm._THEORY_OVERTONE are used.
+src.qnm._THEORY_OVERTONE (Leaver tabulated values) are used.
 
 Usage:
     python scripts/run_pinn_inverse_qnm_2mode.py \\

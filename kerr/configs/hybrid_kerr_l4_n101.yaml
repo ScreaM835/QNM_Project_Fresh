@@ -1,0 +1,45 @@
+# Kerr hybrid FNO — ell=4, COARSE LADDER (prior k4=101) train+eval+plot job.
+#
+# This is the genuine BOTH-AXES regime: dropping the prior to N=101 (vs the
+# saturated N=201) opens spin-graded QNM headroom (prior Mw err 0.3% at a=0 ->
+# ~42% at a=0.95) AND large field headroom (52-76%), while the label-free
+# Richardson teacher (4*up(k2=201) - up(k4=101))/3 stays QNM-clean (<1% all
+# spins, sel_dist tiny) and beats the prior on field too. Verified by
+# probe_prior_resolution_l4 / probe_coarse_ladder_l4 / probe_worst_corner_l4.
+#
+# Same FNO recipe as the ell=2 hybrid (tensor shapes are identical -- all grids
+# upsample to fine N=801 before the FNO, so the coarser prior does not change
+# the network). QNM scoring uses the mode-selective m1-m5 consensus ensemble
+# (omega_target from the per-sample Leaver), NOT the single-method extractor.
+
+seed: 1234
+
+data:
+  dir: kerr/outputs/phase_c_l4_n101
+  target_mode: richardson        # 'supervised' = fine-label A/B upper bound
+
+fno:
+  modes_tau: 64                  # tau-heavy: residual needs ~41 modes here
+  modes_sigma: 24                # sigma is radially smooth: ~9 modes suffice
+  hidden_channels: 48
+  n_layers: 4
+  domain_padding: [0.08, 0.08]   # non-periodic hyperboloidal domain, both axes
+  positional_embedding: grid
+
+train:
+  epochs: 200
+  lr: 1.0e-3
+  weight_decay: 1.0e-6
+  batch_size: 8
+  patience: 30
+
+acceptance:                      # informational gate (coarse-ladder regime)
+  field_rl2: 0.05                # held-out field rel-L2 <= 5%
+  qnm_Mw: 0.01                   # M*omega <= 1% vs Leaver
+  qnm_tau: 0.05                  # tau <= 5% vs Leaver
+
+eval:
+  qnm_workers: 16                # parallel mode-selective ensemble extraction
+
+logging:
+  out_dir: kerr/outputs/phase_c_l4_n101/fno_hybrid_kerr

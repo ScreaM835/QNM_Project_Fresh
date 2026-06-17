@@ -1,0 +1,37 @@
+# Kerr hybrid FNO — comprehensive train+eval+plot job.
+#
+# Design (driven by the measured Kerr residual topology, NOT a port of the SW
+# hybrid): NO gate (no machine-exact region to protect on the hyperboloidal
+# slice), anisotropic tau-heavy modes (residual needs ~41 tau modes vs ~9 sigma),
+# 2 Re/Im output channels (Re/Im correlation ~-0.29), per-sample RMS
+# normalisation (fields span O(1e2)), label-free Richardson target (~11.75x prior
+# reduction), plain additive skip psi_hyb = up4 + s * FNO.
+
+seed: 1234
+
+data:
+  dir: kerr/outputs/phase_c
+  target_mode: richardson        # 'supervised' = fine-label A/B baseline only
+
+fno:
+  modes_tau: 64                  # tau-heavy: residual needs ~41 modes here
+  modes_sigma: 24                # sigma is radially smooth: ~9 modes suffice
+  hidden_channels: 48
+  n_layers: 4
+  domain_padding: [0.08, 0.08]   # non-periodic hyperboloidal domain, both axes
+  positional_embedding: grid
+
+train:
+  epochs: 200
+  lr: 1.0e-3
+  weight_decay: 1.0e-6
+  batch_size: 8
+  patience: 30
+
+acceptance:                      # Phase C locked gate
+  field_rl2: 0.05                # held-out field rel-L2 <= 5%
+  qnm_Mw: 0.01                   # M*omega <= 1% vs Leaver
+  qnm_tau: 0.05                  # tau <= 5% vs Leaver
+
+logging:
+  out_dir: kerr/outputs/phase_c/fno_hybrid_kerr

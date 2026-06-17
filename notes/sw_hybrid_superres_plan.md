@@ -31,7 +31,30 @@ detail correctly instead of from paired data.
 
 **Terminology discipline:** it is *label-free*, **not** *unsupervised*. The PDE
 residual and the coarse anchor are both supervision; we only drop the *fine-FD
-label*. The anchor is load-bearing (it is what cures the collapse), not decorative.
+label*. The anchor is intended to be load-bearing — the *hypothesis* is that it
+cures the collapse — but this is **UNTESTED as of 2026-06-15**, see the honesty
+note below.
+
+> **Anchor track-record (honest, 2026-06-15).** "Anchor" is overloaded in this
+> repo; only one variant is the coarse-prior anchor of this plan, and it is NOT
+> yet demonstrated to work:
+> - **Coarse-prior anchor** `α‖u−u_prior‖²` (THIS plan): the only proper run
+>   (`outputs/hybrid/fno_sw_physics_k4`) has a trained model but **no eval**; the
+>   two diagnostic variants (`..._diag`, `..._diag_norad`) logged the **anchor
+>   term = 0** (residual-only) and sat at field rel-L2 ≈ 5% = the bare k4 prior,
+>   i.e. did **not** beat it. So "cures the collapse" is a hypothesis, not a result.
+> - **The currently-running SW jobs (`30589279`/`30589280`) do NOT test this
+>   anchor.** They are Richardson super-resolution, weights
+>   `(data,physics,anchor)=(1.0,0.0,0.0)` — anchor OFF. They validate the
+>   *Richardson* label-free target, a different mechanism (see §below).
+> - **Continuity anchors** (curriculum-PINN window stitching, weight 10): the
+>   paper conclusion records these performed **WORSE** than the hard-partition
+>   stitch. A *different* kind of anchor, but the reason to be skeptical.
+> - **RAD anchor-retention** / **B.9 "anchor spins"**: unrelated uses of the word
+>   (collocation-point retention; reference spin values) — not loss terms.
+>
+> Net: the coarse-prior anchor is **plausible but unproven**; the Stage-1 run that
+> would actually test it has not been executed (the running jobs test Richardson).
 
 ---
 
@@ -145,14 +168,189 @@ cannot clear the bar here, *before* any GPU/operator spend.
 
 ---
 
-## 6. Stage 2 — parametric operator (LATER, only after Stage 1 passes)
+## 5b. G1b — the anchor go/no-go (EXECUTABLE SPEC, 2026-06-15)
 
-Promote the refiner to an **operator** (FNO/PINO, form (B): `u = up(u_coarse)+δ_θ`,
-trained on the **PDE residual**, not fine-FD MSE), conditioned first on M (SW), then
-on Kerr spin a/M using the **validated Teukolsky residual (2.5e-16)**
-([kerr/src/teukolsky_residual.py](kerr/src/teukolsky_residual.py)). Add PINO's
-**virtual instances** (extra spins, no FD at all) and **instance-wise fine-tuning +
-anchor loss** at query time. This is the label-free operator that scales in dimension.
+**Why this section exists.** The running SW jobs (`30589279`/`30589280`) test the
+**Richardson** target with `(data,physics,anchor)=(1.0,0.0,0.0)` — **anchor OFF**.
+They do NOT test the coarse-prior anchor that the Kerr Stage-2 port (§6) depends on.
+This is the missing test: *does a label-free, PDE-residual-trained refiner anchored
+to the cheap coarse prior actually beat the bare prior?*
+
+**KEY — the model already exists, so Step 0 costs ZERO training.**
+`outputs/hybrid/fno_sw_physics_k4/model_best.pt` was trained with the exact recipe
+([configs/hybrid_sw_physics_k4.yaml](../configs/hybrid_sw_physics_k4.yaml): data=0,
+physics=1.0, anchor=0.1, label-free, hard-IC gating) but was **never evaluated**.
+
+**Form note (honest, do not gloss).** The SW code is **Form (B)**:
+`u = prior + corr`, anchor = `‖corr‖²` (a shrink-toward-prior penalty), with hard-IC
+gating `corr = s²·raw`. The Kerr Stage-2 plan (§6.2) is **Form (A)** (free net,
+anchor `‖u−prior‖²`, prior NOT in the ansatz, to preserve solver-freedom). Form (B)
+is the *stronger* anchor (structural, not just a loss), so: a Form-(B) **PASS** is
+**necessary-but-not-sufficient** evidence for the Form-(A) Kerr port; a Form-(B)
+**FAIL** strongly discourages porting the anchor at all. Say this in any writeup.
+
+**Structural worry to keep in mind.** The anchor `‖corr‖²` can only pull *toward*
+the prior; the only term that can push *past* it is the fine-grid PDE residual. But
+the coarse prior already nearly satisfies the fine 2nd-order residual (the
+`fno_sw_physics_k4_diag` / `_diag_norad` runs sat at field rel-L2 ≈ 5% = the bare
+k4 prior with the residual at ~1e-6). So the live risk is **"refiner just inherits
+the prior"**, not collapse-to-zero (hard-IC blocks zero). Step 0 measures exactly this.
+
+### Controls (all scored vs fine FD + Leaver in ONE eval)
+The eval script already emits all three, so no extra runs:
+- **C0 = bare k4 prior** (coarse-up baseline) = `field.rl2_baseline` + `*_base_*`
+  QNM in `summary.json`. The bar. **Free in every eval.**
+- **A = physics-only** (`anchor_weight=0`): isolates whether the residual alone
+  moves off the prior. (`_diag` evidence hints NO.)
+- **B = physics + anchor 0.1** = the existing `fno_sw_physics_k4`. The test article.
+
+### Steps
+0. **(free) Evaluate the existing checkpoint.**
+   - login smoke (<1 min, confirm it runs):
+     `scripts/eval_hybrid_sw.py --config configs/hybrid_sw_physics_k4.yaml --n 5 --xq 2`
+   - full: same minus `--n`, on **SLURM** (inference-only → CPU icelake is fine).
+   - **PASS iff** `field.rl2_hybrid < field.rl2_baseline` (beats prior on waveform)
+     **AND** `xq2_hyb_M4_omega_pct_err ≤ xq2_base_M4_omega_pct_err` (QNM not
+     regressed). Both read from the SAME `summary.json`.
+1. **If Step 0 PASSES** → G1b green: the anchor works on SW. Proceed to Kerr
+   Stage-2 (still gated on G2). **No new training.**
+2. **If Step 0 FAILS** → run the 1-variable A/B to attribute: A (`anchor_weight=0`)
+   and B (`anchor_weight ∈ {0.1, 1, 10}`), label-free physics, **same seed/budget,
+   ONLY anchor_weight varies**. Gate = best B beats C0 on field AND keeps QNM ≤ C0;
+   report A to show the anchor's marginal effect. If even the best anchor cannot
+   beat C0 → the anchor does **NOT** cure the gap on SW; **do NOT port it to Kerr**;
+   the Kerr collapse rescue must come from elsewhere (Fourier G2 / curriculum). That
+   is itself a decisive, publishable finding (§5 "decisive-failure value").
+
+### Compute & discipline
+- Eval = inference-only, no GPU. Step-2 training = the established FNO GPU path
+  (ampere), short (100 Adam + 30 L-BFGS epochs; `_diag` was ~15 s/epoch).
+- **SLURM mandate:** full eval + any training → SLURM, never login (login only the
+  `--n 5` smoke).
+- Step 0 changes nothing; Step 2 changes ONLY `anchor_weight`. The clean A/B the
+  C.3 over-engineering lesson demands.
+
+---
+
+## 6. Stage 2 — parametric operator → Kerr (LATER; gated on Stage-1 + Fourier verdict)
+
+**Status:** on-paper wiring only (drafted 2026-06-15). NO code, NO compute until
+both gates in §6.1 are green. Written so it is ready to execute the moment the SW
+Stage-1 A/B (`30589279`/`30589280`) and the Kerr Fourier a/M=0 go/no-go
+(`30593612`) report.
+
+### 6.1 Two decision gates (both green before any Stage-2 code)
+
+| gate | source | green = | if red |
+|---|---|---|---|
+| **G1a — Richardson (running)** | SW jobs `30589279`/`30589280` | Richardson refiner beats bare k4 on waveform AND keeps QNM ≤ prior | Richardson target insufficient; lean on the anchor (G1b) |
+| **G1b — anchor (THE port gate)** | §5b anchor go/no-go (eval existing `fno_sw_physics_k4` FIRST) | physics+anchor refiner beats bare k4 on waveform AND keeps QNM ≤ prior | anchor does NOT cure the gap → do NOT port the anchor to Kerr |
+| **G2 — pure-PINN status** | Kerr Fourier a/M=0 (`30593612`) | Fourier PINN already PASSES a/M=0 | anchor is the rescue for the collapse → highest value precisely *here* |
+
+**G1b, not G1a, gates the Kerr anchor port** (Stage-2 uses the anchor, not
+Richardson). G1a is a parallel label-free data point. Run G1b's Step 0 (a free eval
+of an already-trained model) before assuming the anchor works — see §5b.
+
+Honest branch: Stage-2 (anchor) is the **rescue path for the C.3 collapse**, so it
+matters most when **G2 is RED** (Fourier alone does not cure a/M=0). If G2 is green
+the pure PINN stands alone and the anchor becomes a spin-generalisation aid, not a
+rescue.
+
+### 6.2 Reconciliation with the C.0′ pivot (DO NOT resurrect the rejected hybrid)
+
+C.0′ ([kerr/notes/phase_c_plan.md](../kerr/notes/phase_c_plan.md)) dropped the
+**supervised** coarse-FD→FNO→fine-FD hybrid for three reasons: (1) not solver-free
+at inference, (2) capped by its fine-FD teacher, (3) no higher-D transfer. Stage-2
+walks back **none** of these, because it borrows only the *anchor mechanism*, not
+the architecture:
+
+- **Operator = the parametric PINN** (`kerr/src/kerr_pinn.py`), NOT an FNO. C.0′
+  already ruled out FNO/PINO for Kerr (FFT → Gibbs at scri/horizon; 3-scalar family
+  wastes function-space machinery; autodiff is geometry-agnostic and scales past
+  3+1D). Stage-2 keeps that ruling.
+- **Form (A), not Form (B).** Inject the coarse prior as a **training-time anchor
+  loss** `α‖Ψ_θ − Ψ_prior‖²`, NOT baked into the ansatz `up(Ψ_coarse)+δ`. The anchor
+  is a regulariser **discarded at inference** — deployment still evaluates
+  `Ψ_θ(σ,τ;a/M)` from the equation alone. Solver-freedom (C.0′ defect 1) is
+  preserved. This is the deliberate upgrade over this section's old Form-(B) stub,
+  which would have re-introduced an inference-time coarse solve.
+- **Label-free.** Loss = Teukolsky **PDE residual**
+  ([kerr/src/teukolsky_residual.py](../kerr/src/teukolsky_residual.py), 2.5e-16) +
+  anchor; the anchor target is a **cheap coarse Teukolsky solve**, never a fine-FD
+  field. No fine FD in the loss → C.0′ defect 2 does not bite (the network can drop
+  *below* the coarse prior's error, since it minimises the true residual, not a
+  teacher MSE).
+- **Higher-D transfer** (C.0′ defect 3) intact: the residual is identical in any
+  dimension; the anchor is only a finite-time stabiliser to escape the trivial-zero
+  basin, not a 1+1D-specific crutch.
+
+So Stage-2 = "the proven SW anchor mechanism, ported as a **training-time
+regulariser** onto the C.0′ pure PINN." We do not rebuild the hybrid.
+
+### 6.3 Wiring (file-level; extend, do not fork)
+
+- **Residual:** `kerr/src/teukolsky_residual.py` — unchanged.
+- **Network + domain:** `kerr/src/kerr_pinn.py` — add ONE loss term
+  (`α·‖Ψ_θ − Ψ_prior‖²` at collocation points) + a prior-evaluation hook. Fourier
+  features, hard-IC ansatz, hyperboloidal domain, no-BC: all unchanged.
+- **Prior source:** a cheap coarse Teukolsky solve from the Phase-B core
+  (`kerr/src/teukolsky_minimal_gauge.py`). **First check whether the C.1/C.2 corpus
+  (`kerr/outputs/phase_c/`) already carries a coarse tier** — if so, no new solver
+  code, only a differentiable-interpolation hook. Do NOT build a coarse-prior
+  builder until this is confirmed.
+- **Driver:** `kerr/scripts/train_kerr_pinn.py` — add `--anchor-prior PATH` and
+  `--anchor-weight α`, default OFF, so the baseline/Fourier runs stay byte-identical.
+- **Config:** extend the existing schema → new `kerr/configs/kerr_pinn_anchor.yaml`.
+
+### 6.4 Loss (start MINIMAL — same discipline as §5)
+
+| term | weight (start) | role |
+|---|---|---|
+| Teukolsky PDE residual (autograd, 2 real channels) | λ_res = 1.0 | the physics; only term that scales to higher-D |
+| coarse-prior anchor ‖Ψ_θ − Ψ_prior‖² (**training only**) | α = 1.0 | escapes the trivial-zero basin; discarded at inference |
+| hard IC | — (ansatz) | exact; no loss term |
+| BC | **none** | hyperboloidal outflow is automatic (Kerr's free win over SW) |
+| Fourier features | on | spectral-bias mitigation (the G2 lever) |
+
+**Key knob:** α, exactly as SW §5. Sweep α ∈ {0.1, 1, 10} only if a/M=0 still
+collapses. Anchor stays on through Adam→L-BFGS (stabiliser, not warm-up).
+
+### 6.5 Acceptance (the LOCKED Kerr Phase-C gate — unchanged, not softened)
+
+- **First** clear **a/M=0** (the current blocker): scri rel-L2 ≤ 5% AND M*omega ≤
+  1% vs Leaver — the *same* gate the bare and Fourier PINNs face, so the anchor is a
+  clean one-variable A/B.
+- **Then** held-out spins: field rel-L2 ≤ 5% AND M*omega ≤ 1% AND τ ≤ 5% vs Leaver.
+- **Always report the bare-coarse-prior control** (C0). The anchor must let the PINN
+  **beat** the prior, not merely inherit it — else we have validated the coarse
+  solver, not the operator.
+
+### 6.6 Honest risks specific to Stage-2
+
+- **Anchor may not fully cure the collapse.** If a/M=0 still collapses with the
+  training-time anchor, the only fallback is Form (B) (prior in the ansatz) — which
+  **costs solver-freedom** (C.0′ defect 1 returns). Documented last resort, used
+  only if Form (A) + Fourier both fail, and flagged as such in any writeup.
+- **"Cosmetic QNM" repeat.** Phase B showed the FD QNM is robust to coarsening; the
+  coarse prior likely already carries M*omega. Expect the anchor to earn its keep on
+  the **waveform**, with the QNM as a "stays-green" validation — exactly the SW
+  Stage-0 finding. Say so honestly.
+- **Anchor masking a dead network.** A strong anchor can pass the gate while N_θ
+  does nothing. Mitigation: the C0 control above + report the residual reached at
+  α=0 vs α>0.
+- **Compute discipline.** a/M=0 go/no-go is CPU (SLURM, `FERGUSSON-SL3-CPU`); no GPU
+  until a/M=0 passes, per the Phase-C ladder.
+
+### 6.7 Sequencing (one variable at a time)
+
+1. Wait for **G1** (SW Stage-1) and **G2** (Fourier a/M=0).
+2. If G2 RED and G1 GREEN → wire §6.3, run the a/M=0 anchor go/no-go (CPU/SLURM)
+   with **Fourier ON + anchor ON**, vs the Fourier-only control. One new variable.
+3. If a/M=0 passes → a/M=0.7, then held-out spins (this *is* the PINO "virtual
+   instances" test — the parametric PINN already enforces the residual over a
+   continuous a/M distribution, no FD per spin), then C.4 GPU.
+4. PINO over arbitrary IC *fields* stays the documented future option (C.0′ caveat),
+   NOT built here.
 
 ---
 

@@ -1,0 +1,28 @@
+experiment:
+  name: hybrid_sw_k4
+
+dataset:
+  path: outputs/hybrid/dataset_sw_k4.npz
+
+fno:
+  modes_t: 16
+  modes_x: 32
+  hidden_channels: 32
+  n_layers: 4
+  domain_padding: 0.10
+  positional_embedding: grid
+
+train:
+  batch_size: 8
+  epochs_adam: 100
+  lr_adam: 1.0e-3
+  weight_decay: 1.0e-6
+  epochs_lbfgs: 30
+  lbfgs_max_iter: 20
+  lbfgs_chunk_size: 8
+  seed: 1234
+  device: cuda
+
+logging:
+  log_every: 10
+  out_dir: outputs/hybrid/fno_sw_k4

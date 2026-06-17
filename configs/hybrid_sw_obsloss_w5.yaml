@@ -1,0 +1,49 @@
+# WEIGHT SWEEP (Adam-only): observer.weight = 5.0.
+#
+# Byte-identical to hybrid_sw_obsloss_derisk (Adam-only, 100 ep, NO L-BFGS)
+# EXCEPT observer.weight 1.0 -> 5.0. Brackets the weight sweep from above: this
+# is the aggressive end. If field tanks here we have located the field-for-tau
+# ceiling; if tau drops below the weight=1/2 values at acceptable field cost,
+# the best weight is >=5 and we promote it to the full L-BFGS schedule. Adam-only
+# for a clean A/B against weight=1 (fno_sw_obsloss_derisk) and weight=2.
+
+experiment:
+  name: hybrid_sw_obsloss_w5
+
+dataset:
+  path: outputs/hybrid/dataset_sw_k4.npz      # k4 coarse prior (channel 0)
+  path_k2: outputs/hybrid/dataset_sw_k2.npz   # k2 coarse, sample-aligned
+  target_mode: richardson                     # LABEL-FREE Phi_R target
+
+fno:
+  modes_t: 16
+  modes_x: 32
+  hidden_channels: 32
+  n_layers: 4
+  domain_padding: 0.10
+  positional_embedding: grid
+
+train:
+  batch_size: 8
+  epochs_adam: 100          # match modes16 control (clean A/B)
+  lr_adam: 1.0e-3
+  weight_decay: 1.0e-6
+  epochs_lbfgs: 0           # de-risk: Adam-only, matches the modes16 eval point
+  lbfgs_max_iter: 20
+  lbfgs_chunk_size: 8
+  seed: 1234
+  device: cuda
+  loss:
+    data_weight: 1.0        # global field loss UNCHANGED (keeps field accurate)
+    physics_weight: 0.0
+    anchor_weight: 0.0
+    observer:               # QNM-aware envelope-whitened observer-column term
+      weight: 5.0           # SWEEP: 5x the de-risk weight (aggressive bracket)
+      xq: 2.0               # extraction radius where the QNM is read
+      t_start: 10.0         # weight=1 before ringdown; whiten the tail beyond
+      whiten_tau: 11.241    # theory tau: counter e^{-2t/tau} decay of the signal
+      whiten_cap: 50.0      # cap the boost so each e-fold ~equal, no runaway
+
+logging:
+  log_every: 10
+  out_dir: outputs/hybrid/fno_sw_obsloss_w5

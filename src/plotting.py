@@ -17,6 +17,7 @@ def plot_snapshots(
     times: List[float],
     outpath: str,
     title: str,
+    model_label: str = "PINN",
 ) -> None:
     ensure_dir(os.path.dirname(outpath))
     fig, axes = plt.subplots(2, 2, figsize=(10, 7), sharex=True, sharey=True)
@@ -25,7 +26,7 @@ def plot_snapshots(
     for ax, tt in zip(axes, times):
         idx = int(np.argmin(np.abs(t - tt)))
         ax.plot(x, phi_fd[idx], label="FD")
-        ax.plot(x, phi_pinn[idx], label="PINN")
+        ax.plot(x, phi_pinn[idx], label=model_label)
         ax.set_title(f"t/M = {t[idx]:.0f}")
         ax.grid(True, alpha=0.3)
 
@@ -106,6 +107,39 @@ def plot_loss(history: Dict[str, List[float]], outpath: str, title: str) -> None
     plt.close(fig)
 
 
+def plot_loss_fno(history: List[Dict], outpath: str, title: str) -> None:
+    """FNO/operator training history in the same visual style as plot_loss.
+
+    ``history`` is a list of per-epoch dicts as written by train_fno.py
+    (keys: 'epoch', 'loss', and any subset of the weighted components
+    'field', 'h1', 'ring', 'obs', 'tw', 'pde').
+    """
+    ensure_dir(os.path.dirname(outpath))
+    if not history:
+        return
+    epochs = np.array([rec["epoch"] for rec in history])
+    components = ["field", "h1", "ring", "obs", "tw", "pde"]
+
+    fig = plt.figure(figsize=(9, 5))
+    ax = plt.gca()
+    if "loss" in history[0]:
+        L_tot = np.array([rec["loss"] for rec in history])
+        ax.semilogy(epochs, L_tot, label="L_total", linewidth=1.5)
+    for k in components:
+        if k in history[0]:
+            vals = np.array([rec.get(k, np.nan) for rec in history], dtype=float)
+            ax.semilogy(epochs, vals, label=f"L_{k}", alpha=0.7)
+
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel("Loss (weighted)")
+    ax.set_title(title)
+    ax.grid(True, alpha=0.3)
+    ax.legend(ncol=2, fontsize=8)
+    fig.tight_layout()
+    fig.savefig(outpath, dpi=200)
+    plt.close(fig)
+
+
 def plot_ringdown(t: np.ndarray, y: np.ndarray, outpath: str, title: str) -> None:
     ensure_dir(os.path.dirname(outpath))
     fig = plt.figure(figsize=(8, 4))
@@ -126,10 +160,11 @@ def plot_ringdown_overlay(
     outpath: str,
     title: str = "Ringdown comparison",
     xq: float = 10.0,
+    model_label: str = "PINN",
 ) -> None:
     """
     Two-panel ringdown comparison (similar to paper Fig. 5):
-      Top:    linear scale, FD vs PINN overlaid
+      Top:    linear scale, FD vs model overlaid
       Bottom: semi-log |phi| to compare exponential decay / damping rates
     """
     ensure_dir(os.path.dirname(outpath))
@@ -137,7 +172,7 @@ def plot_ringdown_overlay(
 
     # Top panel: linear
     ax1.plot(t, y_fd, label="FD", linewidth=1.2)
-    ax1.plot(t, y_pinn, label="PINN", linewidth=1.2, linestyle="--")
+    ax1.plot(t, y_pinn, label=model_label, linewidth=1.2, linestyle="--")
     ax1.set_ylabel(r"$\Phi(x_q, t)$")
     ax1.set_title(f"{title}  ($x_q = {xq}$)")
     ax1.legend()
@@ -145,7 +180,7 @@ def plot_ringdown_overlay(
 
     # Bottom panel: semi-log |phi|
     ax2.semilogy(t, np.abs(y_fd) + 1e-30, label="FD", linewidth=1.2)
-    ax2.semilogy(t, np.abs(y_pinn) + 1e-30, label="PINN", linewidth=1.2, linestyle="--")
+    ax2.semilogy(t, np.abs(y_pinn) + 1e-30, label=model_label, linewidth=1.2, linestyle="--")
     ax2.set_xlabel("t / M")
     ax2.set_ylabel(r"$|\Phi(x_q, t)|$")
     ax2.legend()
@@ -165,9 +200,10 @@ def plot_error_heatmap(
     title: str = "Pointwise error",
     signed: bool = False,
     xlim: Optional[Tuple[float, float]] = None,
+    model_label: str = "PINN",
 ) -> None:
     """
-    2D colormap of |phi_FD - phi_PINN| (or signed difference) over the full
+    2D colormap of |phi_FD - phi_model| (or signed difference) over the full
     space-time domain.  Similar to paper Fig. 7.
     """
     ensure_dir(os.path.dirname(outpath))
@@ -183,11 +219,11 @@ def plot_error_heatmap(
             x, t, diff, shading="auto", cmap="RdBu_r", vmin=-vmax, vmax=vmax
         )
         cbar = fig.colorbar(im, ax=ax, pad=0.02)
-        cbar.set_label(r"$\Phi_{\mathrm{FD}} - \Phi_{\mathrm{PINN}}$")
+        cbar.set_label(rf"$\Phi_{{\mathrm{{FD}}}} - \Phi_{{\mathrm{{{model_label}}}}}$")
     else:
         im = ax.pcolormesh(x, t, diff, shading="auto", cmap="magma_r")
         cbar = fig.colorbar(im, ax=ax, pad=0.02)
-        cbar.set_label(r"$|\Phi_{\mathrm{FD}} - \Phi_{\mathrm{PINN}}|$")
+        cbar.set_label(rf"$|\Phi_{{\mathrm{{FD}}}} - \Phi_{{\mathrm{{{model_label}}}}}|$")
 
     ax.set_xlabel(r"$x_* / M$")
     ax.set_ylabel("t / M")

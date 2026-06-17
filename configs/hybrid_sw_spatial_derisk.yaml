@@ -1,0 +1,63 @@
+# DE-RISK: spatial |Y|-whitened loss (A/B vs fno_sw_modes16).
+#
+# Second QNM-aware lever (complements hybrid_sw_obsloss_derisk.yaml). Byte-
+# identical to the modes16 control (modes_t=16, 100 Adam, NO L-BFGS) EXCEPT it
+# switches ON the spatial target-magnitude-whitened loss term.
+#
+# Motivation (measured, canonical BH): the FNO improves field rL2 12x by crushing
+# the high-gradient WAVEFRONT error 8-12x, but as a GLOBAL operator it sprays
+# ~5e-5 broadband speckle EVERYWHERE, including:
+#   - smooth/causal-exterior regions where the target Y is MACHINE-ZERO (|Y|~1e-14,
+#     prior already exact) -> pure hallucination, zero field cost to suppress;
+#   - the observer ringdown tail where |Y|~1.6e-4 and the 5e-5 spray is a 32%
+#     perturbation that distorts the QNM decay slope.
+# The absolute data term ignores both (tail ~1e-7 of its energy). This term
+# weights the FULL-field residual (corr - Y)^2 by ws = (|Y| + floor)^(-p)
+# (normalised mean 1), giving small-|Y| regions ~equal say so the FNO must drive
+# corr -> Y there (incl. corr -> 0 where Y -> 0), WITHOUT touching the wavefronts
+# the unchanged absolute data term still governs. floor (~tail |Y| scale) caps the
+# weight so machine-zero regions cannot blow it up. This is the spatial 2D
+# generalisation of the observer (temporal, single-column) term -> clean A/B.
+#
+# A/B: modes16 (both terms OFF) = field 0.52% / M4 tau 0.99% (median, xq=2). Does
+# the spatial term drop M4 tau toward prior 0.17% / fine 0.06% while field stays
+# ~0.5%? Report BOTH metrics.
+
+experiment:
+  name: hybrid_sw_spatial_derisk
+
+dataset:
+  path: outputs/hybrid/dataset_sw_k4.npz      # k4 coarse prior (channel 0)
+  path_k2: outputs/hybrid/dataset_sw_k2.npz   # k2 coarse, sample-aligned
+  target_mode: richardson                     # LABEL-FREE Phi_R target
+
+fno:
+  modes_t: 16
+  modes_x: 32
+  hidden_channels: 32
+  n_layers: 4
+  domain_padding: 0.10
+  positional_embedding: grid
+
+train:
+  batch_size: 8
+  epochs_adam: 100          # match modes16 control (clean A/B)
+  lr_adam: 1.0e-3
+  weight_decay: 1.0e-6
+  epochs_lbfgs: 0           # de-risk: Adam-only, matches the modes16 eval point
+  lbfgs_max_iter: 20
+  lbfgs_chunk_size: 8
+  seed: 1234
+  device: cuda
+  loss:
+    data_weight: 1.0        # global field loss UNCHANGED (keeps wavefronts/field)
+    physics_weight: 0.0
+    anchor_weight: 0.0
+    spatial:                # NEW full-field |Y|-whitened term (default-off elsewhere)
+      weight: 1.0           # weight of the whitened term added on top of data
+      floor: 1.0e-4         # |Y| scale: ~ringdown-tail target; also max-weight cap
+      p: 1.0                # ws=(|Y|+floor)^-p; p=1 gentle, p=2 = relative L2
+
+logging:
+  log_every: 10
+  out_dir: outputs/hybrid/fno_sw_spatial_derisk

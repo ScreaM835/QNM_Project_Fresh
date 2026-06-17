@@ -53,6 +53,10 @@ def main():
                     help="Number of start times in the Method 5 2-D scan (default 10).")
     ap.add_argument("--two-mode-2d-n-te", type=int, default=6,
                     help="Number of end times in the Method 5 2-D scan (default 6).")
+    ap.add_argument("--M", type=float, default=None,
+                    help="Override black-hole mass M used to rescale (omega, tau) "
+                         "to dimensionless (M*omega, tau/M) before comparing to "
+                         "theory. Default: read physics.M from the config (1.0 if absent).")
     args = ap.parse_args()
 
     cfg = load_config(args.config)
@@ -60,6 +64,7 @@ def main():
     xq = float(cfg["evaluation"]["xq"])
     potential = cfg["physics"]["potential"]       # "zerilli" or "regge_wheeler"
     ell = int(cfg["physics"]["l"])                # angular mode number
+    M = float(args.M) if args.M is not None else float(cfg["physics"].get("M", 1.0))
 
     if args.source == "fd":
         npz = np.load(os.path.join("outputs", "fd", f"{name}_fd.npz"))
@@ -81,9 +86,11 @@ def main():
     m1 = qnm_method_1(t, y, t_start=t_start, t_end=t_end)
     m2 = qnm_method_2(t, y, t_start=t_start, t_end=t_end)
 
-    # Compute percentage errors vs theoretical values (Patel et al. Table 3 style)
-    e1 = percentage_errors(m1, potential=potential, ell=ell)
-    e2 = percentage_errors(m2, potential=potential, ell=ell)
+    # Compute percentage errors vs theoretical values (Patel et al. Table 3 style).
+    # Pass M so raw fits in code-time units get rescaled to dimensionless
+    # (M*omega, tau/M) before comparison against the dimensionless theory.
+    e1 = percentage_errors(m1, potential=potential, ell=ell, M=M)
+    e2 = percentage_errors(m2, potential=potential, ell=ell, M=M)
 
     # Merge percentage errors into result dicts for saving
     m1_full = {**m1, **e1}
@@ -97,22 +104,23 @@ def main():
 
     plot_ringdown(t, y, os.path.join(outdir, f"{tag}_ringdown.png"), title=f"Ringdown at xq={xq} ({tag})")
 
-    # Print formatted comparison table (matching Patel et al. Table 3 format)
+    # Print formatted comparison table (matching Patel et al. Table 3 format).
+    # Values shown are the dimensionless rescaled quantities M*omega and tau/M.
     print(f"\n{'='*65}")
-    print(f"  QNM Extraction: {tag.upper()} | {potential} l={ell} | xq={xq}")
+    print(f"  QNM Extraction: {tag.upper()} | {potential} l={ell} | xq={xq} | M={M:.4f}")
     print(f"  Theory:  omega*M = {e1['omega_theory']},  tau/M = {e1['tau_theory']}")
     print(f"{'='*65}")
     print(f"  {'Method':<10} {'tau/M':>10} {'(% err)':>10} {'omega*M':>10} {'(% err)':>10}")
     print(f"  {'-'*50}")
-    print(f"  {'Method 1':<10} {m1['tau']:>10.4f} {_fmt_pct(e1['tau_pct_err']):>10} {m1['omega']:>10.4f} {_fmt_pct(e1['omega_pct_err']):>10}")
-    print(f"  {'Method 2':<10} {m2['tau']:>10.4f} {_fmt_pct(e2['tau_pct_err']):>10} {m2['omega']:>10.4f} {_fmt_pct(e2['omega_pct_err']):>10}")
+    print(f"  {'Method 1':<10} {e1['tau_dim']:>10.4f} {_fmt_pct(e1['tau_pct_err']):>10} {e1['omega_dim']:>10.4f} {_fmt_pct(e1['omega_pct_err']):>10}")
+    print(f"  {'Method 2':<10} {e2['tau_dim']:>10.4f} {_fmt_pct(e2['tau_pct_err']):>10} {e2['omega_dim']:>10.4f} {_fmt_pct(e2['omega_pct_err']):>10}")
 
     if args.esprit:
         m3 = qnm_method_3_esprit(t, y, t_start=t_start, t_end=t_end, K=args.esprit_K)
-        e3 = percentage_errors(m3, potential=potential, ell=ell)
+        e3 = percentage_errors(m3, potential=potential, ell=ell, M=M)
         m3_full = {**m3, **e3}
         save_json(os.path.join(outdir, f"{tag}_method3_esprit.json"), m3_full)
-        print(f"  {'Method 3':<10} {m3['tau']:>10.4f} {_fmt_pct(e3['tau_pct_err']):>10} {m3['omega']:>10.4f} {_fmt_pct(e3['omega_pct_err']):>10}")
+        print(f"  {'Method 3':<10} {e3['tau_dim']:>10.4f} {_fmt_pct(e3['tau_pct_err']):>10} {e3['omega_dim']:>10.4f} {_fmt_pct(e3['omega_pct_err']):>10}")
         # Show secondary modes (potential overtones / tail)
         amps = m3.get("all_amps", [])
         omegas = m3.get("all_omegas", [])
@@ -131,10 +139,10 @@ def main():
             n_starts=args.two_mode_n, potential=potential, ell=ell,
         )
         e4 = percentage_errors({"omega": m4["omega"], "tau": m4["tau"]},
-                               potential=potential, ell=ell)
+                               potential=potential, ell=ell, M=M)
         m4_full = {**m4, **e4}
         save_json(os.path.join(outdir, f"{tag}_method4_two_mode.json"), m4_full)
-        print(f"  {'Method 4':<10} {m4['tau']:>10.4f} {_fmt_pct(e4['tau_pct_err']):>10} {m4['omega']:>10.4f} {_fmt_pct(e4['omega_pct_err']):>10}")
+        print(f"  {'Method 4':<10} {e4['tau_dim']:>10.4f} {_fmt_pct(e4['tau_pct_err']):>10} {e4['omega_dim']:>10.4f} {_fmt_pct(e4['omega_pct_err']):>10}")
         print(f"    plateau t0 in [{m4['t0_plateau_min']:.2f}, {m4['t0_plateau_max']:.2f}]"
               f"   omega = {m4['omega']:.6f} +/- {m4['omega_std']:.6f}"
               f"   tau = {m4['tau']:.6f} +/- {m4['tau_std']:.6f}")
@@ -182,7 +190,7 @@ def main():
                 # exponential-decay range available to constrain tau.
                 t_start_m2 = t0_pl
                 m2_pl = qnm_method_2(t, y, t_start=t_start_m2, t_end=t_end)
-                e2_pl = percentage_errors(m2_pl, potential=potential, ell=ell)
+                e2_pl = percentage_errors(m2_pl, potential=potential, ell=ell, M=M)
                 m2_pl_full = {
                     **m2_pl, **e2_pl,
                     "t_start_used": t_start_m2,
@@ -190,7 +198,7 @@ def main():
                     "m4_plateau_min": t0_pl, "m4_plateau_max": t1_pl,
                 }
                 save_json(os.path.join(outdir, f"{tag}_method2_on_m4_plateau.json"), m2_pl_full)
-                print(f"  {'M2@M4pl':<10} {m2_pl['tau']:>10.4f} {_fmt_pct(e2_pl['tau_pct_err']):>10} {m2_pl['omega']:>10.4f} {_fmt_pct(e2_pl['omega_pct_err']):>10}")
+                print(f"  {'M2@M4pl':<10} {e2_pl['tau_dim']:>10.4f} {_fmt_pct(e2_pl['tau_pct_err']):>10} {e2_pl['omega_dim']:>10.4f} {_fmt_pct(e2_pl['omega_pct_err']):>10}")
                 print(f"    fit window t in [{t_start_m2:.2f}, {t_end:.2f}]"
                       f"  (M4 plateau midpoint)")
         except Exception as exc:
@@ -209,10 +217,10 @@ def main():
             potential=potential, ell=ell,
         )
         e5 = percentage_errors({"omega": m5["omega"], "tau": m5["tau"]},
-                               potential=potential, ell=ell)
+                               potential=potential, ell=ell, M=M)
         m5_full = {**m5, **e5}
         save_json(os.path.join(outdir, f"{tag}_method5_2d_scan.json"), m5_full)
-        print(f"  {'Method 5':<10} {m5['tau']:>10.4f} {_fmt_pct(e5['tau_pct_err']):>10} {m5['omega']:>10.4f} {_fmt_pct(e5['omega_pct_err']):>10}")
+        print(f"  {'Method 5':<10} {e5['tau_dim']:>10.4f} {_fmt_pct(e5['tau_pct_err']):>10} {e5['omega_dim']:>10.4f} {_fmt_pct(e5['omega_pct_err']):>10}")
         print(f"    plateau t0 in [{m5['t0_plateau_min']:.2f}, {m5['t0_plateau_max']:.2f}]"
               f"   te in [{m5['te_plateau_min']:.2f}, {m5['te_plateau_max']:.2f}]")
         print(f"    omega = {m5['omega']:.6f} +/- {m5['omega_std']:.6f}"

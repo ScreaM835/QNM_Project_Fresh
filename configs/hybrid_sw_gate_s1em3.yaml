@@ -1,0 +1,43 @@
+# GATE SCALE SWEEP point: s = 1e-3 (AGGRESSIVE -- confines the FNO to the very
+# sharpest wavefronts; suppresses everything below |grad|~1e-3).
+# Identical to hybrid_sw_gate_derisk.yaml except output_gate.scale and out_dir.
+# field = prior + g * FNO,  g = |grad prior| / (|grad prior| + 1e-3).
+# At |grad|=4.4e-4 (60-70% band) g~0.30 (heavy clipping); only |grad|>3e-3 passes
+# (g>0.78). Tests whether the wavefront correction tolerates aggressive gating;
+# expected to clean the smooth regions hardest but risks costing wavefront field.
+experiment:
+  name: hybrid_sw_gate_s1em3
+
+dataset:
+  path: outputs/hybrid/dataset_sw_k4.npz
+  path_k2: outputs/hybrid/dataset_sw_k2.npz
+  target_mode: richardson
+
+fno:
+  modes_t: 16
+  modes_x: 32
+  hidden_channels: 32
+  n_layers: 4
+  domain_padding: 0.10
+  positional_embedding: grid
+  output_gate:
+    scale: 1.0e-3
+
+train:
+  batch_size: 8
+  epochs_adam: 100
+  lr_adam: 1.0e-3
+  weight_decay: 1.0e-6
+  epochs_lbfgs: 0
+  lbfgs_max_iter: 20
+  lbfgs_chunk_size: 8
+  seed: 1234
+  device: cuda
+  loss:
+    data_weight: 1.0
+    physics_weight: 0.0
+    anchor_weight: 0.0
+
+logging:
+  log_every: 10
+  out_dir: outputs/hybrid/fno_sw_gate_s1em3

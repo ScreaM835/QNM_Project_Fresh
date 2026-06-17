@@ -1,0 +1,250 @@
+"""Evaluate a trained hybrid (coarse FD + FNO residual) surrogate.
+
+For each test sample:
+  - Build inputs via the same pipeline as training (assemble_split on test).
+  - Predict delta with the trained model.
+  - Reconstruct psi_hybrid = upsample(psi_coarse) + delta.
+  - Also compute the pure coarse-up baseline psi_baseline = upsample(psi_coarse).
+  - Compare psi_hybrid, psi_baseline against fine truth (MSE, L2).
+
+Then run QNM Method 4 (two-mode NLS) at xq in {2, 10} on three time series for
+each sample: hybrid, baseline (coarse-up), and fine truth. Save percent errors
+vs Leaver theory (Zerilli l=2: M*omega=0.3737, tau/M=11.241), per-sample and
+aggregated.
+
+Pure inference; runs on GPU. ~ few minutes for 100 test samples.
+
+Usage:
+    python scripts/eval_hybrid_sw.py --config configs/hybrid_sw_train_k2_h64.yaml
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+import time
+from typing import Any, Dict, List
+
+import numpy as np
+import torch
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from src.config import load_config
+from src.hybrid_data_pipe import assemble_split
+from src.hybrid_dataset import load_dataset
+from src.hybrid_fno import build_hybrid_fno
+from src.qnm import qnm_method_4_window_scan, percentage_errors, theory_ref
+
+
+def _safe_pct(extracted: float, theory: float) -> float:
+    if not np.isfinite(extracted) or not np.isfinite(theory) or theory == 0:
+        return float("nan")
+    return abs(extracted - theory) / theory * 100.0
+
+
+def _qnm_extract(t: np.ndarray, y: np.ndarray, t_start: float, t_end: float,
+                 potential: str, ell: int, M: float) -> Dict[str, float]:
+    """Run Method 4 (two-mode NLS, start-time scan). Return dim'less + pct err."""
+    try:
+        res = qnm_method_4_window_scan(
+            t, y,
+            t_start_min=t_start, t_start_max=t_start + 15.0,
+            t_end=t_end, n_starts=12,
+            potential=potential, ell=ell,
+        )
+    except Exception as exc:
+        return {
+            "omega_dim": float("nan"), "tau_dim": float("nan"),
+            "omega_pct_err": float("nan"), "tau_pct_err": float("nan"),
+            "error": str(exc),
+        }
+    err = percentage_errors(res, potential=potential, ell=ell, M=M)
+    return {
+        "omega_dim": err["omega_dim"],
+        "tau_dim": err["tau_dim"],
+        "omega_pct_err": err["omega_pct_err"],
+        "tau_pct_err": err["tau_pct_err"],
+    }
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--config", required=True)
+    ap.add_argument("--ckpt", default=None,
+                    help="Override model checkpoint (default: <out_dir>/model_best.pt).")
+    ap.add_argument("--n", type=int, default=0,
+                    help="If >0, restrict to first n test samples.")
+    ap.add_argument("--xq", type=float, nargs="+", default=[2.0, 10.0],
+                    help="Extraction radii (default 2.0 10.0).")
+    ap.add_argument("--t_start", type=float, default=40.0,
+                    help="QNM fit window start (code units).")
+    ap.add_argument("--t_end_pad", type=float, default=5.0,
+                    help="QNM fit window end = t_fine[-1] - this pad.")
+    ap.add_argument("--ell", type=int, default=2)
+    ap.add_argument("--potential", default="zerilli")
+    args = ap.parse_args()
+
+    cfg = load_config(args.config)
+    out_dir = cfg["logging"]["out_dir"]
+    ckpt_path = args.ckpt or os.path.join(out_dir, "model_best.pt")
+    if not os.path.exists(ckpt_path):
+        raise SystemExit(f"No checkpoint at {ckpt_path}")
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"[EVAL] device={device}  ckpt={ckpt_path}")
+
+    # ---- data ----------------------------------------------------------------
+    ds_path = cfg["dataset"]["path"]
+    print(f"[EVAL] loading {ds_path}")
+    splits, grid, meta = load_dataset(ds_path)
+    test = splits["test"]
+    n_total = test["Phi_fine"].shape[0]
+    n_eval = n_total if args.n <= 0 else min(args.n, n_total)
+    print(f"[EVAL] test: {n_total} samples, evaluating {n_eval}")
+
+    t0 = time.time()
+    X_te, Y_te, up_te = assemble_split(
+        test, grid.x_coarse, grid.t_coarse, grid.x_fine, grid.t_fine,
+    )
+    print(f"[EVAL] assembled in {time.time()-t0:.1f}s  X_te {X_te.shape}")
+
+    # ---- model ---------------------------------------------------------------
+    model = build_hybrid_fno(cfg).to(device)
+    state = torch.load(ckpt_path, map_location=device, weights_only=False)
+    if isinstance(state, dict) and "model_state" in state:
+        model.load_state_dict(state["model_state"])
+    else:
+        model.load_state_dict(state)
+    model.eval()
+
+    # ---- predict residual, reconstruct fields --------------------------------
+    bs = 4
+    delta_pred = np.empty_like(Y_te)
+    t0 = time.time()
+    with torch.no_grad():
+        for i0 in range(0, n_eval, bs):
+            i1 = min(i0 + bs, n_eval)
+            xb = torch.from_numpy(X_te[i0:i1]).to(device, non_blocking=True)
+            pb = model(xb).cpu().numpy()
+            delta_pred[i0:i1] = pb
+    print(f"[EVAL] inference {time.time()-t0:.1f}s for {n_eval} samples")
+
+    # ---- field-level errors --------------------------------------------------
+    psi_fine = test["Phi_fine"][:n_eval].astype(np.float64)
+    psi_up   = up_te[:n_eval].astype(np.float64)             # baseline (coarse upsampled)
+    psi_hyb  = psi_up + delta_pred[:n_eval, 0].astype(np.float64)
+
+    def _mse(a, b):  # mean over (t,x) and over samples
+        return float(np.mean((a - b) ** 2))
+    def _rl2(a, b):  # mean over samples of ||a-b||/||a||
+        diff = a - b
+        num = np.sqrt(np.mean(diff ** 2, axis=(1, 2)))
+        den = np.sqrt(np.mean(a ** 2, axis=(1, 2))) + 1e-30
+        return float(np.mean(num / den))
+
+    mse_hyb  = _mse(psi_fine, psi_hyb)
+    mse_base = _mse(psi_fine, psi_up)
+    rl2_hyb  = _rl2(psi_fine, psi_hyb)
+    rl2_base = _rl2(psi_fine, psi_up)
+    print(f"[EVAL] field MSE :  hybrid={mse_hyb:.3e}   baseline(coarse-up)={mse_base:.3e}"
+          f"   ratio={mse_hyb/mse_base:.3e}")
+    print(f"[EVAL] field rL2 :  hybrid={rl2_hyb:.3e}   baseline(coarse-up)={rl2_base:.3e}"
+          f"   ratio={rl2_hyb/rl2_base:.3e}")
+
+    # ---- QNM extraction ------------------------------------------------------
+    t_fine = grid.t_fine.astype(np.float64)
+    x_fine = grid.x_fine.astype(np.float64)
+    t_start = float(args.t_start)
+    t_end = float(t_fine[-1] - args.t_end_pad)
+
+    ref = theory_ref(args.potential, args.ell)
+    print(f"[EVAL] QNM theory ({args.potential} l={args.ell}): "
+          f"M*omega={ref['omega']:.4f}  tau/M={ref['tau']:.4f}")
+    print(f"[EVAL] QNM fit window: t in [{t_start:.1f}, {t_end:.1f}]")
+
+    P = test["P"][:n_eval]
+    per_sample: List[Dict[str, Any]] = []
+    # accumulators: pct err over samples, per xq, per (hyb/base/fine)
+    accum: Dict[str, List[float]] = {}
+
+    for i in range(n_eval):
+        M_i = float(P[i, 0])
+        rec: Dict[str, Any] = {"i": i, "M": M_i}
+        for xq in args.xq:
+            ix = int(np.argmin(np.abs(x_fine - float(xq))))
+            for tag, field in [
+                ("hyb",  psi_hyb[i, :, ix]),
+                ("base", psi_up[i, :, ix]),
+                ("fine", psi_fine[i, :, ix]),
+            ]:
+                q = _qnm_extract(t_fine, field, t_start, t_end,
+                                 args.potential, args.ell, M_i)
+                key = f"xq{xq:g}_{tag}"
+                rec[key] = q
+                for k in ("omega_pct_err", "tau_pct_err"):
+                    accum.setdefault(f"{key}_{k}", []).append(q[k])
+        per_sample.append(rec)
+        if (i + 1) % 10 == 0 or i == n_eval - 1:
+            print(f"[EVAL] QNM sample {i+1}/{n_eval} done")
+
+    # aggregate
+    summary: Dict[str, Any] = {
+        "n_eval": n_eval,
+        "field": {
+            "mse_hybrid":   mse_hyb,
+            "mse_baseline": mse_base,
+            "rl2_hybrid":   rl2_hyb,
+            "rl2_baseline": rl2_base,
+        },
+        "qnm_window": {"t_start": t_start, "t_end": t_end,
+                       "xq_list": list(args.xq)},
+        "qnm_theory": ref,
+        "qnm_pct_err_median": {},
+        "qnm_pct_err_mean":   {},
+        "qnm_pct_err_max":    {},
+    }
+    for key, vals in accum.items():
+        v = np.array([x for x in vals if np.isfinite(x)])
+        if v.size == 0:
+            summary["qnm_pct_err_median"][key] = float("nan")
+            summary["qnm_pct_err_mean"][key]   = float("nan")
+            summary["qnm_pct_err_max"][key]    = float("nan")
+        else:
+            summary["qnm_pct_err_median"][key] = float(np.median(v))
+            summary["qnm_pct_err_mean"][key]   = float(np.mean(v))
+            summary["qnm_pct_err_max"][key]    = float(np.max(v))
+
+    eval_dir = os.path.join(out_dir, "eval")
+    os.makedirs(eval_dir, exist_ok=True)
+    with open(os.path.join(eval_dir, "summary.json"), "w") as f:
+        json.dump(summary, f, indent=2)
+    with open(os.path.join(eval_dir, "per_sample.json"), "w") as f:
+        json.dump(per_sample, f, indent=2)
+    print(f"[EVAL] wrote {eval_dir}/summary.json and per_sample.json")
+
+    # ---- pretty print --------------------------------------------------------
+    print("\n" + "=" * 78)
+    print("QNM percent error (median over %d samples)" % n_eval)
+    print("=" * 78)
+    for xq in args.xq:
+        print(f"\n  xq = {xq:g}")
+        print(f"    {'source':<8} {'omega %err':>14} {'tau %err':>14}")
+        for tag in ("hyb", "base", "fine"):
+            key = f"xq{xq:g}_{tag}"
+            om = summary["qnm_pct_err_median"][f"{key}_omega_pct_err"]
+            tu = summary["qnm_pct_err_median"][f"{key}_tau_pct_err"]
+            print(f"    {tag:<8} {om:>14.4f} {tu:>14.4f}")
+    print("=" * 78)
+    print("Acceptance: hybrid omega %err <= 2x fine %err at xq=2")
+    for xq in args.xq:
+        om_h = summary["qnm_pct_err_median"][f"xq{xq:g}_hyb_omega_pct_err"]
+        om_f = summary["qnm_pct_err_median"][f"xq{xq:g}_fine_omega_pct_err"]
+        verdict = "PASS" if (np.isfinite(om_h) and np.isfinite(om_f)
+                             and om_h <= 2.0 * om_f) else "FAIL"
+        print(f"  xq={xq:g}:  hybrid {om_h:.4f}%  vs  2*fine {2*om_f:.4f}%  -> {verdict}")
+
+
+if __name__ == "__main__":
+    main()

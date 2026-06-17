@@ -1,0 +1,38 @@
+# Smoke config for the Richardson pipeline (tiny smoke datasets, 4 samples each).
+# Run with: python scripts/train_hybrid_fno.py --config <this> --smoke
+# The --smoke flag trims to 2 samples and 3 Adam epochs; this just points the
+# loader at the small smoke_k*.npz so the end-to-end wiring (two-dataset load,
+# assemble_richardson, Y_eval metric) is validated fast on CPU.
+
+experiment:
+  name: hybrid_sw_richardson_smoke
+
+dataset:
+  path: outputs/hybrid/smoke_k4.npz
+  path_k2: outputs/hybrid/smoke_k2.npz
+  target_mode: richardson
+
+fno:
+  modes_t: 16
+  modes_x: 32
+  hidden_channels: 32
+  n_layers: 4
+  domain_padding: 0.10
+  positional_embedding: grid
+
+train:
+  batch_size: 8
+  epochs_adam: 3
+  lr_adam: 1.0e-3
+  weight_decay: 1.0e-6
+  epochs_lbfgs: 0
+  seed: 1234
+  device: cpu
+  loss:
+    data_weight: 1.0
+    physics_weight: 0.0
+    anchor_weight: 0.0
+
+logging:
+  log_every: 1
+  out_dir: outputs/hybrid/fno_sw_richardson_smoke

@@ -1,0 +1,49 @@
+# DE-RISK: |grad prior| input channel (attack the smooth-region speckle).
+#
+# Byte-identical to the modes16 control EXCEPT epochs_lbfgs 30 -> 0 (Adam-only,
+# matching the de-risk comparison point used for modes16/obsloss) and the NEW
+# fno.extra_channels: [grad_prior]. That prepends |grad(prior)| computed on the
+# fly from channel 0 (inference-safe, +64 params). The pointwise-error plots show
+# the FNO sprays ~1e-4 broadband speckle across the smooth interior and the
+# causal exterior where the coarse prior is already machine-exact -- a global
+# Fourier operator struggling to represent a spatially-compact correction. The
+# gradient channel hands the operator the wavefront location explicitly: it is
+# large on the wavefronts (where the prior's dispersion error lives) and ~0 in
+# the flat regions (where the target correction is ~0 and the FNO should stay
+# silent). A/B question: does it reduce exterior speckle while keeping field+QNM?
+
+experiment:
+  name: hybrid_sw_gradch_derisk
+
+dataset:
+  path: outputs/hybrid/dataset_sw_k4.npz
+  path_k2: outputs/hybrid/dataset_sw_k2.npz
+  target_mode: richardson
+
+fno:
+  modes_t: 16
+  modes_x: 32
+  hidden_channels: 32
+  n_layers: 4
+  domain_padding: 0.10
+  positional_embedding: grid
+  extra_channels: [grad_prior]   # NEW: on-the-fly |grad(prior)| support map
+
+train:
+  batch_size: 8
+  epochs_adam: 100
+  lr_adam: 1.0e-3
+  weight_decay: 1.0e-6
+  epochs_lbfgs: 0               # Adam-only de-risk (A/B vs modes16 / obsloss)
+  lbfgs_max_iter: 20
+  lbfgs_chunk_size: 8
+  seed: 1234
+  device: cuda
+  loss:
+    data_weight: 1.0
+    physics_weight: 0.0
+    anchor_weight: 0.0
+
+logging:
+  log_every: 10
+  out_dir: outputs/hybrid/fno_sw_gradch_derisk

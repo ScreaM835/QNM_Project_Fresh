@@ -1,28 +1,43 @@
-"""Hybrid FNO: predicts the discretisation residual delta = Phi_fine - upsample(Phi_coarse).
+"""Kerr hybrid FNO: predicts the normalised discretisation residual of a coarse
+Teukolsky solve, with NO gate (plain additive skip).
 
-Channel layout (in_channels = 5):
-    ch 0 : upsampled Phi_coarse(x, t)        — the physics-informed prior
-    ch 1 : Phi_coarse(x, 0) broadcast        — initial displacement (fine grid)
-    ch 2 : V_fine(x; M, l) broadcast over t  — per-sample potential
-    ch 3 : M broadcast over (x, t)           — scalar BH mass
-    ch 4 : Phi_coarse_t(x, 0) broadcast      — initial velocity (finite-diff from coarse)
+Design (driven by the measured Kerr residual topology, NOT ported from the
+Schwarzschild hybrid -- see ``kerr/scripts/train_eval_hybrid_kerr.py`` notes):
 
-Output (out_channels = 1):
-    delta(x, t) — additive correction; hybrid prediction is
-                  Phi_hybrid = upsample(Phi_coarse) + delta.
+* **No gradient gate.** On the compactified hyperboloidal slice the field is
+  active almost everywhere (only ~0.4% of cells are machine-zero, vs >50% for
+  the SW tortoise grid) and the residual lives where the field is *large*. The
+  SW gate existed to protect a vast machine-exact causal exterior from
+  band-limited speckle; that region does not exist here, so a gate would only
+  suppress the network where the correction belongs. The reconstruction is the
+  plain additive skip ``psi_hyb = up4 + s * FNO`` (done in the training script;
+  this module is the pure residual operator).
 
-We deliberately *do not* re-use src/fno_dataset.IN_CHANNELS so this module is
-independent of the pure-FNO surrogate's channel layout.
+* **Anisotropic, tau-heavy modes.** The residual needs ~41 Fourier modes along
+  tau but only ~9 along sigma (the hyperboloidal slice is radially smooth), so
+  ``n_modes = (modes_tau, modes_sigma)`` is deliberately asymmetric -- the
+  opposite of treating the two axes symmetrically.
+
+* **Two real channels for the complex field.** Re/Im are carried as separate
+  in/out channels (their correlation is ~-0.29, genuinely independent).
+
+Channel layout (in_channels = 4):
+    ch 0 : up4.real / s        -- the prior (real part), per-sample normalised
+    ch 1 : up4.imag / s        -- the prior (imag part)
+    ch 2 : a/M  (broadcast)    -- the spin (changes the operator; not scaled)
+    ch 3 : psi0.real / s       -- the initial pulse at tau=0, broadcast over tau
+
+Output (out_channels = 2):
+    [delta.real, delta.imag] / s -- normalised additive correction.
 """
 from __future__ import annotations
 
 from typing import Any, Dict
 
-import torch
 import torch.nn as nn
 
-HYBRID_IN_CHANNELS = 5
-HYBRID_OUT_CHANNELS = 1
+HYBRID_IN_CHANNELS = 4
+HYBRID_OUT_CHANNELS = 2
 
 
 def _require_neuralop() -> None:
@@ -30,27 +45,36 @@ def _require_neuralop() -> None:
         from neuralop.models import FNO  # noqa: F401
     except Exception as exc:
         raise RuntimeError(
-            "neuraloperator is required for the hybrid FNO pipeline. "
+            "neuraloperator is required for the Kerr hybrid FNO pipeline. "
             "Install it into the project venv: pip install neuraloperator"
         ) from exc
 
 
 def build_hybrid_fno(cfg: Dict[str, Any]) -> nn.Module:
-    """Build a 2D FNO whose output is the residual delta on the fine grid.
+    """Build the 2-D FNO residual operator (no gate) from the ``fno:`` config.
 
-    Config keys (under `fno:`):
-        modes_t, modes_x, hidden_channels, n_layers, domain_padding,
-        positional_embedding. Defaults are smaller than the pure-FNO defaults
-        because the residual is a smaller-amplitude target.
+    Config keys (under ``fno:``):
+        modes_tau, modes_sigma : retained Fourier modes per axis (tau-heavy).
+        hidden_channels        : lifting width.
+        n_layers               : number of Fourier layers.
+        domain_padding         : scalar or [pad_tau, pad_sigma] for the
+                                 non-periodic hyperboloidal domain.
+        positional_embedding   : 'grid' (default) appends (tau, sigma) coords.
     """
     _require_neuralop()
     from neuralop.models import FNO
 
     fcfg = cfg["fno"]
-    n_modes = (int(fcfg.get("modes_t", 16)), int(fcfg.get("modes_x", 32)))
-    hidden = int(fcfg.get("hidden_channels", 32))
+    n_modes = (int(fcfg.get("modes_tau", 64)), int(fcfg.get("modes_sigma", 24)))
+    hidden = int(fcfg.get("hidden_channels", 48))
     n_layers = int(fcfg.get("n_layers", 4))
-    domain_padding = float(fcfg.get("domain_padding", 0.10))
+
+    dp = fcfg.get("domain_padding", [0.08, 0.08])
+    if isinstance(dp, (list, tuple)):
+        domain_padding: Any = [float(x) for x in dp]
+    else:
+        domain_padding = float(dp)
+
     pos_emb = fcfg.get("positional_embedding", "grid")
 
     return FNO(
@@ -66,3 +90,4 @@ def build_hybrid_fno(cfg: Dict[str, Any]) -> nn.Module:
 
 def count_parameters(model: nn.Module) -> int:
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+

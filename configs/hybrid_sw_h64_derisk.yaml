@@ -1,0 +1,44 @@
+# DE-RISK: wider FNO (hidden_channels 32 -> 64).
+#
+# Byte-identical to the modes16 control EXCEPT epochs_lbfgs 30 -> 0 (Adam-only
+# de-risk point) and hidden_channels 32 -> 64. More channel capacity lets the
+# operator represent both the sharp wavefront corrections AND clean zeros in the
+# smooth/exterior regions simultaneously -- the speckle is the signature of an
+# under-capacity global operator leaking spectral energy into regions where its
+# target is ~0. A/B question: does extra width reduce exterior speckle while
+# keeping (or improving) field + QNM? Isolates capacity from the grad channel.
+
+experiment:
+  name: hybrid_sw_h64_derisk
+
+dataset:
+  path: outputs/hybrid/dataset_sw_k4.npz
+  path_k2: outputs/hybrid/dataset_sw_k2.npz
+  target_mode: richardson
+
+fno:
+  modes_t: 16
+  modes_x: 32
+  hidden_channels: 64            # 32 -> 64: more capacity to localize corrections
+  n_layers: 4
+  domain_padding: 0.10
+  positional_embedding: grid
+
+train:
+  batch_size: 4                  # halved vs h32: h64 FFT activations OOM at bs=8 on 80GB A100
+  epochs_adam: 100
+  lr_adam: 1.0e-3
+  weight_decay: 1.0e-6
+  epochs_lbfgs: 0               # Adam-only de-risk (A/B vs modes16 / obsloss)
+  lbfgs_max_iter: 20
+  lbfgs_chunk_size: 8
+  seed: 1234
+  device: cuda
+  loss:
+    data_weight: 1.0
+    physics_weight: 0.0
+    anchor_weight: 0.0
+
+logging:
+  log_every: 10
+  out_dir: outputs/hybrid/fno_sw_h64_derisk

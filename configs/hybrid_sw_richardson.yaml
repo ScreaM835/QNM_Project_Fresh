@@ -1,0 +1,55 @@
+# LABEL-FREE Richardson super-resolution (k4 prior, 16x cheaper).
+#
+# The FNO regresses the additive correction delta onto the LABEL-FREE Richardson
+# target built from two cheap coarse solves (no fine FD in the loss):
+#
+#   up4   = quintic upsample of the k4 (dx=0.8) coarse solve   <- channel-0 prior
+#   up2   = quintic upsample of the k2 (dx=0.4) coarse solve
+#   Phi_R = (4*up2 - up4) / 3        # a-priori order-p=2 Richardson extrapolation
+#   target = Phi_R - up4             # delta the FNO must learn (label-free)
+#   field  = up4 + delta             # reconstructed waveform
+#
+# Richardson is PHYSICS (two PDE solves + the FD convergence theorem), not a
+# fine-FD label, so this recipe transfers to higher-D regimes where no fine
+# reference exists. M=1 ceiling: Phi_R is ~0.36% rel-L2 from truth vs the bare
+# k4 prior's ~4.93% -- so success = driving the eval field rel-L2 from ~4.9%
+# toward ~0.36%. The reported rel-L2 is ALWAYS measured against the held-out
+# fine FD (eval-only), never used in the loss.
+#
+# A/B control: hybrid_sw_richardson_supervised.yaml is byte-identical except
+# target_mode=supervised (fine-FD label), isolating the label-free penalty.
+
+experiment:
+  name: hybrid_sw_richardson
+
+dataset:
+  path: outputs/hybrid/dataset_sw_k4.npz      # k4 coarse prior (channel 0)
+  path_k2: outputs/hybrid/dataset_sw_k2.npz   # k2 coarse, sample-aligned
+  target_mode: richardson                     # LABEL-FREE Phi_R target
+
+fno:
+  modes_t: 16
+  modes_x: 32
+  hidden_channels: 32
+  n_layers: 4
+  domain_padding: 0.10
+  positional_embedding: grid
+
+train:
+  batch_size: 8
+  epochs_adam: 100
+  lr_adam: 1.0e-3
+  weight_decay: 1.0e-6
+  epochs_lbfgs: 30          # chunked L-BFGS finetune (matches hybrid_sw_train_k4)
+  lbfgs_max_iter: 20
+  lbfgs_chunk_size: 8
+  seed: 1234
+  device: cuda             # A100/ampere — same as every prior FNO/hybrid run
+  loss:
+    data_weight: 1.0        # regress delta onto the Richardson target
+    physics_weight: 0.0     # pure target regression (A/B clean: target only)
+    anchor_weight: 0.0
+
+logging:
+  log_every: 10
+  out_dir: outputs/hybrid/fno_sw_richardson

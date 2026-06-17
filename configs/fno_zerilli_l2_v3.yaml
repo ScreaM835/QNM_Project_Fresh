@@ -1,0 +1,90 @@
+# FNO/PINO experiment v3 — extended time domain.
+# Identical to v2 except domain.tmax 50 -> 100 (gives ~9 τ of ringing
+# instead of ~3 τ), and qnm.t_end extended accordingly. Should reduce
+# QNM-extraction errors by ~10x at the price of 2x training cost.
+experiment:
+  name: fno_zerilli_l2_v3
+
+physics:
+  M: 1.0
+  l: 2
+  potential: zerilli
+  pde_sign: standard
+
+domain:
+  xmin: -50.0
+  xmax: 150.0
+  tmin: 0.0
+  tmax: 100.0           # was 50.0  (~9 τ of ringdown at M=1)
+
+initial_data:
+  A: 1.0
+  x0: 4.0
+  sigma: 5.0
+  velocity_profile: outgoing
+
+fd:
+  dx: 0.5
+  dt: 0.25
+  scheme: rk4_mol
+
+evaluation:
+  xq: 2.0               # canonical observer at barrier peak (set in v2)
+
+qnm:
+  t_start: 10.0
+  t_end: 100.0          # was 50.0 — full window of new domain
+
+# ----- Dataset (same draws as v2) -------------------------------------------
+dataset:
+  seed: 1234
+  n_train: 1000
+  n_val:   100
+  n_test:  100
+  sweep:
+    M_range:     [0.8, 1.2]
+    x0_range:    [-10.0, 30.0]
+    sigma_range: [3.0, 8.0]
+  stride_x: 1
+  stride_t: 1           # 401 t-points (was 201 in v2)
+
+# ----- FNO architecture -----------------------------------------------------
+# modes_t bumped to keep the same Nyquist fraction (32/201 -> 64/401);
+# everything else as in v2.
+fno:
+  modes_t: 64           # was 32 — same fraction of t-grid as v2
+  modes_x: 64
+  hidden_channels: 96
+  n_layers: 4
+  domain_padding: 0.10
+  positional_embedding: grid
+
+# ----- Training (same recipe; epochs unchanged) -----------------------------
+training:
+  seed: 1234
+  dtype: float32
+  device: auto
+  batch_size: 4         # was 8; halved to fit A100-80GB activations at 401x401
+  epochs: 500
+  lr: 1.0e-3
+  weight_decay: 1.0e-6
+  scheduler: cosine
+  grad_clip: 1.0
+  loss:
+    lam_field: 1.0
+    lam_h1:    0.20
+    lam_ring:  2.0
+    lam_pde:   0.05
+    lam_bc:    0.0
+  log_every: 10
+  ckpt_every: 100
+  data_path: outputs/fno/fno_zerilli_l2_v3/dataset.npz
+  out_dir:   outputs/fno/fno_zerilli_l2_v3
+
+inverse:
+  M_init: 1.05
+  M_true: 1.00
+  noise_sigma: 1.0e-3
+  steps: 500
+  lr: 1.0e-2
+  obs_x: [10.0, 20.0]

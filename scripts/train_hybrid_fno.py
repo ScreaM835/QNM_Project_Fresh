@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.config import load_config
 from src.hybrid_dataset import load_dataset
-from src.hybrid_data_pipe import assemble_split, to_torch
+from src.hybrid_data_pipe import assemble_split, assemble_richardson, to_torch
 from src.hybrid_fno import build_hybrid_fno, count_parameters
 from src.fno_model import loss_pde_residual
 
@@ -34,20 +34,43 @@ def _resolve_device(want: str) -> str:
     return want
 
 
-def _make_loader(X: np.ndarray, Y: np.ndarray, batch_size: int, shuffle: bool,
-                 device: str) -> DataLoader:
-    Xt = torch.from_numpy(X)
-    Yt = torch.from_numpy(Y)
-    ds = TensorDataset(Xt, Yt)
+def _make_loader(X: np.ndarray, Y: np.ndarray, Y_eval: np.ndarray,
+                 batch_size: int, shuffle: bool, device: str) -> DataLoader:
+    """Loader yielding ``(X, Y_train, Y_eval)``.
+
+    ``Y_train`` is the loss target: the label-free Richardson delta
+    ``Phi_R - prior`` in richardson mode, or the fine-FD delta
+    ``Phi_fine - prior`` in supervised mode. ``Y_eval`` is the eval-only fine-FD
+    delta ``Phi_fine - prior`` used to report the field rel-L2 against ground
+    truth regardless of which target the loss chases. In supervised mode the two
+    are the same array, so the metric is byte-identical to the legacy path.
+    """
+    ds = TensorDataset(torch.from_numpy(X), torch.from_numpy(Y),
+                       torch.from_numpy(Y_eval))
     return DataLoader(ds, batch_size=batch_size, shuffle=shuffle,
                       pin_memory=(device == "cuda"))
 
 
 def _compose_loss(model: nn.Module, Xb: torch.Tensor, Yb: torch.Tensor,
                   dx: float, dt: float,
-                  weights: Tuple[float, float, float]
+                  weights: Tuple[float, float, float],
+                  whiten: dict | None = None,
+                  spatial: dict | None = None
                   ) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, float]]:
     """Composite hybrid loss. ``weights = (data, physics, anchor)``.
+
+    ``whiten`` (optional) adds a task-aligned, *observer-column* term that gives
+    the network real gradient incentive in the low-amplitude ringdown tail where
+    the QNM is read. The global ``data`` term is amplitude-weighted (absolute
+    MSE), so the tail at the extraction radius is ~1e-7 of the loss and the FNO
+    reshapes it freely -> degraded QNM even as field rL2 improves. This term
+    targets the residual ``corr - Yb`` in the single observer column ``ix``,
+    whitened in time by ``min(exp(2 (t - t_start)/tau), cap)`` so each e-fold of
+    decay contributes ~equally. Driving it to zero pulls the output toward the
+    (already QNM-clean) Richardson target ``Phi_R`` in the fit window. The global
+    field loss is left intact, so field accuracy is preserved while the QNM tail
+    gains incentive (the BOTH-metrics objective). ``None`` -> byte-identical
+    legacy behaviour.
 
     * data    : supervised MSE on the fine-FD delta target ``Yb``  [needs fine FD]
     * physics : Zerilli PDE residual of the RECONSTRUCTED field
@@ -84,7 +107,8 @@ def _compose_loss(model: nn.Module, Xb: torch.Tensor, Yb: torch.Tensor,
         corr = raw
 
     loss = Xb.new_zeros(())
-    terms = {"data": 0.0, "physics": 0.0, "anchor": 0.0}
+    terms = {"data": 0.0, "physics": 0.0, "anchor": 0.0, "observer": 0.0,
+             "spatial": 0.0}
     if w_data > 0.0:
         l_data = torch.mean((corr - Yb) ** 2)
         loss = loss + w_data * l_data
@@ -99,13 +123,43 @@ def _compose_loss(model: nn.Module, Xb: torch.Tensor, Yb: torch.Tensor,
         l_anchor = torch.mean(corr ** 2)
         loss = loss + w_anchor * l_anchor
         terms["anchor"] = float(l_anchor.item())
+    if whiten is not None and whiten["weight"] > 0.0:
+        ix = whiten["ix"]
+        Nt = Xb.shape[2]
+        t = torch.arange(Nt, dtype=Xb.dtype, device=Xb.device) * dt
+        w = torch.clamp(torch.exp(2.0 * (t - whiten["t_start"]) / whiten["tau"]),
+                        max=whiten["cap"])
+        w = torch.where(t >= whiten["t_start"], w, torch.ones_like(w))
+        w = w / w.mean()                              # (Nt,), mean 1 (scale-safe)
+        resid_obs = corr[:, :, :, ix] - Yb[:, :, :, ix]   # (B,1,Nt) observer col
+        l_obs = torch.mean(w.view(1, 1, Nt) * resid_obs ** 2)
+        loss = loss + whiten["weight"] * l_obs
+        terms["observer"] = float(l_obs.item())
+    if spatial is not None and spatial["weight"] > 0.0:
+        # Full-field target-magnitude-whitened residual. The absolute data term
+        # ignores the low-|Y| ringdown tail (~1e-7 of its energy) and the
+        # machine-zero smooth/causal-exterior regions (|Y|~1e-14), so the FNO
+        # sprays broadband speckle there -> QNM contamination. Weighting by
+        # ws = (|Y| + floor)^(-p) (normalised to mean 1) gives small-target
+        # regions ~equal say, forcing corr->Y (incl. corr->0 where Y->0) without
+        # touching the wavefronts the absolute data term still governs. ``floor``
+        # (~the ringdown-tail |Y| scale) doubles as the max-weight cap so the
+        # machine-zero regions cannot blow the weight up.
+        aY = Yb.abs()
+        ws = (aY + spatial["floor"]).pow(-spatial["p"])
+        ws = ws / ws.mean()
+        l_spatial = torch.mean(ws * (corr - Yb) ** 2)
+        loss = loss + spatial["weight"] * l_spatial
+        terms["spatial"] = float(l_spatial.item())
     return loss, corr, terms
 
 
 def _epoch_pass(model: nn.Module, loader: DataLoader, device: str,
                 optimizer: torch.optim.Optimizer | None,
                 dx: float, dt: float,
-                weights: Tuple[float, float, float]
+                weights: Tuple[float, float, float],
+                whiten: dict | None = None,
+                spatial: dict | None = None
                 ) -> Tuple[float, float, Dict[str, float]]:
     """Returns (mean composite loss, mean field rel-L2 vs fine FD, mean terms).
 
@@ -120,12 +174,14 @@ def _epoch_pass(model: nn.Module, loader: DataLoader, device: str,
     total_l2_ratio = 0.0
     n_batches = 0
     term_sums = {"data": 0.0, "physics": 0.0, "anchor": 0.0}
-    for Xb, Yb in loader:
+    for Xb, Yb, Yb_eval in loader:
         Xb = Xb.to(device, non_blocking=True)
         Yb = Yb.to(device, non_blocking=True)
+        Yb_eval = Yb_eval.to(device, non_blocking=True)
         if training:
             optimizer.zero_grad()
-        loss, corr, terms = _compose_loss(model, Xb, Yb, dx, dt, weights)
+        loss, corr, terms = _compose_loss(model, Xb, Yb, dx, dt, weights, whiten,
+                                          spatial)
         if training:
             loss.backward()
             optimizer.step()
@@ -134,11 +190,14 @@ def _epoch_pass(model: nn.Module, loader: DataLoader, device: str,
         total_n += bs
         for k in term_sums:
             term_sums[k] += terms[k]
-        # eval metric: field rel-L2 vs fine FD (valid in every training mode).
-        # corr is the EFFECTIVE correction (hard-IC gated when label-free), so
-        # u = prior + corr and field error = ||corr - Yb|| / ||fine field||.
-        field = Yb + Xb[:, 0:1]
-        resid_after = corr.detach() - Yb
+        # eval metric: field rel-L2 vs the TRUE fine field, ALWAYS. The loss may
+        # chase the label-free Richardson target (Yb = Phi_R - prior), but the
+        # reported error is measured against Yb_eval = Phi_fine - prior so the
+        # number is honest ground truth. corr is the EFFECTIVE correction
+        # (hard-IC gated when label-free), u = prior + corr, hence
+        # field error = ||corr - Yb_eval|| / ||Phi_fine||.
+        field = Yb_eval + Xb[:, 0:1]
+        resid_after = corr.detach() - Yb_eval
         l2_field = torch.sqrt((field ** 2).mean()).item()
         l2_err   = torch.sqrt((resid_after ** 2).mean()).item()
         total_l2_ratio += l2_err / max(l2_field, 1e-12)
@@ -183,30 +242,68 @@ def main() -> None:
     torch.manual_seed(int(cfg["train"].get("seed", 1234)))
 
     # ---- data ----------------------------------------------------------------
-    ds_path = cfg["dataset"]["path"]
-    print(f"[HYBRID-TRAIN] loading {ds_path}")
-    splits, grid, meta = load_dataset(ds_path)
-    print(f"[HYBRID-TRAIN] meta: {meta}")
-
+    ds_cfg = cfg["dataset"]
+    target_mode = str(ds_cfg.get("target_mode", "supervised")).lower()
     t0 = time.time()
-    X_tr, Y_tr, _ = assemble_split(
-        splits["train"], grid.x_coarse, grid.t_coarse, grid.x_fine, grid.t_fine,
-    )
-    X_va, Y_va, _ = assemble_split(
-        splits["val"],   grid.x_coarse, grid.t_coarse, grid.x_fine, grid.t_fine,
-    )
+
+    if target_mode == "supervised" and "path_k2" not in ds_cfg:
+        # Legacy single-dataset supervised path: loss target == eval target.
+        ds_path = ds_cfg["path"]
+        print(f"[HYBRID-TRAIN] loading {ds_path} (supervised, single dataset)")
+        splits, grid, meta = load_dataset(ds_path)
+        print(f"[HYBRID-TRAIN] meta: {meta}")
+        X_tr, Y_tr, _ = assemble_split(
+            splits["train"], grid.x_coarse, grid.t_coarse,
+            grid.x_fine, grid.t_fine,
+        )
+        X_va, Y_va, _ = assemble_split(
+            splits["val"], grid.x_coarse, grid.t_coarse,
+            grid.x_fine, grid.t_fine,
+        )
+        Ye_tr, Ye_va = Y_tr, Y_va           # eval target identical to loss target
+    else:
+        # Richardson pipeline: two sample-aligned coarse datasets (k4 + k2). The
+        # loss target depends on target_mode ("richardson" = label-free Phi_R,
+        # "supervised" = fine-FD label), but the eval target is ALWAYS the true
+        # fine-FD delta so the reported rel-L2 is honest ground truth. Routing
+        # the supervised control through this same pipe means the only A/B
+        # difference is the target -- identical quintic k4 prior either way.
+        path_k4 = ds_cfg["path"]
+        path_k2 = ds_cfg["path_k2"]
+        print(f"[HYBRID-TRAIN] loading k4={path_k4}  k2={path_k2}  "
+              f"(target_mode={target_mode})")
+        splits4, grid4, meta = load_dataset(path_k4)
+        splits2, grid2, meta2 = load_dataset(path_k2)
+        print(f"[HYBRID-TRAIN] meta k4: {meta}")
+        print(f"[HYBRID-TRAIN] meta k2: {meta2}")
+
+        def _assemble(split4, split2):
+            X, Y, up4, Phif = assemble_richardson(
+                split4, split2,
+                grid4.x_coarse, grid4.t_coarse,
+                grid2.x_coarse, grid2.t_coarse,
+                grid4.x_fine, grid4.t_fine,
+                target_mode=target_mode,
+            )
+            Ye = (Phif - up4)[:, None].astype(np.float32)   # true fine-FD delta
+            return X, Y, Ye
+
+        X_tr, Y_tr, Ye_tr = _assemble(splits4["train"], splits2["train"])
+        X_va, Y_va, Ye_va = _assemble(splits4["val"], splits2["val"])
+        grid = grid4
+
     print(f"[HYBRID-TRAIN] assembled in {time.time()-t0:.1f}s: "
           f"X_tr {X_tr.shape}, Y_tr {Y_tr.shape}, X_va {X_va.shape}")
 
     if args.smoke:
-        X_tr, Y_tr = X_tr[:2], Y_tr[:2]
-        X_va, Y_va = X_va[:2], Y_va[:2]
+        X_tr, Y_tr, Ye_tr = X_tr[:2], Y_tr[:2], Ye_tr[:2]
+        X_va, Y_va, Ye_va = X_va[:2], Y_va[:2], Ye_va[:2]
         cfg["train"]["epochs_adam"] = 3
         cfg["train"]["epochs_lbfgs"] = 0
 
     bs = int(cfg["train"]["batch_size"])
-    loader_tr = _make_loader(X_tr, Y_tr, bs, True, device)
-    loader_va = _make_loader(X_va, Y_va, bs, False, device)
+    loader_tr = _make_loader(X_tr, Y_tr, Ye_tr, bs, True, device)
+    loader_va = _make_loader(X_va, Y_va, Ye_va, bs, False, device)
 
     # ---- loss weights (default = pure supervised, == old behaviour) ----------
     lcfg = cfg["train"].get("loss", {})
@@ -218,7 +315,33 @@ def main() -> None:
     print(f"[HYBRID-TRAIN] loss weights (data,physics,anchor)={weights}  "
           f"dx_f={dx_f:.3f} dt_f={dt_f:.3f}")
 
-    # ---- model ---------------------------------------------------------------
+    # ---- optional observer-column QNM-aware whitened loss term ---------------
+    ocfg = lcfg.get("observer", {})
+    obs_w = float(ocfg.get("weight", 0.0))
+    if obs_w > 0.0:
+        xq = float(ocfg.get("xq", 2.0))
+        ix = int(np.argmin(np.abs(np.asarray(grid.x_fine) - xq)))
+        whiten = {"weight": obs_w, "ix": ix,
+                  "tau": float(ocfg.get("whiten_tau", 11.241)),
+                  "cap": float(ocfg.get("whiten_cap", 50.0)),
+                  "t_start": float(ocfg.get("t_start", 10.0))}
+        print(f"[HYBRID-TRAIN] observer loss: weight={obs_w} xq={xq} ix={ix} "
+              f"tau={whiten['tau']} cap={whiten['cap']} t_start={whiten['t_start']}")
+    else:
+        whiten = None
+
+    # ---- optional spatial |Y|-whitened QNM-aware loss term -------------------
+    scfg = lcfg.get("spatial", {})
+    sp_w = float(scfg.get("weight", 0.0))
+    if sp_w > 0.0:
+        spatial = {"weight": sp_w,
+                   "floor": float(scfg.get("floor", 1.0e-4)),
+                   "p": float(scfg.get("p", 1.0))}
+        print(f"[HYBRID-TRAIN] spatial loss: weight={sp_w} "
+              f"floor={spatial['floor']} p={spatial['p']}")
+    else:
+        spatial = None
+
     model = build_hybrid_fno(cfg).to(device)
     n_params = count_parameters(model)
     print(f"[HYBRID-TRAIN] model params: {n_params}")
@@ -238,7 +361,13 @@ def main() -> None:
     ckpt_path = os.path.join(out_dir, "ckpt.pt")
     if args.resume and os.path.exists(ckpt_path):
         ck = torch.load(ckpt_path, map_location=device, weights_only=False)
-        model.load_state_dict(ck["model_state"])
+        msd = ck["model_state"]
+        # neuralop's FNO injects a `_metadata` key into its state_dict that its
+        # own load_state_dict tolerates, but the _PriorFeatureFNO nn.Module
+        # wrapper's strict load rejects as an unexpected key; drop it.
+        if isinstance(msd, dict):
+            msd.pop("_metadata", None)
+        model.load_state_dict(msd)
         try:
             opt.load_state_dict(ck["optim_state"])
         except Exception as exc:  # phase changed (Adam->LBFGS) so optim shape differs
@@ -259,9 +388,11 @@ def main() -> None:
     for ep in range(start_ep_adam, n_ep_adam + 1):
         t_ep = time.time()
         tr_loss, tr_ratio, tr_terms = _epoch_pass(model, loader_tr, device, opt,
-                                                  dx_f, dt_f, weights)
+                                                  dx_f, dt_f, weights, whiten,
+                                                  spatial)
         va_loss, va_ratio, _ = _epoch_pass(model, loader_va, device, None,
-                                           dx_f, dt_f, weights)
+                                           dx_f, dt_f, weights, whiten,
+                                           spatial)
         history.append({
             "epoch": ep, "phase": "adam",
             "train_mse": tr_loss, "val_mse": va_loss,
@@ -321,7 +452,8 @@ def main() -> None:
                 Yc = Y_full_cpu[i:i + chunk].to(device, non_blocking=True)
                 # per-chunk composite loss, weighted by chunk fraction so the
                 # accumulated scalar is the dataset-mean composite loss.
-                part, _, _ = _compose_loss(model, Xc, Yc, dx_f, dt_f, weights)
+                part, _, _ = _compose_loss(model, Xc, Yc, dx_f, dt_f, weights,
+                                           whiten, spatial)
                 part = part * (Xc.shape[0] / float(n_full))
                 part.backward()        # frees this chunk's activations
                 total = total + part.detach()
@@ -332,7 +464,8 @@ def main() -> None:
             model.train()
             opt.step(closure)
             va_loss, va_ratio, _ = _epoch_pass(model, loader_va, device, None,
-                                               dx_f, dt_f, weights)
+                                               dx_f, dt_f, weights, whiten,
+                                               spatial)
             history.append({
                 "epoch": ep, "phase": "lbfgs",
                 "val_mse": va_loss, "val_l2_ratio": va_ratio,

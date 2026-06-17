@@ -1,0 +1,28 @@
+experiment:
+  name: hybrid_sw_drp7_k2_h64
+
+dataset:
+  path: outputs/hybrid/dataset_sw_drp7_k2.npz
+
+fno:
+  modes_t: 16            # unchanged
+  modes_x: 32            # unchanged
+  hidden_channels: 64    # flagship width (matches fno_sw_k2_h64)
+  n_layers: 4            # unchanged
+  domain_padding: 0.10   # unchanged
+  positional_embedding: grid
+
+train:
+  batch_size: 4          # halved (4x activations vs hidden=32)
+  epochs_adam: 100
+  lr_adam: 1.0e-3
+  weight_decay: 1.0e-6
+  epochs_lbfgs: 30
+  lbfgs_max_iter: 20
+  lbfgs_chunk_size: 4    # halved for same reason
+  seed: 1234
+  device: cuda
+
+logging:
+  log_every: 10
+  out_dir: outputs/hybrid/fno_sw_drp7_k2_h64

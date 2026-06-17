@@ -1,0 +1,43 @@
+# DE-RISK: |grad prior| input channel + wider FNO (combined).
+#
+# Byte-identical to the modes16 control EXCEPT epochs_lbfgs 30 -> 0 (Adam-only
+# de-risk point), hidden_channels 32 -> 64, and fno.extra_channels: [grad_prior].
+# Combines the two anti-speckle levers (representation: tell the operator where
+# the prior fails; capacity: give it room to localize) to see whether they stack.
+# Compared against the grad-only and h64-only arms to attribute the effect.
+
+experiment:
+  name: hybrid_sw_gradch_h64_derisk
+
+dataset:
+  path: outputs/hybrid/dataset_sw_k4.npz
+  path_k2: outputs/hybrid/dataset_sw_k2.npz
+  target_mode: richardson
+
+fno:
+  modes_t: 16
+  modes_x: 32
+  hidden_channels: 64
+  n_layers: 4
+  domain_padding: 0.10
+  positional_embedding: grid
+  extra_channels: [grad_prior]
+
+train:
+  batch_size: 4                  # halved vs h32: h64 FFT activations OOM at bs=8 on 80GB A100
+  epochs_adam: 100
+  lr_adam: 1.0e-3
+  weight_decay: 1.0e-6
+  epochs_lbfgs: 0
+  lbfgs_max_iter: 20
+  lbfgs_chunk_size: 8
+  seed: 1234
+  device: cuda
+  loss:
+    data_weight: 1.0
+    physics_weight: 0.0
+    anchor_weight: 0.0
+
+logging:
+  log_every: 10
+  out_dir: outputs/hybrid/fno_sw_gradch_h64_derisk

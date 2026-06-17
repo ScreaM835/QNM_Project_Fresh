@@ -7,12 +7,17 @@ dist/
 build/
 .venv/
 venv_csd3/
+venv_gpu/
+venv_*/
 .vscode/
 .idea/
 *.npz
 *.pt
 *.err
 *.out
+
+# RDS scratch symlink for live datasets/outputs (never commit the data pointer)
+/outputs
 
 # LaTeX build artifacts
 *.aux

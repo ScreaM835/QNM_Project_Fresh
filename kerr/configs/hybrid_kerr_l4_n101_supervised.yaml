@@ -1,0 +1,41 @@
+# Kerr hybrid FNO — ell=4, COARSE LADDER (prior k4=101), SUPERVISED A/B run.
+#
+# Identical to hybrid_kerr_l4_n101.yaml EXCEPT target_mode=supervised: the
+# training target is (fine - up4) instead of the label-free Richardson
+# combination. This is the A/B UPPER BOUND -- it uses the fine N=801 label, so
+# it can reach near-fine quality on BOTH axes (the Richardson run is the
+# label-free, scientifically-honest headline; this bounds what is achievable
+# with the strong teacher). Same corpus (phase_c_l4_n101), separate out_dir so
+# the two runs never overwrite each other.
+
+seed: 1234
+
+data:
+  dir: kerr/outputs/phase_c_l4_n101
+  target_mode: supervised        # fine-label target: A/B upper bound
+
+fno:
+  modes_tau: 64
+  modes_sigma: 24
+  hidden_channels: 48
+  n_layers: 4
+  domain_padding: [0.08, 0.08]
+  positional_embedding: grid
+
+train:
+  epochs: 200
+  lr: 1.0e-3
+  weight_decay: 1.0e-6
+  batch_size: 8
+  patience: 30
+
+acceptance:
+  field_rl2: 0.05
+  qnm_Mw: 0.01
+  qnm_tau: 0.05
+
+eval:
+  qnm_workers: 16
+
+logging:
+  out_dir: kerr/outputs/phase_c_l4_n101/fno_hybrid_kerr_supervised

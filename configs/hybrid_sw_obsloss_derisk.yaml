@@ -1,0 +1,57 @@
+# DE-RISK: QNM-aware observer-whitened loss (A/B vs fno_sw_modes16).
+#
+# Byte-identical to the modes16 control (modes_t=16, 100 Adam, NO L-BFGS) EXCEPT
+# it switches ON the observer-column envelope-whitened loss term. modes16 eval
+# (observer OFF) was field 0.52% / M4 tau 0.99% (median, xq=2). This run isolates
+# whether the observer term drives M4 tau DOWN (toward prior 0.17% / fine 0.06%)
+# while keeping field ~0.5%. If yes -> the QNM-aware loss is the fix and we run
+# the full L-BFGS version; if field collapses or QNM does not move -> rethink.
+#
+# Mechanism: the global data term is absolute-MSE, so the observer ringdown tail
+# is ~1e-7 of the loss and the FNO reshapes it freely (good field, bad QNM). The
+# observer term targets the residual (corr - Phi_R) in the single extraction
+# column, time-whitened by min(exp(2 (t-10)/tau), 50) so each e-fold of decay
+# matters ~equally. Phi_R is itself QNM-clean, so faithfully reproducing it in
+# the fit window restores the mode WITHOUT touching the (intact) global field
+# loss -> the BOTH-metrics objective.
+
+experiment:
+  name: hybrid_sw_obsloss_derisk
+
+dataset:
+  path: outputs/hybrid/dataset_sw_k4.npz      # k4 coarse prior (channel 0)
+  path_k2: outputs/hybrid/dataset_sw_k2.npz   # k2 coarse, sample-aligned
+  target_mode: richardson                     # LABEL-FREE Phi_R target
+
+fno:
+  modes_t: 16
+  modes_x: 32
+  hidden_channels: 32
+  n_layers: 4
+  domain_padding: 0.10
+  positional_embedding: grid
+
+train:
+  batch_size: 8
+  epochs_adam: 100          # match modes16 control (clean A/B)
+  lr_adam: 1.0e-3
+  weight_decay: 1.0e-6
+  epochs_lbfgs: 0           # de-risk: Adam-only, matches the modes16 eval point
+  lbfgs_max_iter: 20
+  lbfgs_chunk_size: 8
+  seed: 1234
+  device: cuda
+  loss:
+    data_weight: 1.0        # global field loss UNCHANGED (keeps field accurate)
+    physics_weight: 0.0
+    anchor_weight: 0.0
+    observer:               # NEW QNM-aware term (default-off elsewhere)
+      weight: 1.0           # per-element this boosts the observer column ~1000x
+      xq: 2.0               # extraction radius where the QNM is read
+      t_start: 10.0         # weight=1 before ringdown; whiten the tail beyond
+      whiten_tau: 11.241    # theory tau: counter e^{-2t/tau} decay of the signal
+      whiten_cap: 50.0      # cap the boost so each e-fold ~equal, no runaway
+
+logging:
+  log_every: 10
+  out_dir: outputs/hybrid/fno_sw_obsloss_derisk
