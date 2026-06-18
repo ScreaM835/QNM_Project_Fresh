@@ -8,7 +8,7 @@
 # Writes to kerr/outputs/phase_c_l4_n101/ (does NOT touch other corpora).
 #SBATCH --job-name=qnm_l4n101
 #SBATCH --account=FERGUSSON-SL3-CPU
-#SBATCH --partition=icelake
+#SBATCH --partition=sapphire
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=32

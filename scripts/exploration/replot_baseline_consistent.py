@@ -26,12 +26,16 @@ def load(d):
     pp = np.load(p[0]); ff = np.load(f[0])
     return pp["x"], pp["t"], ff["phi"], pp["phi"]
 
-# Greedy run (improved repo) --- shared log-scale max
+# Greedy run (improved repo). Use the SAME shared log colour scale as the
+# hybrid pointwise-error figures (scripts/make_hybrid_paper_figs.py:
+# vmax=1.11e-1, vmin=vmax*1e-4) so that EVERY pointwise-error heatmap in the
+# presentation (forward PINN, greedy-vs-uniform, and hybrid) is directly
+# comparable on one common magma_r LogNorm scale.
 gx, gt, gfd, gpinn = load(os.path.join(ROOT, "outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k"))
 greedy_err = np.abs(gfd - gpinn)
-abs_max = float(greedy_err.max())
-vmin = max(abs_max * 1e-4, 1e-6)
-print(f"shared abs_max = {abs_max:.4e}, vmin = {vmin:.4e}")
+abs_max = 1.11e-1
+vmin = abs_max * 1e-4
+print(f"shared abs_max = {abs_max:.4e}, vmin = {vmin:.4e}  (matched to hybrid figs)")
 
 
 def render(x, t, err, title, outpath, zoom=False):
@@ -65,4 +69,8 @@ render(bx, bt, berr, "Pointwise error  (uniform baseline)  --  zoom $x_*/M\\in[-
 gdir = os.path.join(ROOT, "outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k")
 render(gx, gt, greedy_err, "Pointwise error  (greedy $f=0.3$ + L-BFGS 30k)",
        os.path.join(gdir, "error_heatmap_compare.png"))
+# Also regenerate the forward greedy error_heatmap.png on the SAME shared scale
+# so the forward-PINN slides match the greedy-vs-uniform slide.
+render(gx, gt, greedy_err, "Pointwise error  (greedy $f=0.3$ + L-BFGS 30k)",
+       os.path.join(gdir, "error_heatmap.png"))
 
