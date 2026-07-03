@@ -144,7 +144,8 @@ def theory_ref(potential: str = "zerilli", ell: int = 2) -> Optional[Dict[str, f
 
     Leaver 1985 / Berti et al. 2009 tabulated values; see ``THEORY``.
     """
-    return THEORY.get(potential, {}).get(ell)
+    key = str(potential).replace("-", "_")
+    return THEORY.get(key, {}).get(ell)
 
 
 def percentage_errors(

@@ -28,6 +28,24 @@ def ko_dissipation(u: np.ndarray, sigma_ko: float) -> np.ndarray:
     return q
 
 
+def ko_dissipation_6(u: np.ndarray, sigma_ko: float) -> np.ndarray:
+    """Kreiss-Oliger sixth-difference dissipation; zero in the outermost 3 cells.
+
+    The order-6 KO operator matched to a 4th-order spatial scheme (``d1_4``):
+        Q u_i = +(sigma / 64) (u_{i+3} - 6 u_{i+2} + 15 u_{i+1} - 20 u_i
+                               + 15 u_{i-1} - 6 u_{i-2} + u_{i-3})
+    It damps grid-scale modes without affecting 4th-order accuracy on smooth
+    solutions (one order higher than ``ko_dissipation``). The ``+sigma/64`` sign
+    is the dissipative branch for r=3. Needs at least 7 points.
+    """
+    q = np.zeros_like(u)
+    q[3:-3] = (sigma_ko / 64.0) * (
+        u[6:] - 6.0 * u[5:-1] + 15.0 * u[4:-2] - 20.0 * u[3:-3]
+        + 15.0 * u[2:-4] - 6.0 * u[1:-5] + u[:-6]
+    )
+    return q
+
+
 def outer_sponge_profile(r_star: np.ndarray, width_frac: float = 0.2, gamma_max: float = 1.0) -> np.ndarray:
     """gamma(r_*): 0 on inner (1 - width_frac) of grid, smoothly to gamma_max at outer edge."""
     n = r_star.shape[0]

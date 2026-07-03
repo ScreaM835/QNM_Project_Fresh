@@ -1,78 +1,89 @@
-% =============================================================
+﻿% =============================================================
 % Section 3: Methods
 % =============================================================
 \section{Methods}\label{sec:methods}
 
 We state the FD reference (Sec.~\ref{sec:fwd-problem}), the
 forward (Sec.~\ref{sec:fwd-pinn}) and inverse
-(Sec.~\ref{sec:inv-pinn}) PINNs, the five extraction methods
-M1--M5 (Sec.~\ref{sec:qnm-methods}), and the reporting convention
-(Sec.~\ref{sec:reporting}). M4 and M5 are the new estimators.
+(Sec.~\ref{sec:inv-pinn}) PINNs, the two amortised surrogates
+(Secs.~\ref{sec:fno-method} and~\ref{sec:hyb-method}), the five
+extraction methods M1--M5 (Sec.~\ref{sec:qnm-methods}), the
+plateau criterion (Sec.~\ref{sec:plateau}), and the reporting
+convention (Sec.~\ref{sec:reporting}). M4 and M5 are the new
+estimators. Table~\ref{tab:train-config} collects the training
+configuration of the four networks.
+
+\begin{table}[!htbp]
+\centering
+\caption{Training configuration of the four networks. The two
+surrogates train with weight decay $10^{-6}$ and gradient
+clipping at unit norm; all learning rates are $10^{-3}$.}
+\label{tab:train-config}
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+ & Forward PINN & Inverse PINN & FNO & Hybrid FNO \\
+\midrule
+Parameters & $4{,}521$ & $4{,}521 + 5$ & $7.8\times 10^{7}$ & $1.13\times 10^{6}$ \\
+Optimiser  & Adam${\to}$L-BFGS & Adam${\to}$L-BFGS & Adam & Adam \\
+Budget     & $10^{4} + 3{\times}10^{4}$ it. & $10^{4} + 1.5{\times}10^{4}$ it. & $300$ ep. & $100$ ep. \\
+Batch size & full & full & $4$ & $8$ \\
+Precision  & \texttt{float64} & \texttt{float64} & \texttt{float32} & \texttt{float32} \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 % --------------------------------------------------------------
 \subsection{Schwarzschild Zerilli problem}
 \label{sec:fwd-problem}
 
-The forward problem solved by the PINN of Sec.~\ref{sec:fwd-pinn}
-is the Zerilli equation Eq.~\eqref{eq:zerilli} of
-Sec.~\ref{sec:bg-zerilli}, with the polar potential
-$V_{\ell}^{\mathrm{Z}}$ of Eq.~\eqref{eq:V-zerilli} at $\ell = 2$
-and $M = 1$. The numerical domain is $x \in [-50,\,150]\,M$ and
-$t \in [0,\,50]\,M$. The initial data are an outgoing Gaussian
-pulse,
+The forward problem is the Zerilli equation
+Eq.~\eqref{eq:zerilli} with the polar potential
+$V_{\ell}^{\mathrm{Z}}$ of Eq.~\eqref{eq:V-zerilli} at
+$\ell = 2$, $M = 1$, on the numerical domain
+$x \in [-50,\,150]\,M$, $t \in [0,\,50]\,M$, with
+outgoing-Gaussian initial data
 \begin{equation}
   \Phi(x,0) = A_0\,\exp\!\left[-\frac{(x-x_0)^2}{2\sigma_0^2}\right],
   \qquad
   \partial_t \Phi(x,0) = -\partial_x \Phi(x,0),
   \label{eq:ic}
 \end{equation}
-with $A_0 = 1$, $x_0 = 4\,M$ and $\sigma_0 = 5\,M$. The right-hand side of the velocity
-condition imposes a purely outgoing Gaussian, in contrast to the
-quadratic $\partial_t \Phi \propto (x-x_0)^2 \Phi$ used by
-\citet{Patel2024pinn}. We adopt the standard outgoing form, which is the conventional
-initial condition for the Zerilli equation \citep{Berti2009review}. The asymptotic outgoing QNM
-boundary conditions Eq.~\eqref{eq:qnm-bc} are not
-imposed exactly at the truncated boundaries; instead we apply
-first-order Sommerfeld absorbing conditions,
+with $A_0 = 1$, $x_0 = 4\,M$ and $\sigma_0 = 5\,M$. The velocity
+condition imposes the conventional purely outgoing pulse
+\citep{Berti2009review}, in contrast to the quadratic
+$\partial_t \Phi \propto (x-x_0)^2 \Phi$ of
+\citet{Patel2024pinn}. At the truncated boundaries we apply
+first-order Sommerfeld absorbing conditions in place of the
+asymptotic QNM conditions Eq.~\eqref{eq:qnm-bc},
 \begin{equation}
   (\partial_t - \partial_x)\Phi\bigl|_{x=x_{\min}} = 0, \qquad
   (\partial_t + \partial_x)\Phi\bigl|_{x=x_{\max}} = 0,
   \label{eq:bc-sommerfeld}
 \end{equation}
-identical to those used by \citet{Patel2024pinn}. The spatial
-domain $[-50,150]\,M$ is sized so that the wavefront, propagating
-at unit speed from $x_0 = 4\,M$, never reaches either boundary
-within the simulated interval $t \in [0,50]\,M$. The right-going
-and left-going arrival times are
+identical to those used by \citet{Patel2024pinn}. The domain is
+sized so that the wavefront, propagating at unit speed from
+$x_0 = 4\,M$, never reaches either boundary within
+$t \in [0,50]\,M$: the arrival times
 \begin{equation}
   t_{R} = x_{\max} - x_0 = 146\,M, \qquad
   t_{L} = x_0 - x_{\min} = 54\,M,
   \label{eq:bc-arrival}
 \end{equation}
-both larger than the QNM extraction window $t \in [10,50]\,M$ at
-the observer position $x_{\mathrm{obs}} = 10\,M$, so the residuals
-of Eq.~\eqref{eq:bc-sommerfeld} act only as soft regularisers in a
-region that is causally disconnected from the initial pulse on the
-simulated interval, and therefore does not affect the extracted
-modes.
+both exceed the extraction window, so the boundary residuals
+act only as soft regularisers in a causally disconnected
+region.
 
-The reference solution is obtained by a fourth-order Runge--Kutta
-method-of-lines finite-difference (FD) integration of
-Eq.~\eqref{eq:zerilli} with $\Delta x = 0.2\,M$ and
-$\Delta t = 0.1\,M$. This FD waveform is used throughout as the ground
-truth for benchmarking PINN field accuracy and for cross-checking the
-QNM extraction methods on a non-PINN signal. The Leaver reference
-values $M\omega_0 = 0.3737$, $\tau_0/M = 11.241$ (fundamental) and
-$M\omega_1 = 0.3467$, $\tau_1/M = 3.651$ (first overtone) of
-Eq.~\eqref{eq:qnm-ref} are used for percentage-error reporting.
-Figure~\ref{fig:waveform-3d} shows the full FD reference field
-$\Phi_{\mathrm{FD}}(x, t)$ as a 3D surface, with the outgoing
-Gaussian initial condition producing a right-moving free pulse and
-a back-scattered left-moving component, the photon-sphere
-barrier at $r \simeq 3M$ trapping a fraction of the energy that
-then leaks out as the QNM ringdown along $x \simeq 0$--$15\,M$,
-and the ringdown decay visible as the amplitude decrease in the
-$t$ direction at the observer column $\xq = 10\,M$.
+The reference solution (Fig.~\ref{fig:waveform-3d}) is a
+fourth-order Runge--Kutta method-of-lines finite-difference (FD)
+integration of Eq.~\eqref{eq:zerilli} with $\Delta x = 0.2\,M$
+and $\Delta t = 0.1\,M$, used throughout as the ground truth for
+field accuracy and for cross-checking the extractors on a
+non-PINN signal. The Leaver values $M\omega_0 = 0.3737$,
+$\tau_0/M = 11.241$ (fundamental) and $M\omega_1 = 0.3467$,
+$\tau_1/M = 3.651$ (first overtone) of Eq.~\eqref{eq:qnm-ref}
+are used for percentage-error reporting.
 
 \begin{figure}[!htbp]
 \centering
@@ -100,7 +111,7 @@ Schwarzschild $\ell = 2$, generated by the fourth-order
 Runge--Kutta method-of-lines integration of
 Eq.~\eqref{eq:zerilli} with the initial data of
 Eq.~\eqref{eq:ic} and the Sommerfeld boundaries of
-Eq.~\eqref{eq:bc-sommerfeld}). All PINN field-accuracy
+Eq.~\eqref{eq:bc-sommerfeld}. All PINN field-accuracy
 metrics in Sec.~\ref{sec:results} are computed against this
 reference.}
 \label{fig:waveform-3d}
@@ -113,26 +124,21 @@ reference.}
 We solve the forward problem of Sec.~\ref{sec:fwd-problem} with a
 fully-connected PINN
 \citep{Raissi2017} implemented in DeepXDE \citep{Lu2021deepxde} with
-the PyTorch backend.
+the PyTorch backend \citep{Paszke2019pytorch}.
 
-The network architecture, output transform and weight initialiser
-are chosen identically to \citet{Patel2024pinn} so that any
-difference in extracted QNMs between the two works can be attributed
-to the loss formulation, training schedule, sampling strategy or
-extraction methodology rather than to the network itself.
-The network has hidden layers $[80,40,20,10]$ with $\tanh$
-activations and a single scalar output $\Phi(x,t)$ from input
-$(x,t) \in \mathbb{R}^{2}$, giving $4{,}521$ trainable
-parameters.\footnote{$2{\cdot}80 + 80 + 80{\cdot}40 + 40 +
-40{\cdot}20 + 20 + 20{\cdot}10 + 10 + 10{\cdot}1 + 1 = 4521$.} The
-raw scalar output $\hat y(x,t)$ is wrapped in a tanh envelope,
+Architecture, output transform and weight initialiser are chosen
+identically to \citet{Patel2024pinn}, so that differences in
+extracted QNMs are attributable to training and extraction
+rather than the network itself: hidden layers $[80,40,20,10]$
+with $\tanh$ activations, input $(x,t) \in \mathbb{R}^{2}$, and
+a single scalar output wrapped in the tanh envelope
 $\Phi_\theta(x,t) = A\tanh\bigl(\hat y(x,t)\bigr)$ with
-$A = A_0 = 1$ taken as the dynamic range of the initial data,
-to keep activations within
-the dynamic range of $\Phi$ over the whole domain.
+$A = A_0 = 1$, giving $4{,}521$ trainable
+parameters.\footnote{$2{\cdot}80 + 80 + 80{\cdot}40 + 40 +
+40{\cdot}20 + 20 + 20{\cdot}10 + 10 + 10{\cdot}1 + 1 = 4521$.}
 The architecture is summarised in Fig.~\ref{fig:fwd-pinn-arch},
-together with the automatic-differentiation
-pipeline that produces the residual losses defined below.
+together with the automatic-differentiation pipeline that
+produces the residual losses defined below.
 
 \begin{figure}[!htbp]
 \centering
@@ -239,8 +245,7 @@ reflected in the visually shrinking node columns.}
 \label{fig:fwd-pinn-arch}
 \end{figure}
 
-The training loss combines PDE, initial-condition and boundary
-residuals. Let $r_\theta(x,t) \equiv \partial_t^2\Phi_\theta -
+Let $r_\theta(x,t) \equiv \partial_t^2\Phi_\theta -
 \partial_x^2\Phi_\theta + V_\ell\,\Phi_\theta$ be the pointwise
 residual of Eq.~\eqref{eq:zerilli}. The training loss is the
 standard composite of PDE, initial-condition and boundary-condition
@@ -284,100 +289,52 @@ The seven mean-squared component losses are
 \end{align}
 mirroring the formulation of \citet[Eqs.~(4)--(10)]{Patel2024pinn}.
 The two gradient terms $\mathcal{L}_{\partial_x r},
-\mathcal{L}_{\partial_t r}$ encourage the network to produce a
-residual field that vanishes \emph{smoothly} rather than oscillating
-around zero \citep{Yu2022gpinn}. The collocation set has $N_r = 32{,}000$ PDE points,
-$N_i = 800$ initial-condition points and $N_b = 400$ boundary points distributed across both spatial
-boundaries (so each boundary contributes $\sim 200$ points), for
-$33{,}200$ space-time points in
-total. \citet{Patel2024pinn} use the same $N_r$ and $N_i$ but quote
-$N_b = 400$ \emph{per boundary}, giving their total of $33{,}600$;
-this is the only collocation-count difference between the two
-baselines. The weight vector applied throughout this work is
+\mathcal{L}_{\partial_t r}$ drive the residual to vanish
+smoothly rather than oscillate about zero \citep{Yu2022gpinn}. The collocation set sizes are listed in
+Table~\ref{tab:fwd-hyper}, with $N_b = 400$ boundary points
+shared across both boundaries where \citet{Patel2024pinn} quote
+$400$ \emph{per boundary} --- the only collocation difference
+between the two baselines. The weight vector applied throughout this work is
 \begin{equation}
   \boldsymbol{\lambda}
   = (\lambda_{r},\lambda_{r_x},\lambda_{r_t},\lambda_{\mathrm{IC}},
      \lambda_{\mathrm{IV}},\lambda_{\mathrm{BL}},\lambda_{\mathrm{BR}})
-  = (100,\,100,\,100,\,1,\,100,\,1,\,1).
+  = (100,\,100,\,100,\,1,\,100,\,1,\,1),
   \label{eq:weights}
 \end{equation}
-The equal weight $100$ on the PDE primary residual, its two
-gradient augmentations, and the velocity initial condition reflects
-that the first three terms control how accurately the network
-satisfies Eq.~\eqref{eq:zerilli} throughout the bulk of the domain,
-while the velocity initial condition fixes the propagation
-direction of the pulse at $t = 0$ and was found by
-\citet{Patel2024pinn} to be unstable to under-weighting (see
-below). The unit weights on the field initial condition and on the
-two Sommerfeld boundaries reflect that, by
-Eq.~\eqref{eq:bc-arrival}, the wavefront does not reach either
-boundary within the simulated interval, so the boundary residuals
-act only as soft regularisers on a region the dynamics of
-Eq.~\eqref{eq:zerilli} barely populate. The choice
-$\lambda_{\mathrm{IV}} = 100$ follows \citet{Patel2024pinn}, who
-report empirically that down-weighting the velocity initial
-condition produces a ``phase problem'' (a slow drift of the learned
-waveform's phase relative to the FD reference), which the larger
-weight suppresses. We observe the same behaviour and adopt the same
-remedy.
+following \citet{Patel2024pinn}: $\lambda_{\mathrm{IV}} = 100$
+suppresses the phase drift reported (and reproduced here) when
+the velocity condition is under-weighted, and the unit
+Sommerfeld weights reflect the causal disconnection at
+Eq.~\eqref{eq:bc-arrival}.
 
-Optimisation proceeds in two stages, namely $10{,}000$ iterations
-of Adam \citep{Kingma2015adam} with learning rate $10^{-3}$,
-followed by $30{,}000$ iterations of L-BFGS \citep{Liu1989lbfgs}.
-The number of L-BFGS iterations is doubled relative to the
-$15{,}000$ used by \citet{Patel2024pinn}. Empirically the field-residual loss
-continues to decrease through iteration $\sim 25{,}000$ in our runs,
-and the
-plateau-window analysis of Sec.~\ref{sec:plateau} requires the
-resulting $\Phi(\xq,t)$ to be sufficiently converged that the
-plateau standard deviation is dominated by the window choice rather
-than by the noise floor of the converged training loss.
-We use the residual-based adaptive sampling scheme of
-\citet{Lu2021deepxde} (the RAR-G variant in the taxonomy of
-\citet{Wu2023adaptive}): every $1{,}000$ Adam
-iterations, $10^{5}$ candidate residual points are drawn uniformly
-from the spacetime domain, the PDE residual is evaluated on them in
-minibatches of $5{,}000$, and the entire $N_r = 32{,}000$
-collocation set is replaced by $0.3\,N_r = 9{,}600$ candidates of
-largest $|r_\theta|$ together with $0.7\,N_r = 22{,}400$ candidates
-drawn uniformly at random from the remainder. The greedy fraction
-$0.3$ was tuned for this problem; the
-uniform component prevents the collocation set from collapsing
-entirely onto the wavefront at late training iterations.
-
-All computations use double precision; we found
-this necessary to avoid floating-point-induced stalls in L-BFGS for
-this problem.
+Optimisation is Adam \citep{Kingma2015adam} followed by L-BFGS
+\citep{Liu1989lbfgs} at double the budget of
+\citet{Patel2024pinn} (Table~\ref{tab:train-config}), since the
+loss still decreases through iteration $\sim\!25{,}000$;
+training is full-batch in double precision, which we found
+necessary to avoid floating-point-induced L-BFGS stalls.
+Every $1{,}000$ Adam iterations a greedy residual-resampling
+scheme \citep{Lu2021deepxde,Wu2023adaptive} scores $10^{5}$
+uniform candidates by $|r_\theta|$ and rebuilds the collocation
+set as the top $0.3\,N_r$ by residual plus $0.7\,N_r$ uniform
+redraws; the uniform floor prevents collapse onto the wavefront
+late in training.
 
 % --------------------------------------------------------------
 \subsection{Inverse PINN}
 \label{sec:inv-pinn}
 
-The forward problem of Sec.~\ref{sec:fwd-pinn} computes
-$\Phi(x,t)$ from a known PDE; the inverse problem reverses the
-direction of inference and recovers unknown parameters of the
-PDE, and of the asymptotic solution that the PDE supports, from
-noisy observations of the field. Here the unknown parameters are
-the black hole mass $M$, which enters the Zerilli potential
-Eq.~\eqref{eq:V-zerilli} through every $M$-dependent term, and
-the fundamental QNM template parameters
-$(\omega,\tau,A_{\mathrm{ring}},\phi)$ that label the late-time
-damped sinusoid of Eq.~\eqref{eq:qnm-omega} at the observer
-position. The inverse PINN trains the same network of
-Sec.~\ref{sec:fwd-pinn} jointly with these five scalars, treated
-as learnable variables. Each scalar is appended to the optimiser's
-trainable-parameter list alongside the network weights, so Adam
-and L-BFGS update the network weights $\theta$ and the five
-scalars $(M,\omega,\tau,A_{\mathrm{ring}},\phi)$ in the same
-gradient step, with a single shared loss
-\citep{Lu2021deepxde,Cornell2022pinnqnm}. The PDE residual
-depends on $M$ and pushes the optimiser to values of $M$ for
-which $\Phi_\theta$ satisfies the Zerilli equation; the data
-residual pushes $\Phi_\theta$ to match the noisy observations;
-the template residual pushes $(\omega,\tau,A_{\mathrm{ring}},\phi)$ to label the late-time behaviour of the same
-$\Phi_\theta$. The shared gradient step couples all five
-unknowns and the network weights, and the joint minimum is the
-inverse-problem solution. Training data are noisy samples of
+The inverse problem recovers five unknowns from noisy field
+observations: the black-hole mass $M$, which enters the Zerilli
+potential Eq.~\eqref{eq:V-zerilli}, and the template parameters
+$(\omega,\tau,A_{\mathrm{ring}},\phi)$ of the late-time damped
+sinusoid of Eq.~\eqref{eq:qnm-omega} at the observer. The
+network of Sec.~\ref{sec:fwd-pinn} is trained jointly with these
+five scalars --- appended to the optimiser's parameter list and
+updated in the same gradient steps --- under the single loss of
+Eq.~\eqref{eq:loss-inv} \citep{Lu2021deepxde,Cornell2022pinnqnm}.
+Training data are noisy samples of
 the true Zerilli waveform, generated by adding Gaussian noise to
 the FD reference,
 \begin{equation}
@@ -412,10 +369,8 @@ network output and the observations,
   \Ldata = \frac{1}{\Nobs}\sum_{i=1}^{\Nobs}
   \bigl(\Phitheta(x_i,t_i) - \Phiobs(x_i,t_i)\bigr)^{2},
 \end{equation*}
-with weight $\lambda_{\mathrm{data}} = 10$, set empirically so that
-$\lambda_{\mathrm{data}}\Ldata$ is comparable in magnitude to the
-PDE residual term at the start of training; we did not tune this
-value further. The ringdown term
+with $\lambda_{\mathrm{data}} = 10$, set once so that the data
+and PDE terms start at comparable magnitude. The ringdown term
 enforces a damped-sinusoid template at the observer position,
 \begin{equation}
   \Lring = \frac{1}{\Nring}\sum_{j=1}^{\Nring}
@@ -423,31 +378,17 @@ enforces a damped-sinusoid template at the observer position,
   \label{eq:loss-ring}
 \end{equation}
 with the times $t_j$ on a uniform grid of $\Nring$ points on
-$[\tring,\,t_{\max}]$, where $t_{\max} = 50\,M$ is the end of the
-simulation domain. Eq.~\eqref{eq:loss-ring} is implemented as a soft constraint that
-evaluates the template residual on a one-dimensional grid of
-$\Nring$ time samples at $x = \xq$; the residual
-$\Phitheta(\xq,t_j) - \mathrm{template}(t_j)$ back-propagates into
-both the network parameters $\theta$ and the
-template parameters $(\omega,\tau,A_{\mathrm{ring}},\phi)$ on every
-training step. Embedding a damped-sinusoid template as a soft
-constraint inside the PINN loss is new. The template encodes the
-prior knowledge that, in the QNM regime, $\Phi(\xq,t)$ takes the
-damped-sinusoid form of Eq.~\eqref{eq:qnm-omega}; without it the
-inverse PINN would have to discover that functional form from
-noisy observations alone, and the learnable scalars
-$(\omega,\tau,A_{\mathrm{ring}},\phi)$ would have no operational
-definition inside the loss. Prior PINN-based black-hole
-perturbation studies, including \citet{Patel2024pinn},
-fit the template only after training. We therefore treat
-Eq.~\eqref{eq:loss-ring} as a methodological component of this
-paper and study its sensitivity to $\tring$,
-$\lambda_{\mathrm{ring}}$ and $\Nring$ in
-Sec.~\ref{sec:variants} below.
+$[\tring,\,50]\,M$; the residual back-propagates into both
+$\theta$ and the template scalars on every step. Embedding the
+template inside the loss is new --- prior PINN-based
+perturbation studies, including \citet{Patel2024pinn}, fit it
+only after training --- and gives the scalars their operational
+definition; its hyperparameters $(\tring,
+\lambda_{\mathrm{ring}}, \Nring)$ are ablated in
+Sec.~\ref{sec:variants}.
 
-The architecture and the (Adam, L-BFGS) optimiser sequence are the
-same as in the forward PINN; here we use $10{,}000$ Adam
-iterations followed by $15{,}000$ L-BFGS iterations.
+The architecture and optimiser sequence match the forward PINN
+at a reduced L-BFGS budget (Table~\ref{tab:train-config}).
 The full architecture, including the five learnable scalars
 appended to the network parameters, is shown in
 Fig.~\ref{fig:inv-pinn-arch}.
@@ -582,17 +523,15 @@ difference from the forward PINN.}
 \label{fig:inv-pinn-arch}
 \end{figure}
 
-We initialise $M_{\mathrm{init}} = 0.8$ ($20\%$ below the true mass),
-$\omega_{\mathrm{init}} = 0.30$ ($\approx 20\%$ below the
-$M\omega_0 = 0.3737$ value of \citet{Leaver1985}) and
-$\tau_{\mathrm{init}} = 8.0$ ($\approx 29\%$ below
-$\tau_0/M = 11.241$). These offsets are large enough that the
+We initialise $M_{\mathrm{init}} = 0.8$,
+$\omega_{\mathrm{init}} = 0.30$ and $\tau_{\mathrm{init}} = 8.0$
+--- offsets of $20$--$29\%$ from the true values ($M = 1$ and
+the Leaver references of Eq.~\eqref{eq:qnm-ref}) --- so the
 inverse pipeline cannot succeed by sitting near its
 initialisation.
 
-A schematic of the full inverse training pipeline (data generation,
-loss decomposition, parameter update and post-hoc QNM extraction)
-is given in Fig.~\ref{fig:pipeline}.
+The full training pipeline is summarised in
+Fig.~\ref{fig:pipeline}.
 
 \begin{figure}[t]
 \centering
@@ -667,26 +606,19 @@ QNM extraction methods of Sec.~\ref{sec:qnm-methods}.}
 \label{sec:variants}
 
 The hyperparameters $\tring$, $\lambda_{\mathrm{ring}}$ and $\Nring$
-control, respectively, the start of the ringdown window, the strength
-of the template constraint relative to the PDE constraint, and the
-number of template evaluation points. We study the six configurations
-of Table~\ref{tab:variants}, designed as a one-factor-at-a-time
-ablation followed by a combined run and a structural extension.
-Variants A, B, C each modify exactly one hyperparameter relative to
-the baseline; variant D combines all three; variant E adds the first
-overtone to the ringdown template as a second damped sinusoid with
-its own learnable $(\omega_1,\tau_1,A_1,\phi_1)$, and the original
-template parameters of Eq.~\eqref{eq:loss-ring} are relabelled
-$(\omega_0,\tau_0,A_0^{\mathrm{ring}},\phi_0)$ in this variant.
-The overtone is initialised at $\omega_1^{\mathrm{init}} = 0.28$
-($\approx 19\%$ below the Leaver value $M\omega_1 = 0.3467$) and
-$\tau_1^{\mathrm{init}} = 4.7$ ($\approx 29\%$ above
-$\tau_1/M = 3.651$), matching the offset philosophy adopted for the
-fundamental in Sec.~\ref{sec:inv-pinn}. The subscripts
-$\omega_n,\tau_n$ used here for the two learnable template modes are
-distinct from the Leaver overtone labels of Eq.~\eqref{eq:qnm-ref}
-and from the two-mode NLS post-hoc fit of Eq.~\eqref{eq:two-mode}
-below; the three notations agree numerically only at the truth.
+control the start of the ringdown window, the strength
+of the template constraint relative to the PDE terms, and the
+number of template evaluation points. The six configurations of
+Table~\ref{tab:variants} form a one-factor-at-a-time ablation
+(A, B, C), a combined run (D), and a structural extension (E)
+that adds the first overtone to the template as a second damped
+sinusoid with its own learnable $(\omega_1,\tau_1,A_1,\phi_1)$,
+initialised $19$--$29\%$ from the Leaver values in the same
+offset philosophy as the fundamental. The template-mode
+subscripts $\omega_n,\tau_n$ are distinct from the Leaver
+overtone labels of Eq.~\eqref{eq:qnm-ref} and from the two-mode
+NLS post-hoc fit of Eq.~\eqref{eq:two-mode} below; the three
+notations agree numerically only at the truth.
 
 \begin{table}[t]
 \centering
@@ -704,356 +636,99 @@ of two damped sinusoids. Bold values mark the hyperparameter changed
 relative to the baseline.}
 \label{tab:variants}
 \small
-\begin{tabular}{@{}llcccl@{}}
+\begin{tabular}{@{}lcccl@{}}
 \toprule
-Tag & Config name & $\tring/M$ & $\lambda_{\mathrm{ring}}$ & $\Nring$ & Template \\
+Tag & $\tring/M$ & $\lambda_{\mathrm{ring}}$ & $\Nring$ & Template \\
 \midrule
-baseline   & \texttt{inverse\_qnm}            & $10$ & $1$   & $200$  & single mode \\
-A          & \texttt{inverse\_qnm\_tring18}   & $\mathbf{18}$ & $1$   & $200$  & single mode \\
-B          & \texttt{inverse\_qnm\_lring100}  & $10$ & $\mathbf{100}$ & $200$  & single mode \\
-C          & \texttt{inverse\_qnm\_nring1000} & $10$ & $1$   & $\mathbf{1000}$ & single mode \\
-\textbf{D} & \texttt{inverse\_qnm\_combo}     & $\mathbf{18}$ & $\mathbf{100}$ & $\mathbf{1000}$ & single mode \\
-E          & \texttt{inverse\_qnm\_2mode}     & $18$ & $100$ & $1000$ & two modes \\
+baseline   & $10$ & $1$   & $200$  & single mode \\
+A          & $\mathbf{18}$ & $1$   & $200$  & single mode \\
+B          & $10$ & $\mathbf{100}$ & $200$  & single mode \\
+C          & $10$ & $1$   & $\mathbf{1000}$ & single mode \\
+\textbf{D} & $\mathbf{18}$ & $\mathbf{100}$ & $\mathbf{1000}$ & single mode \\
+E          & $18$ & $100$ & $1000$ & two modes \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The choice $\tring = 18\,M$ in variants A, D, E is motivated
-\emph{a~posteriori} by the M5 plateau scan of
-Sec.~\ref{sec:qnm-methods} on the forward waveform, which identifies
-$t_0 \in [10,\,16.7]\,M$ as the lowest-bias plateau for the
-fundamental. The value $18\,M$ sits at the upper edge, where overtone
-contamination is negligible
-($e^{-18/\tau_1} = e^{-18/3.651} \approx 7\times 10^{-3}$) while
-the fundamental still retains
-$e^{-18/\tau_0} = e^{-18/11.241} \approx 0.20$ of its initial
-amplitude. The choice $\lambda_{\mathrm{ring}} = 100$ in variants B,
-D, E places the template constraint at the same weight as the PDE
-primary residual $\lambda_r = 100$ in
-Eq.~\eqref{eq:weights}. With the default $\lambda_{\mathrm{ring}} = 1$
-the template is two orders of magnitude weaker than $\lambda_r$, and
-the QNM parameters drift to whatever configuration minimises the
-residual under the much weaker template penalty.
+The value $\tring = 18\,M$ (variants A, D, E) sits at the upper
+edge of the forward M5 plateau: overtone contamination is
+negligible there ($e^{-18/\tau_1} \approx 7\times 10^{-3}$)
+while the fundamental retains
+$e^{-18/\tau_0} \approx 0.20$ of its initial amplitude.
+$\lambda_{\mathrm{ring}} = 100$ (variants B, D, E) raises the
+template to the weight of the PDE residual in
+Eq.~\eqref{eq:weights}; at the default
+$\lambda_{\mathrm{ring}} = 1$ it is two orders of magnitude
+weaker and the QNM scalars drift.
 
-The ringdown loss term Eq.~\eqref{eq:loss-ring} contains an
-$A_{\mathrm{ring}}$--$\tau$ degeneracy that follows directly from
-the shape of the template inside the fit window. Expand the
-envelope at the early edge of the window,
-$A_{\mathrm{ring}} e^{-t/\tau} = A_{\mathrm{ring}}\bigl(1 - t/\tau + \mathcal{O}(t^2/\tau^2)\bigr)$,
-so that to leading order the envelope enters the residual only
-through the two combinations $A_{\mathrm{ring}}$ and
-$A_{\mathrm{ring}}/\tau$. Pairs $(A_{\mathrm{ring}},\tau)$ that
-share the same $A_{\mathrm{ring}}$ at the start of the window and
-the same ratio $A_{\mathrm{ring}}/\tau$ are therefore
-indistinguishable to first order in $t/\tau$; equivalently, a
-smaller $\tau$ paired with a larger $A_{\mathrm{ring}}$ produces
-a fit of comparable residual at the early edge of the template
-window. At late times the envelope is exponentially suppressed
-and contributes negligibly to $\Lring$, so the second-order
-curvature term that would lift the degeneracy is too weak to
-constrain the optimiser. The optimiser drifts down this
-degenerate direction during L-BFGS,
-so the \emph{learned} $\tau_{\mathrm{learned}}$ recorded in the
-parameter history can differ substantially from the decay rate
-actually present in the converged $\Phi_\theta(\xq,t)$. A direct
-empirical diagnostic of this effect is that M2 evaluated on the
-variant's own training-template window $[\tring,\,50]\,M$
-recovers the (biased) learned $\tau_{\mathrm{learned}}$, whereas
-M2 evaluated on the wider window $[10,\,50]\,M$ recovers a value
-much closer to the Leaver value. The reporting convention of
-Sec.~\ref{sec:reporting} therefore quotes M2 over the wide window
-as the primary $\tau$ across all variants. The narrower-window
-value is reported separately as a diagnostic in
-Sec.~\ref{sec:results} to characterise the degeneracy.
-
-% --------------------------------------------------------------
-\subsection{Curriculum PINN}
-\label{sec:cur-pinn}
-
-The forward PINN of Sec.~\ref{sec:fwd-pinn} trains a single
-network on the full temporal domain $t \in [0,50]\,M$. The
-pointwise error of the converged baseline grows monotonically
-with $t$: the late-time band $t \in [37.5,\,50]\,M$ contributes
-$\sim 41\%$ of the total RMSD against the FD reference, despite
-spanning only a quarter of the domain. This motivates a
-curriculum-learning strategy
-\citep{Bengio2009curriculum,Krishnapriyan2021failure} in which
-the temporal domain is split into $K$ contiguous windows and a
-separate PINN is trained sequentially on each window, with the
-trained $k$-th PINN providing the initial conditions for the
-$(k{+}1)$-th. Smaller temporal sub-domains carry less of the
-late-time decay range and therefore an easier optimisation
-landscape; the price is that the initial conditions of every
-window after the first are themselves PINN outputs, and so
-inherit the residual error of the previous window.
-
-\paragraph{Relation to causal training.} The hard-window
-curriculum used here is the discrete limit of the continuous
-causal-training scheme of \citet{Wang2022causal}, in which the
-PDE-residual loss is reweighted by a soft causal envelope
-$w(t) = \exp\!\bigl(-\varepsilon \int_{t_{\min}}^{t}
-\mathcal{R}(\tau)\,d\tau\bigr)$ that suppresses gradient flow
-from time $t$ until the residual $\mathcal{R}$ at all earlier
-times has been driven down. Both strategies diagnose the same
-pathology---a vanilla PINN can minimise its total residual by
-fitting the late-time decay before the early-time pulse, in
-violation of the underlying causal structure---and both impose
-an earliest-first ordering on the optimisation. The hard
-partition adopted here trades the continuous reweighting of
-\citet{Wang2022causal} for a discrete handoff between $K$
-independent sub-networks: this couples cleanly to the
-three-window soft-overlap variant of
-Sec.~\ref{sec:res-cur} ($\Delta_{\mathrm{ov}}=10\,M$,
-$\lambda_{\mathrm{cont}}=10$), which sits between the hard
-partition and the fully soft causal envelope.
-
-\paragraph{Hard partition.} The general $K$-window curriculum
-splits the temporal domain at $K-1$ split points
-$t_{\min} < t_{1} < \dots < t_{K-1} < t_{\max}$ into $K$ disjoint
-windows
-\begin{equation}
-  W_{k} = [t_{k-1},\,t_{k}],
-  \qquad
-  t_{0} = t_{\min},\;\; t_{K} = t_{\max}.
-  \label{eq:cur-split}
-\end{equation}
-On each window we train an independent PINN
-$\Phi_{\theta_{k}}$ with the same architecture as
-Sec.~\ref{sec:fwd-pinn}, the loss Eq.~\eqref{eq:loss-fwd},
-weights Eq.~\eqref{eq:weights}, and optimiser schedule (Adam
-$10{,}000$ + L-BFGS $30{,}000$). Window $W_{1}$ uses the analytic
-Gaussian-pulse initial conditions of Eq.~\eqref{eq:ic};
-for $k \ge 2$ the initial conditions at $t = t_{k-1}$ are
-extracted from the trained $\Phi_{\theta_{k-1}}$ at the matching
-time slice,
-\begin{equation}
-  \Phi^{\mathrm{IC}}_{k}(x) = \Phi_{\theta_{k-1}}(x,\,t_{k-1}),
-  \qquad
-  \partial_{t}\Phi^{\mathrm{IC}}_{k}(x)
-   = \partial_{t}\Phi_{\theta_{k-1}}(x,\,t_{k-1}),
-  \label{eq:cur-ic}
-\end{equation}
-with the velocity field $\partial_{t}\Phi_{\theta_{k-1}}$
-computed by automatic differentiation on the trained network and
-both fields then evaluated by cubic-spline interpolation at the
-collocation points of $W_{k}$. The IC residuals
-$\mathcal{L}_{\Phi}^{\mathrm{IC}},
-\mathcal{L}_{\partial_{t}\Phi}^{\mathrm{IC}}$ in
-Eq.~\eqref{eq:loss-components} are then evaluated against
-Eq.~\eqref{eq:cur-ic} rather than against the analytic IC. The
-greedy adaptive resampler of Sec.~\ref{sec:fwd-pinn} is restarted
-fresh on each window so that $0.3 N_{r}$ collocation points are
-concentrated on the window's own residual field. The final
-stitched field is
-\begin{equation}
-  \Phi_{\mathrm{cur}}(x,t)
-  = \Phi_{\theta_{k}}(x,t),
-  \qquad t \in W_{k},
-  \label{eq:cur-stitch}
-\end{equation}
-with the splits $\{t_{k}\}_{k=1}^{K-1}$ being the only points at
-which two networks could disagree; we adopt the convention that
-$\Phi_{\theta_{k+1}}$ owns the splice time exactly.
-
-\paragraph{Soft-overlap partition.} The hard partition of
-Eq.~\eqref{eq:cur-stitch} produces a discontinuity in the stitched
-field whenever
-$\Phi_{\theta_{k}}(x,t_{k}) \ne \Phi_{\theta_{k+1}}(x,t_{k})$,
-which occurs generically because $\Phi_{\theta_{k+1}}$ is trained
-against an interpolated rather than exact initial condition. We
-also implement a soft-overlap variant in which two consecutive
-windows share an overlap band of width $\Delta_{\mathrm{ov}}$
-centred on $t_{\mathrm{split}}$,
-\begin{equation}
-  W_{1}^{\mathrm{ov}}
-   = [t_{\min},\,t_{\mathrm{split}} + \Delta_{\mathrm{ov}}/2],
-  \qquad
-  W_{2}^{\mathrm{ov}}
-   = [t_{\mathrm{split}} - \Delta_{\mathrm{ov}}/2,\,t_{\max}],
-  \label{eq:cur-soft}
-\end{equation}
-with two additional ingredients on top of Eq.~\eqref{eq:cur-ic}.
-First, $\Phi_{\theta_{2}}$ receives a fixed
-\emph{continuity-anchor} loss term on a uniform grid of
-$n_{x} \times n_{t}$ points across the overlap rectangle
-$[x_{\min},x_{\max}] \times
-[t_{\mathrm{split}} - \Delta_{\mathrm{ov}}/2,\,
- t_{\mathrm{split}} + \Delta_{\mathrm{ov}}/2]$,
-\begin{equation}
-  \mathcal{L}_{\mathrm{cont}}
-  = \frac{\lambda_{\mathrm{cont}}}{n_{x} n_{t}}
-    \sum_{i=1}^{n_{x}}\sum_{j=1}^{n_{t}}
-    \bigl(\Phi_{\theta_{2}}(x_{i},t_{j})
-        - \Phi_{\theta_{1}}(x_{i},t_{j})\bigr)^{2},
-  \label{eq:cur-anchor}
-\end{equation}
-that pulls $\Phi_{\theta_{2}}$ towards the (already-trained)
-$\Phi_{\theta_{1}}$ across the entire overlap rather than at the
-splice time alone. Second, the final field on the overlap is a
-smoothstep-blended average of the two networks,
-\begin{equation}
-  \Phi_{\mathrm{cur}}^{\mathrm{ov}}(x,t)
-  = \bigl(1 - s(\xi)\bigr)\,\Phi_{\theta_{1}}(x,t)
-   + s(\xi)\,\Phi_{\theta_{2}}(x,t),
-  \quad
-  s(\xi) = \xi^{2}(3 - 2\xi),
-  \quad
-  \xi = \frac{t - t_{\mathrm{ov}}^{-}}{\Delta_{\mathrm{ov}}},
-  \label{eq:cur-blend}
-\end{equation}
-with $t_{\mathrm{ov}}^{-} = t_{\mathrm{split}} -
-\Delta_{\mathrm{ov}}/2$, on the band
-$t \in W_{1}^{\mathrm{ov}} \cap W_{2}^{\mathrm{ov}}$. The
-smoothstep $s$ is $C^{1}$ and satisfies $s(0) = 0$, $s(1) = 1$,
-$s'(0) = s'(1) = 0$, so the blended field is continuously
-differentiable across the overlap edges. Outside the overlap the
-stitching reduces to Eq.~\eqref{eq:cur-stitch}.
-
-We study three configurations of the curriculum PINN, summarised
-in Table~\ref{tab:cur-variants}: a 2-window hard partition at
-$t_{\mathrm{split}} = 25\,M$, a 3-window hard partition at
-$\{17,34\}\,M$, and a 2-window soft-overlap partition with
-$\Delta_{\mathrm{ov}} = 10\,M$, $n_{x} \times n_{t} = 201\times 11$
-continuity anchors and $\lambda_{\mathrm{cont}} = 10$. All three
-variants share the per-window architecture of
-Sec.~\ref{sec:fwd-pinn}, the loss Eq.~\eqref{eq:loss-fwd}, the
-weights Eq.~\eqref{eq:weights}, and the (Adam + L-BFGS) optimiser
-schedule applied independently per window (so the total training
-budget scales linearly with $K$).
-
-\begin{table}[!htbp]
-\centering
-\caption{Curriculum PINN variants. ``Windows'' lists the temporal
-sub-domains in units of $M$. The hard-partition variants stitch
-through Eq.~\eqref{eq:cur-stitch}; the soft-overlap variant
-additionally applies the continuity anchors of
-Eq.~\eqref{eq:cur-anchor} and the smoothstep blend of
-Eq.~\eqref{eq:cur-blend} on the overlap band.}
-\label{tab:cur-variants}
-\small
-\setlength{\tabcolsep}{6pt}
-\begin{tabular}{@{}llll@{}}
-\toprule
-Tag      & Config name                          & Windows                          & Stitching \\
-\midrule
-Cur-2w   & \texttt{curriculum}                  & $[0,25]\cup[25,50]$              & hard \\
-Cur-3w   & \texttt{curriculum\_3w}              & $[0,17]\cup[17,34]\cup[34,50]$   & hard \\
-Cur-soft & \texttt{soft\_overlap\_curriculum}   & $[0,30]\cup[20,50]$              & soft, $\Delta_{\mathrm{ov}}{=}10$, $\lambda_{\mathrm{cont}}{=}10$ \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-The schematic of the three partitions is shown in
-Fig.~\ref{fig:cur-partition}, alongside the IC-transfer arrows
-that distinguish each variant.
-
-\begin{figure}[!htbp]
-\centering
-\begin{tikzpicture}[
-  every node/.style={font=\small},
-  win/.style={draw, rounded corners=2pt, minimum height=9mm,
-              inner sep=2pt, font=\small},
-  ovl/.style={draw, rounded corners=2pt, minimum height=9mm,
-              inner sep=2pt, fill=purple!25, font=\small},
-  arr/.style={->, >=stealth, thick, gray!50!black},
-  tick/.style={font=\scriptsize, gray!50!black},
-]
-  % Horizontal axis scale.
-  \def\sc{0.28}    % cm per M
-  \def\xo{-0.5*50*\sc} % so t=0 sits at this x
-
-  % --- Cur-2w: [0,25] U [25,50] ---
-  \node[font=\small\bfseries, anchor=east] at ({\xo - 0.4}, 2.6) {Cur-2w:};
-  \node[win, fill=orange!20, minimum width={25*\sc cm}, anchor=west] (a1)
-       at ({0*\sc + \xo}, 2.6) {$W_{1}=[0,25]M$};
-  \node[win, fill=blue!15, minimum width={25*\sc cm}, anchor=west] (a2)
-       at ({25*\sc + \xo}, 2.6) {$W_{2}=[25,50]M$};
-  % IC transfer arrow lifted above the boundary
-  \draw[arr] ($(a1.north)!0.85!(a1.north east)$)
-          .. controls +(0.2,0.7) and +(-0.2,0.7) ..
-             ($(a2.north)!0.15!(a2.north west)$);
-  \node[font=\scriptsize, anchor=south]
-       at ({25*\sc + \xo}, 3.85) {IC at $t{=}25M$};
-
-  % --- Cur-3w: [0,17] U [17,34] U [34,50] ---
-  \node[font=\small\bfseries, anchor=east] at ({\xo - 0.4}, 0.7) {Cur-3w:};
-  \node[win, fill=orange!20, minimum width={17*\sc cm}, anchor=west] (b1)
-       at ({0*\sc + \xo}, 0.7) {$[0,17]M$};
-  \node[win, fill=blue!15,   minimum width={17*\sc cm}, anchor=west] (b2)
-       at ({17*\sc + \xo}, 0.7) {$[17,34]M$};
-  \node[win, fill=green!15,  minimum width={16*\sc cm}, anchor=west] (b3)
-       at ({34*\sc + \xo}, 0.7) {$[34,50]M$};
-  \draw[arr] ($(b1.north)!0.85!(b1.north east)$)
-          .. controls +(0.15,0.55) and +(-0.15,0.55) ..
-             ($(b2.north)!0.15!(b2.north west)$);
-  \draw[arr] ($(b2.north)!0.85!(b2.north east)$)
-          .. controls +(0.15,0.55) and +(-0.15,0.55) ..
-             ($(b3.north)!0.15!(b3.north west)$);
-  \node[font=\scriptsize, anchor=south]
-       at ({17*\sc + \xo}, 1.85) {IC};
-  \node[font=\scriptsize, anchor=south]
-       at ({34*\sc + \xo}, 1.85) {IC};
-
-  % --- Cur-soft: W1 [0,30] (top) and W2 [20,50] (bottom), overlap [20,30] ---
-  \node[font=\small\bfseries, anchor=east] at ({\xo - 0.4}, -1.0) {Cur-soft:};
-  \node[win, fill=orange!20, minimum width={30*\sc cm}, anchor=west] (c1)
-       at ({0*\sc + \xo}, -1.0) {$W_{1}^{\mathrm{ov}}=[0,30]M$};
-  \node[win, fill=blue!15, minimum width={30*\sc cm}, anchor=west] (c2)
-       at ({20*\sc + \xo}, -2.0) {$W_{2}^{\mathrm{ov}}=[20,50]M$};
-  % Highlight overlap band as vertical purple shading spanning both rows
-  \fill[purple!25, opacity=0.55]
-       ({20*\sc + \xo}, -2.5) rectangle ({30*\sc + \xo}, -0.5);
-  \draw[purple!60!black, dashed] ({20*\sc + \xo}, -2.5) -- ({20*\sc + \xo}, -0.5);
-  \draw[purple!60!black, dashed] ({30*\sc + \xo}, -2.5) -- ({30*\sc + \xo}, -0.5);
-  \node[font=\scriptsize, anchor=south, purple!60!black]
-       at ({25*\sc + \xo}, -0.5)
-       {overlap $[20,30]M$: anchors\,+\,blend};
-
-  % Time axis (bottom)
-  \draw[->, thick] ({0*\sc + \xo}, -3.0)
-                -- ({50*\sc + \xo + 0.5}, -3.0)
-                node[right]{$t/M$};
-  \foreach \t in {0,10,17,20,25,30,34,40,50}{
-    \draw ({\t*\sc + \xo}, -3.0) -- ({\t*\sc + \xo}, -3.15);
-    \node[tick, below] at ({\t*\sc + \xo}, -3.15) {\t};
-  }
-\end{tikzpicture}
-\caption{Curriculum PINN partitions. Cur-2w (top) splits the
-temporal domain at $t = 25\,M$ into two disjoint hard-stitched
-windows; the trained network on $W_{1}$ supplies the numerical
-initial condition Eq.~\eqref{eq:cur-ic} for $W_{2}$. Cur-3w
-(middle) splits at $\{17,34\}\,M$ into three windows with the
-same hard-stitch IC transfer between consecutive windows.
-Cur-soft (bottom) uses overlapping windows
-$W_{1}^{\mathrm{ov}} = [0,30]\,M$ and
-$W_{2}^{\mathrm{ov}} = [20,50]\,M$ with a $10\,M$ overlap band
-(purple) on which the continuity anchors of
-Eq.~\eqref{eq:cur-anchor} are imposed and the smoothstep blend of
-Eq.~\eqref{eq:cur-blend} is applied to the final stitched field.}
-\label{fig:cur-partition}
-\end{figure}
+The ringdown loss Eq.~\eqref{eq:loss-ring} contains an
+$A_{\mathrm{ring}}$--$\tau$ degeneracy: expanding the envelope,
+$A_{\mathrm{ring}} e^{-t/\tau}
+= A_{\mathrm{ring}}\bigl(1 - t/\tau
++ \mathcal{O}(t^2/\tau^2)\bigr)$, the residual depends to first
+order only on $A_{\mathrm{ring}}$ and $A_{\mathrm{ring}}/\tau$,
+and the exponentially suppressed tail is too weak to lift the
+degeneracy at second order. L-BFGS drifts along this direction,
+so $\tau_{\mathrm{learned}}$ can differ substantially from the
+decay rate of the converged field: M2 on the training window
+$[\tring,\,50]\,M$ recovers the biased $\tau_{\mathrm{learned}}$
+while M2 on $[10,\,50]\,M$ recovers a value close to Leaver,
+and the convention of Sec.~\ref{sec:reporting} therefore quotes
+the wide window.
 
 % --------------------------------------------------------------
 \subsection{Fourier neural operator surrogate}
 \label{sec:fno-method}
 
-The forward, inverse and curriculum PINNs of
-Secs.~\ref{sec:fwd-pinn}--\ref{sec:cur-pinn} each train a network
-that solves a \emph{single} instance of the Zerilli problem,
-parametrised by one mass $M$ and one Gaussian initial pulse
-$(x_{0},\sigma)$. A new initial pulse, or a different mass,
-requires a new $\mathcal{O}(10^{4})$-iteration L-BFGS run from a
-fresh random initialisation. The Fourier neural operator
-\citep{Li2021fno,Kovachki2023neuralop}, henceforth FNO, instead
-trains a single network once on a population of $1{,}000$
-$(M,x_{0},\sigma)$ draws and then predicts $\Phi(x,t)$ on the
-full spacetime grid for an unseen draw with one forward pass.
-This subsection describes the surrogate as a fourth modality
-that produces the same field $\Phi(\xq,t)$ on which the
-QNM extractors of Secs.~\ref{sec:qnm-methods}--\ref{sec:plateau}
-operate, and the reporting convention of
-Sec.~\ref{sec:reporting} applies unchanged. The architecture and
-loss pipeline are summarised in Fig.~\ref{fig:fno-arch}.
+Each PINN above solves a \emph{single} Zerilli instance,
+parametrised by one mass $M$ and one Gaussian pulse
+$(x_{0},\sigma)$; a new pulse or mass requires a fresh
+$\mathcal{O}(10^{4})$-iteration run. The Fourier neural operator
+(FNO) \citep{Li2021fno,Kovachki2023neuralop} instead trains once
+on $1{,}000$ $(M,x_{0},\sigma)$ draws and predicts $\Phi(x,t)$
+for an unseen draw with one forward pass, producing the same
+observer series on which the extractors and reporting
+convention of Secs.~\ref{sec:qnm-methods}--\ref{sec:reporting}
+operate unchanged. The architecture and
+loss pipeline are summarised in Fig.~\ref{fig:fno-arch}, and
+the configuration of both surrogates in
+Table~\ref{tab:surrogate-config}.
+
+\begin{table}[!htbp]
+\centering
+\caption{Configuration of the two surrogates: the end-to-end
+FNO of Sec.~\ref{sec:fno-method} and the hybrid residual
+operator of Sec.~\ref{sec:hyb-method}. Optimiser settings are
+listed in Table~\ref{tab:train-config}; the FNO loss weights
+are the deployed
+$(\lambda_{f},\lambda_{H^{1}},\lambda_{\mathrm{ring}},
+\lambda_{\mathrm{obs}},\lambda_{\mathrm{tw}},
+\lambda_{\mathrm{pde}})$ of Eq.~\eqref{eq:fno-loss}.}
+\label{tab:surrogate-config}
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+ & FNO & Hybrid FNO \\
+\midrule
+Domain $x/M \times t/M$ & $[-50,150]\times[0,100]$ & $[-50,150]\times[0,50]$ \\
+Grid $N_{x}\times N_{t}$ (fine) & $401\times 401$ & $1001\times 501$ \\
+Coarse grids & --- & $k{=}4$ prior; $k{=}2$ label only \\
+Input channels & $4$ & $5$ \\
+Hidden channels $h$ & $96$ & $32$ \\
+Fourier modes $(K_{t},K_{x})$ & $(64,64)$ & $(16,32)$ \\
+Domain padding & $0.10$ & $0.10$ \\
+Parameters & $7.8\times 10^{7}$ & $1.13\times 10^{6}$ \\
+$M$ & $\mathrm{Unif}[0.8,1.2]$ & $\mathrm{Unif}[0.8,1.2]$ \\
+$x_{0}/M$ & $\mathrm{Unif}[-10,30]$ & $\mathrm{Unif}[2,6]$ \\
+$\sigma/M$ & $\mathrm{Unif}[3,8]$ & $\mathrm{Unif}[3,7]$ \\
+Split (seed $1234$) & $1000/100/100$ & $1000/100/100$ \\
+Loss & Eq.~\eqref{eq:fno-loss}, $(1,0.20,10,5,1,0.05)$ & Eq.~\eqref{eq:hyb-loss} \\
+Observer $\xq$ & $2\,M$ & $2\,M$ \\
+Canonical BH $(M,x_{0},\sigma)$ & $(1,4,5)$ & $(1,4,5)$ \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \begin{figure}[!htbp]
 \centering
@@ -1109,7 +784,7 @@ loss pipeline are summarised in Fig.~\ref{fig:fno-arch}.
   \node[sconvhdr, below=8mm of stackbg.south] (sconvhdrn) {%
     \begin{minipage}{96mm}
       \centering
-      \textbf{neural solution operator $\mathcal{G}_{\theta}$ — four-layer 2-D FNO}\\[1mm]
+      \textbf{neural solution operator $\mathcal{G}_{\theta}$ â€” four-layer 2-D FNO}\\[1mm]
       hidden channels $h=96$,\;
       Fourier modes $(K_{t},K_{x})=(64,64)$
     \end{minipage}};
@@ -1132,7 +807,7 @@ loss pipeline are summarised in Fig.~\ref{fig:fno-arch}.
 
   % ============ output field ============
   \node[outn, below=8mm of fnoall.south, fill=orange!45]
-        (phi) {$\Phi_{\theta}(x,t)$ — predicted field on $(N_{t}{\times}N_{x})$ fine grid};
+        (phi) {$\Phi_{\theta}(x,t)$ â€” predicted field on $(N_{t}{\times}N_{x})$ fine grid};
   \draw[arr] (fnoall.south) -- (phi.north);
 
     % ============ six loss terms (training only) ============
@@ -1140,17 +815,17 @@ loss pipeline are summarised in Fig.~\ref{fig:fno-arch}.
       \textbf{six weighted loss terms}\\[-0.5mm]
       training only};
     \node[loss, below=2mm of losshdr] (lf)
-      {$\mathcal{L}_{\mathrm{field}}$ — relative $L^{2}$ on $\Phi$};
+      {$\mathcal{L}_{\mathrm{field}}$ â€” relative $L^{2}$ on $\Phi$};
     \node[loss, below=1mm of lf] (lh1)
-      {$\mathcal{L}_{H^{1}}$ — gradients $(\partial_{t}\Phi,\partial_{x}\Phi)$};
+      {$\mathcal{L}_{H^{1}}$ â€” gradients $(\partial_{t}\Phi,\partial_{x}\Phi)$};
     \node[loss, below=1mm of lh1] (lring)
-      {$\mathcal{L}_{\mathrm{ring}}$ — ringdown window $t\ge\tring$};
+      {$\mathcal{L}_{\mathrm{ring}}$ â€” ringdown window $t\ge\tring$};
     \node[loss, below=1mm of lring] (lobs)
-      {$\mathcal{L}_{\mathrm{obs}}$ — observer column $x=\xq$};
+      {$\mathcal{L}_{\mathrm{obs}}$ â€” observer column $x=\xq$};
     \node[loss, below=1mm of lobs] (ltw)
-      {$\mathcal{L}_{\mathrm{tw}}$ — time-window ramp $w(t)$};
+      {$\mathcal{L}_{\mathrm{tw}}$ â€” time-window ramp $w(t)$};
     \node[loss, below=1mm of ltw] (lpde)
-      {$\mathcal{L}_{\mathrm{pde}}$ — FD residual of the wave eq.};
+      {$\mathcal{L}_{\mathrm{pde}}$ â€” FD residual of the wave eq.};
     \begin{scope}[on background layer]
       \node[lossbg, fit=(losshdr)(lf)(lpde)] (lossall) {};
     \end{scope}
@@ -1177,8 +852,8 @@ $\Phi_{\theta}(x,t)$. The output field feeds six weighted loss
 terms summed into $\mathcal{L}_{\mathrm{FNO}}$
 (Eq.~\eqref{eq:fno-loss}), of which $\mathcal{L}_{\mathrm{obs}}$
 and $\mathcal{L}_{\mathrm{tw}}$ are the QNM-targeted terms
-introduced in the v4 configuration of
-Sec.~\ref{sec:res-fno}. The total parameter count is
+introduced in the final training configuration (see the
+ablation in Appendix~\ref{app:supp-fno}). The total parameter count is
 $\sim\!7.8\times 10^{7}$.}
 \label{fig:fno-arch}
 \end{figure}
@@ -1193,63 +868,35 @@ solution operator
   \Phi(x,t),
   \label{eq:fno-operator}
 \end{equation}
-discretised on a uniform $N_{x}\times N_{t} = 401\times 401$
-grid with $\Delta x = 0.5\,M$ and $\Delta t = 0.25\,M$, covering
-$x \in [-50,150]\,M$ and $t \in [0,100]\,M$. The input is a
-four-channel rank-3 tensor stacked along the channel axis: the
-field initial condition $\Phi(x,0)$, the outgoing initial
-velocity $\partial_{t}\Phi(x,0) = -\partial_{x}\Phi(x,0)$, the
-Zerilli potential $V_{\ell}(x;M)$ of Eq.~\eqref{eq:V-zerilli}
-broadcast in $t$, and the scalar mass $M$ broadcast across the
-full $(x,t)$ grid. The output is the single-channel field
-$\Phi(x,t)$ on the same grid.
+discretised on a uniform $401\times 401$ grid
+($\Delta x = 0.5\,M$, $\Delta t = 0.25\,M$) covering
+$x \in [-50,150]\,M$, $t \in [0,100]\,M$. The four input
+channels --- $\Phi(x,0)$, the outgoing velocity
+$\partial_{t}\Phi(x,0) = -\partial_{x}\Phi(x,0)$,
+$V_{\ell}(x;M)$ of Eq.~\eqref{eq:V-zerilli} and the broadcast
+mass $M$ --- are stacked as in Fig.~\ref{fig:fno-arch}; the
+output is the single-channel field on the same grid, with
+target fields from the RK4 solver of Appendix~\ref{app:fd} at
+the same resolution.
 
-\paragraph{Architecture.} The configuration adopted for the
-primary numbers (denoted \texttt{v4} in
-Sec.~\ref{sec:res-fno}) is a four-layer 2-D FNO with
-$96$ hidden channels, $64$ retained Fourier modes along $t$,
-$64$ retained Fourier modes along $x$, GELU activations, a
-domain-padding fraction of $0.10$, and grid positional
-embeddings, for $\sim\!7.8\times 10^{7}$ trainable parameters.
-The discretisation-invariance of the FNO
-\citep{Li2021fno,Kovachki2023neuralop} means that the trained
-operator can in principle be evaluated on a finer grid than the
-training resolution; we exercise this property in
-Sec.~\ref{sec:res-fno} on grids ranging from $201^{2}$ to
-$801^{2}$ over the same physical box.
+\paragraph{Architecture.} A four-layer 2-D FNO with the
+configuration of Table~\ref{tab:surrogate-config} (GELU
+activations, grid positional embeddings). The FNO's
+discretisation invariance
+\citep{Li2021fno,Kovachki2023neuralop} is exercised in
+Appendix~\ref{app:supp-fno} on grids from $201^{2}$ to $801^{2}$
+over the same physical box.
 
-\paragraph{Why FNO and not DeepONet?} The other widely used
-neural-operator architecture is DeepONet
-\citep{Lu2021deeponet}, which factorises the operator into a
-branch network acting on the input function sampled at a fixed
-set of sensor points and a trunk network acting on the output
-query coordinates. For Zerilli ringdown the relevant input is
-the full initial-data pair $(\Phi(\cdot,0),\partial_{t}\Phi(\cdot,0))$
-plus the potential $V_{\ell}(\cdot;M)$, all of which are
-naturally functions of $x$ on a regular grid: a 2-D spectral
-operator exploits this structure directly through FFTs and
-benefits from the discretisation invariance demonstrated in
-Sec.~\ref{sec:res-fno}, whereas a DeepONet would commit at
-training time to a fixed sensor grid and would have to learn
-the ringdown decay through pointwise trunk evaluations rather
-than through global spectral truncation. The two architectures
-are comparable in expressive power on benchmark PDE problems
-\citep{Kovachki2023neuralop,Lu2021deeponet}; we therefore make
-the practical choice of FNO and leave a DeepONet comparison
-on the same Zerilli population to future work.
+\paragraph{Why FNO and not DeepONet?} DeepONet
+\citep{Lu2021deeponet} commits at training time to a fixed
+sensor grid, whereas the FNO's spectral parameterisation
+exploits the regular-grid inputs directly through FFTs and
+carries the discretisation invariance above; the two are
+comparable in expressive power on benchmark PDEs
+\citep{Kovachki2023neuralop,Lu2021deeponet}, and we make the
+practical choice.
 
-\paragraph{Training distribution.} The training distribution
-covers $M \sim \mathrm{Unif}[0.8,\,1.2]$,
-$x_{0} \sim \mathrm{Unif}[-10,\,30]\,M$, and
-$\sigma \sim \mathrm{Unif}[3,\,8]\,M$. We draw $1{,}000$ training,
-$100$ validation and $100$ test triples with seed $1234$; for
-each draw the target field is the same RK4 method-of-lines
-solver of Appendix~\ref{app:fd} that supplies the FD reference
-to the PINNs, run on the same $401\times 401$ grid as the FNO
-input--output. The canonical evaluation BH used for the
-single-instance diagnostics below is $(M, x_{0}, \sigma) = (1,4,5)$.
-
-\paragraph{Loss.} The training loss combines five terms,
+\paragraph{Loss.} The training loss combines six terms,
 \begin{equation}
   \mathcal{L}_{\mathrm{FNO}}
   = \lambda_{f}\,\mathcal{L}_{\mathrm{field}}
@@ -1261,90 +908,59 @@ single-instance diagnostics below is $(M, x_{0}, \sigma) = (1,4,5)$.
   \label{eq:fno-loss}
 \end{equation}
 with $\mathcal{L}_{\mathrm{field}}$ the relative $L^{2}$ field
-error, $\mathcal{L}_{H^{1}}$ the analogous $H^{1}$ seminorm
-penalising mis-resolved spatial and temporal derivatives,
-$\mathcal{L}_{\mathrm{ring}}$ the field $L^{2}$ restricted to
-the ringdown window $t \in [\tring,\,t_{\max}]$ with
-$\tring = 18\,M$, $\mathcal{L}_{\mathrm{obs}}$ the 1-D
-$L^{2}$ along the observer slice $x = \xq = 2\,M$ that the QNM
-extractors actually read, $\mathcal{L}_{\mathrm{tw}}$ the
-field $L^{2}$ weighted by a smooth ramp
-$w(t) = 1 + \beta\,\mathrm{ramp}(t;\,t_{a},t_{b})$ that grows
-from $1$ at $t \le t_{a} = 10\,M$ to $1 + \beta$ at
-$t \ge t_{b} = 15\,M$ with $\beta = 50$, and
-$\mathcal{L}_{\mathrm{pde}}$ a soft Zerilli residual evaluated
-by central finite differences on the output grid. The weights
+error, $\mathcal{L}_{H^{1}}$ its $H^{1}$ analogue on
+$(\partial_{t}\Phi,\partial_{x}\Phi)$,
+$\mathcal{L}_{\mathrm{ring}}$ the field $L^{2}$ on
+$t \ge \tring = 18\,M$, $\mathcal{L}_{\mathrm{obs}}$ the 1-D
+$L^{2}$ on the observer slice $x = \xq$ that the QNM extractors
+read, $\mathcal{L}_{\mathrm{tw}}$ the field $L^{2}$ under the
+ramp $w(t) = 1 + \beta\,\mathrm{ramp}(t;\,10\,M,\,15\,M)$ with
+$\beta = 50$, and $\mathcal{L}_{\mathrm{pde}}$ the central-FD
+Zerilli residual on the output grid. The deployed weights are
 $(\lambda_{f},\lambda_{H^{1}},\lambda_{\mathrm{ring}},
   \lambda_{\mathrm{obs}},\lambda_{\mathrm{tw}},
   \lambda_{\mathrm{pde}})
-  = (1,\,0.20,\,10,\,5,\,1,\,0.05)$
-are the v4 values; the prior configurations differ from this
-choice by one or two terms as set out in
-Table~\ref{tab:fno-versions} of Sec.~\ref{sec:res-fno}. The
-observer slice loss $\mathcal{L}_{\mathrm{obs}}$ and the
-time-weighted loss $\mathcal{L}_{\mathrm{tw}}$ are the two
-terms introduced in v4 specifically to target QNM extraction
-fidelity; the empirical effect of their addition is reported in
-the ablation of Sec.~\ref{sec:res-fno}.
+  = (1,\,0.20,\,10,\,5,\,1,\,0.05)$;
+prior configurations differ by one or two terms, and the
+ablation of Appendix~\ref{app:supp-fno}
+(Table~\ref{tab:fno-versions}) isolates
+$\mathcal{L}_{\mathrm{obs}}$ and $\mathcal{L}_{\mathrm{tw}}$ as
+the QNM-critical additions.
 
-\paragraph{Optimiser.} Training uses Adam with learning rate
-$10^{-3}$, weight decay $10^{-6}$, batch size $4$,
-cosine-annealed for $300$ epochs, with gradient clipping at $1.0$
-and \texttt{float32} precision. The Adam-only schedule is
-standard for FNO training
-\citep{Li2021fno,Kovachki2023neuralop}; we do not follow with
-an L-BFGS phase because the memory and wall-clock cost of
-L-BFGS on $\sim\!7.8\times 10^{7}$ parameters is prohibitive
-on a single A100 (per-iteration activation requirement scales
-as the chunk size times the full spatio-temporal grid).
+\paragraph{Optimiser.} Training uses Adam only
+(Table~\ref{tab:train-config}); the schedule is standard for
+FNOs \citep{Li2021fno,Kovachki2023neuralop}, and L-BFGS on
+$\sim\!7.8\times 10^{7}$ parameters is prohibitive on a single
+A100.
 
-\paragraph{Observer location.} All FNO numbers in
-Sec.~\ref{sec:res-fno} are reported at $\xq = 2\,M$, in
-contrast to the $\xq = 10\,M$ adopted throughout the PINN
-results of Secs.~\ref{sec:res-fwd}--\ref{sec:res-inv}. The
-choice is forced by the joint window $t \in [10,100]\,M$ used
-for FNO QNM extraction. At $\xq = 10\,M$ the ringdown amplitude
-$\propto e^{-(t-t_{\mathrm{peak}})/\tau_{0}}$ is below the
-field-error floor of both the FNO surrogate and the FD
-reference itself for most of the window, so the M4 plateau scan
-of Sec.~\ref{sec:plateau} returns no plateau for the FD ground
-truth as well as for the FNO. We demonstrate this shared
-failure mode in Sec.~\ref{sec:res-fno} as part of the
-$\xq$-sweep diagnostic. At $\xq = 2\,M$ the same M4 scan
-returns a clean plateau for the FD reference and an
-adjacent plateau for the FNO, and the two damping-time
-estimates lie within the FD reference's own fit-window
-systematic.
+\paragraph{Observer location.} All FNO numbers are reported at
+$\xq = 2\,M$ rather than the PINNs' $10\,M$: within the
+$[10,100]\,M$ extraction window the ringdown at $10\,M$ falls
+below the field-error floor of the FD reference itself, so M4
+returns no plateau for either source, while at $2\,M$ it
+validates on both (observer sweep in
+Appendix~\ref{app:supp-xq}). Since $(\omega,\tau)$ are
+observer-independent, the choice affects only the conditioning
+of the fit.
 
 % --------------------------------------------------------------
 \subsection{Hybrid coarse-FD + neural-residual surrogate}
 \label{sec:hyb-method}
 
-The FNO surrogate of Sec.~\ref{sec:fno-method} predicts
-$\Phi(x,t)$ end-to-end from initial data and so commits the
-network to learning the entire wave-propagation operator. An
-alternative is to keep a cheap classical solver as the workhorse
-and ask the network only for the part the classical solver
-cannot resolve. The hybrid surrogate described here runs a
-single inexpensive coarse-grid FD solve, upsamples it to the
-fine grid, and trains a 2-D FNO to predict the pointwise
-discretisation residual that a label-free Richardson
-extrapolation of two coarse solves estimates against that
-upsample. The network is never shown the fine-grid FD field in
-its loss: its training target is built entirely from coarse
-solves, so the surrogate is self-supervised in the sense that it
-requires no fine-grid ground truth to train. A parameter-free
-gradient gate confines the learned correction to the
-under-resolved wavefronts, where the coarse prior carries its
-dispersion error, and hands the smooth interior and the causal
-exterior back to the prior unchanged. The neural component
-therefore sees only the truncation error of the classical
-solver, which is smaller and structurally simpler than the field
-itself; inference cost is dominated by the single coarse-grid FD
-solve plus one forward pass on the fine grid. The same post-hoc
-QNM extractors and reporting convention of
-Secs.~\ref{sec:qnm-methods}--\ref{sec:reporting} apply unchanged
-to the hybrid prediction. The full pipeline is summarised in
+Where the FNO of Sec.~\ref{sec:fno-method} commits the network
+to learning the entire wave-propagation operator, the hybrid
+keeps a cheap classical solver for the propagation and asks the
+network only for what that solver cannot resolve: it runs a
+single coarse-grid FD solve, upsamples it to the fine grid, and
+trains a small 2-D FNO to predict the pointwise discretisation
+residual estimated by a label-free Richardson extrapolation of
+two coarse solves. The network is never shown the fine-grid
+field in its loss, and a parameter-free gradient gate confines
+the correction to the under-resolved wavefronts, handing the
+smooth interior and causal exterior back to the prior. The
+extractors and reporting convention of
+Secs.~\ref{sec:qnm-methods}--\ref{sec:reporting} apply
+unchanged; the pipeline is summarised in
 Fig.~\ref{fig:hyb-arch}.
 
 \begin{figure}[!htbp]
@@ -1406,7 +1022,7 @@ Fig.~\ref{fig:hyb-arch}.
     \textbf{five-channel input on fine grid}\;
     $X\in\mathbb{R}^{5\times N_{t}\times N_{x}}$};
   \node[inp, below=2mm of stackhdr]
-        (c0) {ch~0: $\mathcal{U}\Phi^{\mathrm{c}}(x,t)$ — quintic-upsampled $k{=}4$ prior};
+        (c0) {ch~0: $\mathcal{U}\Phi^{\mathrm{c}}(x,t)$ â€” quintic-upsampled $k{=}4$ prior};
   \node[inp, below=1mm of c0]
         (c1) {ch~1: $\Phi^{\mathrm{c}}(x,0)$ broadcast in $t$};
   \node[inp, below=1mm of c1]
@@ -1426,7 +1042,7 @@ Fig.~\ref{fig:hyb-arch}.
   \node[fnoblock, below=8mm of stackbg.south] (fnohdr) {%
     \begin{minipage}{96mm}
       \centering
-      \textbf{neural residual operator $\mathcal{H}_{\theta}$ — four-layer 2-D FNO}\\[1mm]
+      \textbf{neural residual operator $\mathcal{H}_{\theta}$ â€” four-layer 2-D FNO}\\[1mm]
       hidden channels $h=32$,\;
       Fourier modes $(K_{t},K_{x})=(16,32)$,\;
       domain padding $0.10$
@@ -1452,7 +1068,7 @@ Fig.~\ref{fig:hyb-arch}.
 
   % ============ output residual + reconstruction ============
   \node[outn, below=8mm of fnoall.south]
-        (delta) {$g\,\delta\Phi_{\theta}(x,t)$ — gated residual\\
+        (delta) {$g\,\delta\Phi_{\theta}(x,t)$ â€” gated residual\\
                  $g=|\nabla\mathcal{U}\Phi^{\mathrm{c}}|/
                  (|\nabla\mathcal{U}\Phi^{\mathrm{c}}|+s),\;s{=}10^{-3}$\\
                  (Eq.~\eqref{eq:hyb-gate})};
@@ -1531,114 +1147,52 @@ $1.13\times 10^{6}$.}
 \label{fig:hyb-arch}
 \end{figure}
 
-\paragraph{Discretisation and grids.} The fine grid is
-$(\Delta x, \Delta t)_{\mathrm{f}} = (0.2, 0.1)\,M$ on
-$x \in [-50, 150]\,M$ and $t \in [0, 50]\,M$, giving
-$(N_{x}, N_{t})_{\mathrm{f}} = (1001, 501)$. The coarse grid
-adopts a single coarsening factor $k$ along both axes,
-$(\Delta x, \Delta t)_{\mathrm{c}} = (k\Delta x, k\Delta
-t)_{\mathrm{f}}$, on the same physical box. The deployment prior
-uses $k = 4$, so $(\Delta x, \Delta t)_{\mathrm{c}} = (0.8,
-0.4)\,M$ and $(N_{x}, N_{t})_{\mathrm{c}} = (251, 126)$; the
-label-construction solve described below additionally uses
-$k = 2$ ($(N_{x}, N_{t}) = (501, 251)$). All grids advance in
-time with the RK4 method-of-lines scheme of
-Appendix~\ref{app:fd} and use the same default second-order
-centred difference for $\partial_x^2$ on both the coarse and the
-fine grids; the coarse prior is deliberately under-resolved
-rather than carrying a higher-order stencil, and the
-leading-order error it incurs is removed instead by the
-Richardson extrapolation of the next paragraph. Quadrupling
-$\Delta x$ and $\Delta t$ together reduces FD work per draw by a
-factor of $k^{3} = 64$ (volume of $(x, t)$ samples times the
-$1/\Delta t$ step count), so the cost of the classical component
-of one deployed hybrid prediction is $\tfrac{1}{64}$ of the fine
-FD solve; the FNO forward pass adds a fixed
-$\mathcal{O}(N_{x} N_{t} \log N_{x} N_{t})$ cost that is small
-compared to RK4-MOL on the fine grid and is quantified
-empirically in Sec.~\ref{sec:res-hyb}.
+\paragraph{Discretisation and grids.} The fine and coarse
+grids (Table~\ref{tab:surrogate-config}) share the box and the
+RK4 method-of-lines scheme of Appendix~\ref{app:fd} with the
+same second-order centred stencil. Coarsening by $k$ cuts FD
+work by $k^{3} = 64$, so the classical component of one
+deployed prediction costs $\tfrac{1}{64}$ of the fine solve,
+with the FNO forward pass small by comparison
+(Sec.~\ref{sec:res-hyb}).
 
-\paragraph{Label-free Richardson target.} The coarsening factor
-$k$ sets how many fine-grid points the cheap prior discards; at
-$k = 4$ the coarse solve is deliberately under-resolved, and its
-default second-order centred stencil leaves a large
-$\mathcal{O}(\Delta x_{\mathrm{c}}^{2})$ dispersion error --- the
-upsampled coarse field misses the fine reference by a relative
-$L^{2}$ error of $6.1\%$ on the canonical draw
-(Sec.~\ref{sec:res-hyb}). Rather than invest in a more accurate
-stencil, we keep the cheap second-order prior and construct the
-training target by Richardson extrapolation, which removes the
-leading discretisation error using only coarse solves and so
-needs no fine-grid ground truth. We run the same problem at two
-coarsenings, $k = 4$ and $k = 2$, upsample both to the fine grid
-with the operator $\mathcal{U}$ of Eq.~\eqref{eq:hyb-upsample},
-and form
+\paragraph{Label-free Richardson target.} At $k = 4$ the
+second-order stencil leaves a large
+$\mathcal{O}(\Delta x_{\mathrm{c}}^{2})$ dispersion error: the
+upsampled prior misses the fine reference by $4.93\%$ relative
+$L^{2}$ on the canonical draw ($6.11\%$ in the population mean;
+Sec.~\ref{sec:res-hyb}). We therefore run the same problem at
+$k = 4$ and $k = 2$, upsample both to the fine grid with the
+operator $\mathcal{U}$ of Eq.~\eqref{eq:hyb-upsample}, and form
 \begin{equation}
   \Phi^{\mathrm{R}}
   \;=\; \frac{4\,\mathcal{U}\Phi^{\mathrm{c}}_{2}
               - \mathcal{U}\Phi^{\mathrm{c}}}{3},
   \label{eq:hyb-richardson}
 \end{equation}
-the standard $p = 2$ Richardson combination, in which the
-$\mathcal{O}(\Delta x_{\mathrm{c}}^{2})$ terms of the two solves
-cancel and $\Phi^{\mathrm{R}}$ is accurate to
-$\mathcal{O}(\Delta x_{\mathrm{c}}^{4})$. Here
-$\mathcal{U}\Phi^{\mathrm{c}}$ is the quintic upsample of the
-$k = 4$ prior --- the deployment prior and channel~0 of the
-input stack --- and $\mathcal{U}\Phi^{\mathrm{c}}_{2}$ is the
-quintic upsample of the $k = 2$ solve, used only to build the
-label. The network is trained to predict the
-Richardson-estimated residual
-$\delta\Phi_{\mathrm{R}} = \Phi^{\mathrm{R}} -
-\mathcal{U}\Phi^{\mathrm{c}}$, so its loss never sees the
-fine-grid FD field: the entire supervision signal is built from
-coarse solves. At inference only the single $k = 4$ solve is
-required --- the $k = 2$ solve and $\Phi^{\mathrm{R}}$ are
-label-construction artefacts of the training set, not inputs to
-the deployed surrogate --- so the classical component of one
-hybrid prediction costs $k^{-3} = 1/64$ of a fine FD solve. This
-weak-prior-plus-Richardson design is the opposite of investing
-in a strong classical stencil: it keeps the cheapest possible
-solver and asks the network to do correspondingly more, which is
-the regime in which the $k^{d+1}$ work saving of a coarse prior
-is largest and which is the operative lever for scaling the
-construction to higher-dimensional problems.
-
-\paragraph{Discretisation-error decomposition.} For a smooth
-solution $\Phi(x, t)$ of the Zerilli equation, the fine-grid
-RK4-MOL solution satisfies
-$\Phi^{\mathrm{f}} = \Phi + \mathcal{O}(\Delta x_{\mathrm{f}}^{2},
-\Delta t_{\mathrm{f}}^{4})$ and is taken as the ground truth at
-this resolution, used only to \emph{evaluate} the surrogate. The
-$k = 4$ coarse solve carries a second-order error,
-$\Phi^{\mathrm{c}} = \Phi + \mathcal{O}(\Delta x_{\mathrm{c}}^{2})$,
-whose leading term the Richardson combination
-Eq.~\eqref{eq:hyb-richardson} cancels, leaving
+the standard $p = 2$ Richardson combination: the
+$\mathcal{O}(\Delta x_{\mathrm{c}}^{2})$ terms cancel and
 $\Phi^{\mathrm{R}} = \Phi + \mathcal{O}(\Delta x_{\mathrm{c}}^{4})$
 up to the quintic-interpolation error of the upsample. The
-quantity the network learns,
+network is trained to predict
+the Richardson-estimated residual
 \begin{equation}
   \delta\Phi_{\mathrm{R}}(x, t)
   \;=\; \Phi^{\mathrm{R}}(x, t) - \mathcal{U}\Phi^{\mathrm{c}}(x, t),
   \label{eq:hyb-residual}
 \end{equation}
-is therefore a label-free estimate of the coarse-prior
-discretisation error, agreeing with the true error
+which agrees with the true error
 $\Phi^{\mathrm{f}} - \mathcal{U}\Phi^{\mathrm{c}}$ to
-$\mathcal{O}(\Delta x_{\mathrm{c}}^{4})$; both vanish as
-$k \to 1$. The target is dominated by the coarse spatial
-truncation: it is largest on the under-resolved wavefronts,
-where the second-order stencil dephases the high-wavenumber
-content of the prompt burst, and is near zero in the smooth
-interior and the causal exterior where the coarse solve is
-already accurate. This strong spatial localisation of the target
-is exactly what the gradient gate of Eq.~\eqref{eq:hyb-gate}
-exploits. Against a typical $|\Phi^{\mathrm{f}}|_{\max} \approx 1$
-the upsampled $k = 4$ prior already carries a $6.1\%$ relative
-$L^{2}$ error (Sec.~\ref{sec:res-hyb}), so unlike the end-to-end
-FNO of Sec.~\ref{sec:fno-method} --- which must synthesise the
-full field --- the network here only repairs this bounded,
-spatially-localised residual.
+$\mathcal{O}(\Delta x_{\mathrm{c}}^{4})$. The entire supervision
+signal is thus built from coarse solves --- the fine solve is
+retained only to \emph{evaluate} the surrogate, and at inference
+only the single $k = 4$ solve is required. The target is largest
+on the under-resolved wavefronts, where the stencil dephases the
+high-wavenumber content of the prompt burst, and near zero
+elsewhere: a bounded repair task rather than full-field
+synthesis, whose spatial localisation the gate of
+Eq.~\eqref{eq:hyb-gate} exploits, in the weak-prior regime where
+the $k^{d+1}$ work saving of a coarse prior is largest.
 
 \paragraph{Upsample operator.} The operator $\mathcal{U}$ used
 in Eqs.~\eqref{eq:hyb-richardson}--\eqref{eq:hyb-residual} and as
@@ -1651,52 +1205,31 @@ tensor-product spline on the rectangular grid:
         B_{5}\!\Bigl(\tfrac{x - x_{j}}{\Delta x_{\mathrm{c}}}\Bigr),
   \label{eq:hyb-upsample}
 \end{equation}
-with $B_{5}$ the quintic B-spline basis and coefficients
-$\{c_{ij}\}$ fixed by collocation at the coarse-grid nodes
-$\{(t_{i}, x_{j})\}$. The quintic spline is preferred to a cubic
-because its $\mathcal{O}(\Delta x_{\mathrm{c}}^{6})$
-interpolation error stays comfortably below the
-$\mathcal{O}(\Delta x_{\mathrm{c}}^{4})$ Richardson signal, so
-the upsample does not contaminate the extrapolated target. The
-same operator is applied to both the $k = 4$ and $k = 2$ coarse
-solves in Eq.~\eqref{eq:hyb-richardson}. Out-of-domain queries
-are clamped to zero amplitude. The upsample is performed once
-per sample during dataset assembly at $\mathcal{O}(N_{x} N_{t})$
-cost.
+with $B_{5}$ the quintic B-spline basis and $\{c_{ij}\}$ fixed
+by collocation at the coarse nodes. The quintic order keeps the
+$\mathcal{O}(\Delta x_{\mathrm{c}}^{6})$ interpolation error
+below the $\mathcal{O}(\Delta x_{\mathrm{c}}^{4})$ Richardson
+signal; the same $\mathcal{U}$ is applied to both coarse
+solves.
 
-\paragraph{Input stack.} The network input is a tensor
-$X \in \mathbb{R}^{5\times N_{t}\times N_{x}}$ whose five
-channels are listed in Fig.~\ref{fig:hyb-arch} and described
-here in full. Channel~0 is the quintic-upsampled $k = 4$ coarse
-field $\mathcal{U}\Phi^{\mathrm{c}}(x, t)$ --- the deployment
-prior --- which carries the bulk of the dynamical content the
-network is asked to repair.
-Channel~1 is the initial-displacement profile
-$\Phi^{\mathrm{c}}(x, 0)$ broadcast across $t$, giving the
-network unambiguous access to the unperturbed initial datum
-without having to extract it from the noisy upsampled prior at
-$t = 0$. Channel~2 is the per-sample Zerilli potential
-$V_{\ell}(x; M)$ of Eq.~\eqref{eq:V-zerilli} broadcast across
-$t$, which encodes the BH mass dependence in a form the
-spectral layers can exploit through their $x$-convolution.
-Channel~3 is the scalar mass $M$ broadcast across the full
-$(x, t)$ grid, redundant with the potential channel but
-inexpensive and empirically helpful for the
-spline-upsample-conditioned residual at the prompt-burst edge.
-Channel~4 is the initial velocity
+\paragraph{Input stack.} The five input channels are listed in
+Fig.~\ref{fig:hyb-arch}: the upsampled prior
+$\mathcal{U}\Phi^{\mathrm{c}}$ (the dynamical content the
+network is asked to repair), the initial datum
+$\Phi^{\mathrm{c}}(x, 0)$, the potential $V_{\ell}(x; M)$ of
+Eq.~\eqref{eq:V-zerilli} (the mass dependence in the form the
+spectral $x$-convolution exploits), the broadcast scalar $M$
+(redundant with it but empirically helpful at the prompt-burst
+edge), and the initial velocity
 \begin{equation}
   \Pi^{\mathrm{c}}_{0}(x)
   \;=\; \frac{\Phi^{\mathrm{c}}(x, \Delta t_{\mathrm{c}}) -
-              \Phi^{\mathrm{c}}(x, 0)}{\Delta t_{\mathrm{c}}}
+              \Phi^{\mathrm{c}}(x, 0)}{\Delta t_{\mathrm{c}}},
   \label{eq:hyb-pi0}
 \end{equation}
-computed by a forward Euler differencing of the coarse field at
-$t = 0$ and then linearly resampled from the coarse $x$-grid
-onto the fine $x$-grid, broadcast across $t$. The first-order
-truncation of Eq.~\eqref{eq:hyb-pi0} is acceptable here because
-the channel is auxiliary: it informs the network of the prompt
-velocity sign and amplitude in a form that does not require
-recovery from the upsampled prior.
+forward-Euler differenced on the coarse grid and linearly
+resampled onto the fine $x$-grid; its first-order truncation is
+acceptable for an auxiliary channel.
 
 \paragraph{Residual operator, gradient gate, and reconstruction.}
 The neural residual operator
@@ -1720,44 +1253,31 @@ added to the prior. The gate
           + (\partial_{x}\mathcal{U}\Phi^{\mathrm{c}})^{2}},
   \label{eq:hyb-gate}
 \end{equation}
-is a deterministic function of the prior alone --- it adds no
-trainable parameters and needs no extra data at inference ---
-with a single scale hyperparameter $s = 10^{-3}$, whose
-principled, label-free selection from the prior gradient
-distribution is derived in App.~\ref{app:gate-scale}. It rises
-to $g \to 1$ on the
-high-gradient wavefronts, where the coarse prior carries its
-dispersion error, and falls to $g \to 0$ in the smooth interior
-and the causal exterior, where the prior is already accurate and
-$|\nabla\mathcal{U}\Phi^{\mathrm{c}}| \ll s$. The hybrid
-prediction is the gated additive skip
+is a deterministic function of the prior alone, with a single
+scale $s = 10^{-3}$ whose label-free selection from the prior
+gradient distribution is derived in App.~\ref{app:gate-scale}:
+$g \to 1$ on the high-gradient wavefronts where the prior
+carries its dispersion error, and $g \to 0$ in the smooth
+interior and causal exterior. The hybrid prediction is the
+gated additive skip
 \begin{equation}
   \Phi^{\mathrm{hyb}}(x, t)
   \;=\; \mathcal{U}\Phi^{\mathrm{c}}(x, t)
          + g(x, t)\,\mathcal{H}_{\theta}(X)(x, t),
   \label{eq:hyb-reconstruct}
 \end{equation}
-so the network correction is confined by construction to the
-under-resolved regions and cannot inject error into the parts of
-the domain the coarse solver already resolves. The gate is also
-the prior$\leftrightarrow$network stitch: $g$ is a smooth convex
-blend between the pure coarse prior ($g = 0$) and the
-fully-corrected field ($g = 1$). With $\mathcal{H}_{\theta}
-\equiv 0$, or wherever $g = 0$, the hybrid reduces to the
-coarse-up baseline. This is the key structural difference from
-the end-to-end FNO of Sec.~\ref{sec:fno-method}: the network is
-in series with a classical solver that already produces a good
-guess, and so inherits the stability and
-discretisation-invariance of the underlying numerical scheme as
-a hard prior.
+which confines the correction to the under-resolved regions by
+construction and reduces to the quintic-upsampled coarse solve
+(the ``coarse-up'' baseline of Sec.~\ref{sec:res-hyb}) wherever
+$g = 0$ or $\mathcal{H}_{\theta} \equiv 0$; the network sits in
+series with the classical solver and inherits its stability
+behaviour as a hard prior.
 
 \paragraph{FNO architecture.} The residual operator
 $\mathcal{H}_{\theta}$ is a 2-D Fourier neural operator
-\citep{Li2021fno,Kovachki2023neuralop} on the fine
-$(t, x)$ grid. A $1\times 1$ \emph{lift} convolution maps the
-$5$-channel input to $h = 32$ hidden channels, and a $1\times 1$
-\emph{projection} maps back to the single output channel. In
-between sit $L = 4$ Fourier layers, each of the form
+\citep{Li2021fno,Kovachki2023neuralop} on the fine $(t, x)$
+grid: a $1\times 1$ lift to $h = 32$ hidden channels, $L = 4$
+Fourier layers of the form
 \begin{equation}
   v^{(\ell+1)}(x, t)
   \;=\; \mathrm{GELU}\!\Bigl(
@@ -1767,42 +1287,23 @@ between sit $L = 4$ Fourier layers, each of the form
        \Bigr),
   \label{eq:hyb-fno-layer}
 \end{equation}
-where $\mathcal{F}$ is the 2-D discrete Fourier transform along
-$(t, x)$, $R^{(\ell)} \in \mathbb{C}^{h\times h\times K_{t}\times
-K_{x}}$ is a complex spectral-weight tensor truncated to the
-lowest $K_{t}$ frequencies along $t$ and the lowest $K_{x}$
-along $x$, $\odot$ is mode-by-mode matrix multiplication
-across the channel axis, and $W^{(\ell)}$ is a pointwise
-$1\times 1$ convolution acting as a local residual path. We use
-$(K_{t}, K_{x}) = (16, 32)$, which matches the natural mode
-ratio of the discrete grid ($N_{x} = 2 N_{t}$) and represents
-all spatial frequencies below $k_{x,\max} = 2\pi \cdot 32 / 200
-\approx 1.0\,M^{-1}$ on the fine grid. We pre-pad each axis by
-the fraction $p = 0.10$ before $\mathcal{F}$ and crop the
-output back after $\mathcal{F}^{-1}$, which damps the periodic
-wraparound that would otherwise pollute the spectral
-convolution near the domain boundaries. Positional grid
-encodings $(x, t)$ are concatenated to the lifted features
-before the first spectral block to break the translation
-equivariance that would otherwise prevent the network from
-distinguishing the source region $x \approx x_{0}$ from the
-wave zones. The total trainable parameter count is dominated
-by the spectral weights, $L \cdot h^{2} \cdot 2 K_{t} \cdot
-2 K_{x} = 4\cdot 32^{2}\cdot 32\cdot 64 \approx 8.4\times
-10^{6}$ real degrees of freedom before sparsification, with
-the actual count of $1.13\times 10^{6}$ reduced by the
-\texttt{neuraloperator} library's factorised-tensor
-parametrisation of $R^{(\ell)}$
-\citep{Kovachki2023neuralop}. The smaller hidden width and total
-mode count relative to the end-to-end FNO of
-Sec.~\ref{sec:fno-method}
-($K_{t} = K_{x} = 64$, $h = 96$, $7.8\times 10^{7}$ parameters)
-is afforded by the simpler target $\delta\Phi_{\mathrm{R}}$: the
-residual has narrower spectral support than the full field
-$\Phi^{\mathrm{f}}$ because the wave-propagation operator
-already lives in the upsampled prior $\mathcal{U}\Phi^{\mathrm{c}}$,
-so the network needs only to add a low-rank dispersion correction
-rather than synthesise an outgoing wave from scratch.
+and a $1\times 1$ projection back to one channel, where
+$\mathcal{F}$ is the 2-D DFT along $(t, x)$, $R^{(\ell)}$ the
+complex spectral-weight tensor truncated to
+$(K_{t}, K_{x}) = (16, 32)$ retained modes (the grid's natural
+$2{:}1$ mode ratio, resolving
+$k_{x} \lesssim 1.0\,M^{-1}$), $\odot$ mode-by-mode matrix
+multiplication across channels, and $W^{(\ell)}$ a pointwise
+residual path. Each axis is pre-padded by $p = 0.10$ against
+periodic wraparound, and positional $(x, t)$ encodings break
+translation equivariance to distinguish the source region from
+the wave zones. The total parameter count is $1.13\times 10^{6}$ under the
+\texttt{neuraloperator} factorised parametrisation
+\citep{Kovachki2023neuralop} --- almost two orders of magnitude
+below the end-to-end FNO (Table~\ref{tab:surrogate-config}):
+the residual target has narrower spectral
+support than the full field, since the wave-propagation
+operator already lives in the upsampled prior.
 
 \paragraph{Loss.} The training loss is the gridwise mean
 squared error between the gated network output and the
@@ -1818,84 +1319,51 @@ label-free Richardson residual,
          \bigr]^{2},
   \label{eq:hyb-loss}
 \end{equation}
-averaged across the training batch of size $B$. We do not weight
-by a physical-units factor, do not include a PDE-residual term,
-and do not introduce auxiliary observer-slice or time-weighted
-losses of the kind that the end-to-end FNO of
-Sec.~\ref{sec:fno-method} requires: the target
-$\delta\Phi_{\mathrm{R}}$ is already small, smooth, and
-spatially localised, and the gate $g$ of Eq.~\eqref{eq:hyb-gate}
+averaged over the batch of size $B$. No auxiliary terms are
+needed: the target is small, smooth and localised and the gate
 has already confined the correction to the wavefronts, so a
-uniform MSE on the gated output is adequate. The empirical
-effect of the loss simplicity and of the gate scale $s$ on the
-field-error, speckle, and QNM-extraction floors is quantified in
+uniform MSE on the gated output suffices
+(Sec.~\ref{sec:res-hyb}).
+
+\paragraph{Optimiser.} A single Adam phase
+(Table~\ref{tab:train-config}) reaches the validation floor
+within $100$ epochs on this small network and smooth, localised
+target; a trial L-BFGS phase gave no measurable gain. The
+per-epoch validation history is shown in
 Sec.~\ref{sec:res-hyb}.
 
-\paragraph{Optimiser.} Training is a single phase of Adam with
-learning rate $10^{-3}$, weight decay $10^{-6}$, batch size
-$B = 8$, gradient clipping at unit norm, and \texttt{float32}
-precision, for $N_{\mathrm{adam}} = 100$
-epochs over the $n_{\mathrm{train}} = 1{,}000$ training BHs.
-The network is small ($1.13\times 10^{6}$ parameters) and the
-gated residual target is smooth and spatially localised, so
-$100$ Adam epochs reach the validation floor; we found no
-measurable improvement from a subsequent L-BFGS phase on this
-target and report the Adam-only optimum. The per-epoch
-validation history is shown in Sec.~\ref{sec:res-hyb}.
+\paragraph{Training distribution.} The Sobol distribution,
+split and canonical BH are listed in
+Table~\ref{tab:surrogate-config}; the fine, $k = 4$ and $k = 2$
+solves are precomputed and cached per triple. The
+$(x_{0}, \sigma)$ box is contracted relative to the FNO's to
+keep the prompt burst inside the shorter $t \in [0, 50]\,M$
+hybrid window --- the only intentional difference between the
+two surrogates' distributions.
 
-\paragraph{Training distribution.} A Sobol sequence of $1{,}200$
-$(M, x_{0}, \sigma)$ triples is drawn from
-$M \sim \mathrm{Unif}[0.8, 1.2]$,
-$x_{0} \sim \mathrm{Unif}[2, 6]\,M$, and
-$\sigma \sim \mathrm{Unif}[3, 7]\,M$, then split
-$(n_{\mathrm{train}}, n_{\mathrm{val}}, n_{\mathrm{test}}) =
-(1000, 100, 100)$ with seed $1234$. For each triple the
-fine-grid FD solution and the $k = 4$ and $k = 2$ coarse-grid FD
-solutions are precomputed offline; the quintic upsample
-$\mathcal{U}\Phi^{\mathrm{c}}$ of the $k = 4$ prior and the four
-auxiliary channels of Fig.~\ref{fig:hyb-arch} are assembled
-once and cached to disk, and the label-free Richardson target
-$\delta\Phi_{\mathrm{R}} = \Phi^{\mathrm{R}} -
-\mathcal{U}\Phi^{\mathrm{c}}$ of
-Eqs.~\eqref{eq:hyb-richardson}--\eqref{eq:hyb-residual} is
-stored alongside. The fine-grid FD solution is retained only as
-an evaluation reference and is never used in the training loss.
-The canonical evaluation BH used for the
-single-instance diagnostics in Sec.~\ref{sec:res-hyb} is
-$(M, x_{0}, \sigma) = (1, 4, 5)$. The training distribution
-overlaps but is not identical to the FNO training distribution
-of Sec.~\ref{sec:fno-method}: we contract the $(x_{0},
-\sigma)$ box to keep the prompt-burst region inside the
-$t \in [0, 50]\,M$ window of the hybrid simulation, which is
-shorter than the $t \in [0, 100]\,M$ window used by the
-end-to-end FNO. This is the only intentional difference in
-training distribution between the two surrogates.
-
-\paragraph{Observer location.} Hybrid numbers in
-Sec.~\ref{sec:res-hyb} are reported at $\xq = 2\,M$. The choice
-matches the FNO surrogate of Sec.~\ref{sec:fno-method} for
-direct comparability; the empirical finding from
-Sec.~\ref{sec:res-hyb} that the QNM observable is already at
-the plateau-extractor precision floor on the coarse-up baseline
-at this observer (and not at the hybrid-vs-baseline field-error
-crossover) motivates reporting the hybrid's value through the
-global field-error reduction discussed there rather than
-through the median QNM at $\xq = 2\,M$.
+\paragraph{Observer location.} Hybrid numbers are reported at
+$\xq = 2\,M$, matching the FNO of Sec.~\ref{sec:fno-method} for
+direct comparability; since the coarse-up baseline already sits
+at the plateau-extractor floor there (Sec.~\ref{sec:res-hyb}),
+the hybrid's value is reported through the global field-error
+reduction rather than the median QNM.
 
 % --------------------------------------------------------------
 \subsection{QNM extraction methods}
 \label{sec:qnm-methods}
 
-Once a forward or inverse PINN has been trained, the QNM parameters
-$(\omega,\tau)$ are extracted post-hoc from the time series
-$\Phi(\xq,t)$ at $\xq = 10\,M$. We apply five extraction methods, the
-first three of which mirror standard numerical-relativity practice
-and the last two of which are the plateau-based methods that
-constitute our methodological contribution.
-
-The two plateau-based methods rely on the following operational
-definition, formalised and motivated in
-Sec.~\ref{sec:plateau} below.
+Once any of the five models has produced a field, the QNM
+parameters $(\omega,\tau)$ are extracted post-hoc from the time
+series $\Phi(\xq,t)$ at the model's observer position
+($\xq = 10\,M$ for the PINNs, $\xq = 2\,M$ for the surrogates).
+The scan grids below are quoted for the PINN window
+$[10,50]\,M$; on the surrogate windows the same procedures apply
+with the block-width rule $w = \lfloor N/2\rfloor$ unchanged. We
+apply five methods: M1--M3 mirror standard numerical-relativity
+practice; M4--M5 are the plateau-based estimators that
+constitute our methodological contribution, relying on the
+operational definition below (formalised and motivated in
+Sec.~\ref{sec:plateau}).
 
 \begin{definition}[fit-window plateau]
 \label{def:plateau}
@@ -1910,64 +1378,46 @@ the per-window fits inside the block (population standard deviation,
 divisor $N$).
 \end{definition}
 
-Method 1 (M1) is FFT and log-line through local maxima.
-The frequency $\omega$ is estimated from the location of the largest
-peak of a zero-padded, Hann-windowed FFT of $\Phi(\xq,t)$ over the
-fit window, with parabolic interpolation around the peak bin. The
-damping time $\tau$ is estimated from the slope of
-Eq.~\eqref{eq:logline} applied to the local maxima
-$\{(t_k, |\Phi(\xq, t_k)|)\}$ of $\Phi$ in the same window; in
-practice the slope $-1/\tau$ is obtained by an ordinary
-least-squares straight-line fit to $\log|\Phi(\xq, t_k)|$ versus
-$t_k$. This is the procedure adopted by
-\citet{Patel2024pinn}.
+Method 1 (M1), the procedure adopted by \citet{Patel2024pinn},
+estimates $\omega$ from the largest peak of a zero-padded,
+Hann-windowed FFT of $\Phi(\xq,t)$ over the fit window
+(parabolic interpolation around the peak bin), and $\tau$ from
+an ordinary least-squares fit of Eq.~\eqref{eq:logline} to the
+local maxima $\log|\Phi(\xq, t_k)|$ versus $t_k$.
 
-Method 2 (M2) is direct nonlinear least squares.
-A single damped sinusoid is fitted to $\Phi(\xq,t)$ on the chosen
-window,
+Method 2 (M2) fits a single damped sinusoid to $\Phi(\xq,t)$ on
+the chosen window,
 \[
   \Phi_{\mathrm{model}}(t) = A\,e^{-t/\tau}\cos(\omega t + \phi),
 \]
-using a bound-constrained Levenberg--Marquardt solver. M2 is a
-four-parameter fit and is the most sensitive of the five methods to
-overtone contamination at the early edge of the window.
+by bound-constrained Levenberg--Marquardt; the four-parameter
+fit is the most sensitive of the five methods to overtone
+contamination at the early window edge.
 
-Method 3 (M3) is ESPRIT subspace decomposition.
-ESPRIT \citep{Roy1989esprit} applied with model order $K = 6$ to
-the Hilbert-analytic signal is ill-conditioned at the SNR of the
-PINN-derived $\Phi(\xq,t)$ in our setup; M3 is reported in
-Appendix~\ref{app:esprit} but is not used in the quoted numbers.
+Method 3 (M3) is ESPRIT subspace decomposition
+\citep{Roy1989esprit}, applied to the Hilbert-analytic signal.
+It is ill-conditioned on the PINN waveforms at $\xq = 10\,M$
+(model order $K = 6$; Appendix~\ref{app:esprit}) and is not used
+for primary values; on the surrogate fields at $\xq = 2\,M$ it
+is well-conditioned and is quoted in the corresponding tables.
 
-Method 4 (M4) is two-mode NLS with start-time plateau scan,
-following the Schwarzschild $\ell=m=2$ overtone-aware ringdown
-recipe of \citet{Giesler2019overtones}: simultaneously fitting the
-fundamental and the first overtone absorbs the
-residual $n=1$ power that would otherwise bias a single-mode
-template at early times, and we shall see below that this is the
-reason M4 attains a fundamental-mode accuracy roughly an order of
-magnitude better than the single-mode M2 estimator on the same
-data. A two-mode template,
+Method 4 (M4) is two-mode NLS with a start-time plateau scan,
+following the Schwarzschild $\ell=m=2$ overtone-aware
+prescription of \citet{Giesler2019overtones}: the overtone term
+absorbs residual $n=1$ power that would otherwise bias a
+single-mode template at early times. The two-mode template,
 \begin{equation}
   \Phi_{\mathrm{model}}(t) =
   A_0\,e^{-t/\tau_0}\cos(\omega_0 t + \phi_0)
   + A_1\,e^{-t/\tau_1}\cos(\omega_1 t + \phi_1),
   \label{eq:two-mode}
 \end{equation}
-is fitted by nonlinear least squares over a window
-$[t_0,\,t_{\max}]$, with the mode of longer $\tau$ identified as the
-fundamental. The fit is repeated for $t_0$ on a uniform grid of $16$
-values in $[10,\,25]\,M$ (step $1\,M$), at fixed $\tend = 50\,M$.
-We then identify the contiguous block of
-eight consecutive start times of lowest combined relative scatter in
-$(\omega_0,\tau_0)$ and report the plateau mean and the plateau
-population standard deviation
-as the M4 estimate of $(\omega,\tau)$ and its
-fit-window systematic uncertainty $(\sigma_\omega,\sigma_\tau)$. The
-block width $w = 8$ is fixed by the convention
-$w = \lfloor\tfrac12 N_{t_0}\rfloor$,
-which trades scan
-resolution against block statistics.
-The procedure is summarised in Algorithm~\ref{alg:m4}.
+is fitted by nonlinear least squares over $[t_0,\,\tend]$, with
+the longer-$\tau$ mode identified as the fundamental;
+Algorithm~\ref{alg:m4} scans $t_0$ and reports the plateau mean
+and population standard deviation as the M4 estimate and its
+fit-window systematic uncertainty, with the block width fixed by
+the convention $w = \lfloor\tfrac12 N_{t_0}\rfloor$.
 
 \begin{algorithm}[t]
 \caption{M4 --- 1-D plateau scan for $(\omega_0,\tau_0)$.}
@@ -1991,21 +1441,14 @@ The procedure is summarised in Algorithm~\ref{alg:m4}.
 \end{algorithmic}
 \end{algorithm}
 
-Method 5 (M5) is two-mode NLS with two-dimensional plateau scan.
-M5 generalises M4 by sweeping both edges of the fit window
-$[t_0,\,\tend]$. We use a $10\times 6$ rectangular grid with
-$t_0 \in [10,\,25]\,M$ in steps of $5/3\,M$ and
-$\tend \in [30,\,50]\,M$ in steps of $4\,M$.
-The plateau is the contiguous $5\times 3$ rectangle of smallest
-combined relative scatter, fixed by the same
-$\lfloor\tfrac12 N\rfloor$ rule applied independently along the two
-axes ($\lfloor10/2\rfloor=5$ in $t_0$, $\lfloor 6/2\rfloor=3$ in
-$\tend$). The plateau mean and plateau standard deviation are
+Method 5 (M5) generalises M4 by sweeping both window edges on a
+$10\times 6$ rectangular grid ($t_0 \in [10,\,25]\,M$,
+$\tend \in [30,\,50]\,M$), with the plateau the contiguous
+$5\times 3$ rectangle of smallest combined relative scatter
+under the same $\lfloor\tfrac12 N\rfloor$ rule applied per axis,
 reported as for M4. To our knowledge M5 is the first
 systematic two-dimensional plateau analysis applied to PINN-derived
-QNM extraction. A schematic of the two scans, overlaid on a
-representative ringdown waveform, is given in
-Fig.~\ref{fig:windows}.
+QNM extraction. Both scans are sketched in Fig.~\ref{fig:windows}.
 
 \begin{figure}[t]
 \centering
@@ -2042,8 +1485,9 @@ Fig.~\ref{fig:windows}.
   \foreach \x in {0,10,18,25,50}
     \draw (\x,-0.5) -- (\x,-0.7) node[below]{$\x$};
 \end{tikzpicture}
-\caption{M4 schematic: 1-D scan of the start time $t_0$ on
-$\{10,12,14,16,18,22\}\,M$ with the end time fixed at $t=50\,M$.
+\caption{M4 schematic: 1-D scan of the start time $t_0$ (six
+representative windows of the sixteen-window, step-$1\,M$ scan
+shown) with the end time fixed at $t=50\,M$.
 Solid bars belong to the contiguous plateau block; dotted bars sit
 outside it. The decorative curve at the top depicts the ringdown
 waveform $\Phi(\xq,t)$ on the same time axis.}
@@ -2107,18 +1551,18 @@ rectangle in the $(t_0,\tend)$ plane.}
 
 The damped-sinusoid template
 $A\,e^{-t/\tau}\cos(\omega t + \phi)$ is the correct model for
-$\Phi(\xq,t)$ only inside the QNM regime, that is, after the prompt
-response of the initial pulse has passed and before the late-time
-power-law tail becomes comparable to the exponential. Fitting the template to
-data outside this regime is \emph{model misspecification}, not a
-noise problem, and the resulting parameter biases do not vanish with
-more data. The fit window is therefore a hyperparameter of the
-extraction, and a robust $(\omega,\tau)$ measurement requires a
-reproducible criterion for the window. Definition~\ref{def:plateau}
-captures the operational criterion adopted in M4 and M5; inside the
-plateau the recovered $(\omega,\tau)$ are stationary in the window
-edges, and their variation across the plateau provides an estimate
-of the fit-window systematic uncertainty.
+$\Phi(\xq,t)$ only inside the QNM regime --- after the prompt
+response has passed and before the power-law tail becomes
+comparable to the exponential. Fitting it outside this regime
+is \emph{model misspecification}, not a noise problem: the
+resulting biases do not vanish with more data, so the fit
+window is a hyperparameter of the extraction and a robust
+$(\omega,\tau)$ measurement requires a reproducible criterion
+for it. Definition~\ref{def:plateau} captures the criterion
+adopted in M4 and M5; inside the plateau the recovered
+$(\omega,\tau)$ are stationary in the window edges, and their
+variation across it estimates the fit-window systematic
+uncertainty.
 
 For the Schwarzschild $\ell = 2$ fundamental at our parameters the
 four relevant timescales are summarised by
@@ -2129,88 +1573,62 @@ four relevant timescales are summarised by
   t_{\mathrm{tail}} \gg 50\,M,
   \label{eq:timescales}
 \end{equation}
-where $t_{\mathrm{burst}}$ is the prompt-burst duration set by the
-initial condition Eq.~\eqref{eq:ic}, $\tau_1$ and $\tau_0$ are the
-overtone and fundamental decay times of
-Eq.~\eqref{eq:qnm-ref}, and $t_{\mathrm{tail}}$ is the onset of the
-power-law Price tail $\propto t^{-(2\ell+3)}$
-\citep{Berti2009review}. The Price-tail amplitude depends on the
-initial data and observer position, but for our setup the QNM
-remains the dominant component of $\Phi(\xq,t)$ on the entire
-simulation interval $[0,50]\,M$, as confirmed by direct inspection
-of the FD reference. The right edge of any fit window inside this
-interval is therefore well within the QNM regime, which is borne
-out empirically by the M5 plateau rectangles extending in $\tend$
-all the way to the domain end (Sec.~\ref{sec:results}).
-The plateau procedure differs from the standard practice of quoting a
-single number from a single fit window, including that of
-\citet{Patel2024pinn}, who do not specify a numerical $t_0$ or
-$\tend$ and report no fit-window sensitivity. The closest precedents
-in the gravitational-wave ringdown literature are the start-time
-stability scans of \citet{Buonanno2007ringdown} and the
-$f_{220}$-vs-start-time consistency check used in the
-GW150914 ringdown analysis \citep{LIGO2016ringdown}, both of which
-sweep $t_0$ at fixed $\tend$, and the Bayesian start-time
-marginalisation of \citet{Isi2021priors}, which integrates over the
-posterior of $t_0$ instead of selecting a window. The present
-approach extends these along two axes. First, we sweep both edges
-of the window simultaneously rather than $t_0$ alone (M5,
-Sec.~\ref{sec:qnm-methods}). Second, we quote the spread of the
-recovered $(\omega,\tau)$ across the empirically identified
-plateau as a fit-window systematic uncertainty for $\omega$, in lieu
-of the nonlinear-fit covariance which our M2 implementation
-discards (see Sec.~\ref{sec:reporting}).
+where $t_{\mathrm{burst}}$ is the prompt-burst duration set by
+the initial condition Eq.~\eqref{eq:ic} and $t_{\mathrm{tail}}$
+is the onset of the power-law Price tail
+$\propto t^{-(2\ell+3)}$ \citep{Berti2009review}. For our setup
+the QNM dominates $\Phi(\xq,t)$ over the entire simulation
+interval (confirmed by direct inspection of the FD reference),
+so any right edge inside $[0,50]\,M$ lies within the QNM regime
+--- borne out by the M5 plateaus extending in $\tend$ to the
+domain end (Sec.~\ref{sec:results}).
+This differs from the single-window practice of
+\citet{Patel2024pinn}, who specify no numerical $t_0$ or $\tend$
+and report no window sensitivity. The closest precedents are the
+start-time stability scans of \citet{Buonanno2007ringdown} and
+the GW150914 ringdown analysis \citep{LIGO2016ringdown}, both
+sweeping $t_0$ at fixed $\tend$, and the Bayesian start-time
+marginalisation of \citet{Isi2021priors}. The present approach
+extends these by sweeping both edges simultaneously (M5) and by
+quoting the plateau spread as a fit-window systematic
+uncertainty, in lieu of the nonlinear-fit covariance which our
+M2 implementation discards (Sec.~\ref{sec:reporting}).
 % --------------------------------------------------------------
 \subsection{Reporting convention}
 \label{sec:reporting}
 
-We quote one $(\omega,\tau)$ per experiment, with $\omega$ from
-the M4 plateau mean and $\tau$ from M2 on the wide window
-$[10,\,50]\,M$. The
-$\sigma_\omega$ quoted alongside $\omega$ is the M4 plateau standard
-deviation (Algorithm~\ref{alg:m4}, line~7), an estimate of the
-fit-window systematic uncertainty in the sense of
-Def.~\ref{def:plateau}. M2 over a single fixed window does not
-produce an uncertainty, so the dispersion in $\tau$ across variants
-is reported only through the per-window per-method tables of
-Appendix~\ref{app:per-window} rather than as a single $\sigma_\tau$
-on the primary value.
+We quote one $(\omega,\tau)$ per experiment. $\omega$ is always
+the M4 plateau mean, and the $\sigma_\omega$ quoted alongside it
+is the M4 plateau standard deviation (Algorithm~\ref{alg:m4},
+line~7), an estimate of the fit-window systematic uncertainty in
+the sense of Def.~\ref{def:plateau}. $\tau$ is likewise taken
+from M4, except for the inverse PINN: there the training embeds
+the ringdown template of Eq.~\eqref{eq:loss-ring}, whose
+$A_{\mathrm{ring}}$--$\tau$ degeneracy (Sec.~\ref{sec:inv-pinn})
+biases the template-window fit, and the primary $\tau$ is
+instead M2 on the wide window $[10,\,50]\,M$, never the learned
+scalar $\tau_{\mathrm{learned}}$. M2 over a single
+fixed window does not produce an uncertainty, so the dispersion
+in $\tau$ across variants is reported through the per-window
+per-method tables in the repository documentation rather than as
+a single $\sigma_\tau$ on the primary value.
 
-The lower edge $t = 10\,M$ matches the lower edge $\tring$ of
-the baseline ringdown-template window in Eq.~\eqref{eq:loss-ring}
-and is used unchanged across all extraction variants.
-Empirically the
-dominant peak of $|\Phi(\xq,t)|$ on the FD reference falls at
-$t \approx 10.8\,M$ (with subsequent local maxima at
-$t \approx 18.3, 26.7, 35.2, 43.6\,M$),
-so the lower edge $t = 10\,M$ is placed just before the first
-ringdown peak. The choice $t = 10\,M$ rather than the empirical peak
-location $t \approx 10.8\,M$ is conventional and is preserved here
-for exact comparability with the inverse training window.
+The lower edge $t = 10\,M$, used unchanged across all
+extraction variants, sits just before the first ringdown peak
+of the FD reference ($t \approx 10.8\,M$) and matches the
+baseline template window $\tring$ of Eq.~\eqref{eq:loss-ring}.
 
-This convention follows established practice in numerical-relativity
-QNM extraction. Quoting different estimators for $\omega$ and
-$\tau$ is also done by \citet{Berti2007ringdown}, who use FFT
-for $\omega$ and an amplitude-envelope fit for $\tau$, and by
-\citet{Patel2024pinn}, who use FFT for $\omega$ and a log-line
-through local maxima for $\tau$. The motivation in all cases is
-that $\omega$ is best estimated from phase information aggregated
-across many cycles, and the M4 plateau is the lowest-variance such
-estimator in our setup with $\sigma_\omega \sim 10^{-5}$ for the
-converged variants, whereas $\tau$ is best estimated from amplitude
-information over the longest available decay range, motivating a
-wider M2 window.
+Full per-window per-method results are tabulated in the
+repository documentation, with the corresponding plateau plots
+and 2-D heatmaps in Appendix~\ref{app:plots}; the summary table
+in Sec.~\ref{sec:results} collects only the values selected by
+this convention.
 
-The primary $\tau$ is taken from the post-hoc M2 wide-window fit
-on $\Phi_\theta(\xq,t)$ rather than from the learned scalar
-$\tau_{\mathrm{learned}}$, because of the
-$A_{\mathrm{ring}}$--$\tau$ degeneracy of
-Eq.~\eqref{eq:loss-ring} introduced in Sec.~\ref{sec:inv-pinn}
-and quantified in Sec.~\ref{sec:res-inv}.
-
-For each method and each variant the full per-window per-method
-results are tabulated in Appendix~\ref{app:per-window} and the
-corresponding plateau plots and 2-D heatmaps are shown in
-Appendix~\ref{app:plots}. The summary table in
-Sec.~\ref{sec:results} collects only the values selected by the
-convention above.
+Quoting different estimators for $\omega$ and $\tau$ follows
+established numerical-relativity practice
+\citep{Berti2007ringdown,Patel2024pinn}: $\omega$ is best
+estimated from phase information aggregated across many cycles
+--- the M4 plateau is the lowest-variance such estimator here,
+with $\sigma_\omega \sim 10^{-5}$ for the converged variants ---
+and $\tau$ from amplitude information over the longest available
+decay range, motivating the wide M2 window in the inverse case.

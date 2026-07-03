@@ -1,0 +1,300 @@
+% =====================================================================
+\section{Supplementary scans and diagnostics}
+\label{app:supp}
+
+This appendix collects the parameter scans, ablations and
+diagnostics that justify the configuration choices reported in
+Sec.~\ref{sec:results}.
+
+\subsection{Inverse PINN: template diagnostics}
+\label{app:supp-inv}
+
+Tables~\ref{tab:inv-learned} and~\ref{tab:tau-degeneracy} list
+the learned template scalars for the six inverse variants and
+compare $\tau_{\mathrm{learned}}$ with the post-hoc M2
+wide-window fit: the strongly template-weighted variants (A, D,
+E) drift $1.2$--$1.9\,M$ below the post-hoc value along the
+$A_{\mathrm{ring}}$--$\tau$ degeneracy of
+Eq.~\eqref{eq:loss-ring} while the field retains the physical
+decay rate --- the quantitative basis for the reporting
+convention of Sec.~\ref{sec:reporting}.
+
+\begin{table}[!htbp]
+\centering
+\caption{Inverse PINN learned template parameters at the end of
+training for each
+variant. These are the values of the learnable scalars
+$(\omega,\tau,A_{\mathrm{ring}},\phi)$ inside the ringdown loss of
+Eq.~\eqref{eq:loss-ring} after $10{,}000$ Adam plus $15{,}000$
+L-BFGS iterations. They are reported as a diagnostic and are not
+the primary QNM estimates of Table~\ref{tab:inv-summary}; the
+reason is given in the
+$A_{\mathrm{ring}}$--$\tau$ paragraph below.}
+\label{tab:inv-learned}
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Variant & $\omega_{\mathrm{learned}}$ & $\tau_{\mathrm{learned}}/M$ &
+        $A_{\mathrm{ring}}$ & $\phi$ \\
+\midrule
+baseline   & $0.3820$ & $11.89$ & $1.92$ & $-0.99$ \\
+A          & $0.3704$ & $10.10$ & $2.59$ & $-0.72$ \\
+B          & $0.4050$ & $8.62$  & $2.97$ & $-1.38$ \\
+C          & $0.3822$ & $11.84$ & $1.92$ & $-0.99$ \\
+D          & $0.3748$ & $9.48$  & $2.93$ & $-0.85$ \\
+E (mode 0) & $0.3496$ & $9.22$  & $2.52$ & $+0.31$ \\
+E (mode 1) & $0.3810$ & $7.38$  & $3.24$ & $-1.90$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[!htbp]
+\centering
+\caption{$A_{\mathrm{ring}}$--$\tau$ degeneracy diagnostic. The
+training-time learned $\tau_{\mathrm{learned}}$ is the value of the
+learnable scalar at the end of training. The post-hoc M2 wide-window
+$\tau_{\mathrm{M2}}^{\mathrm{wide}}$ is the M2 fit to
+$\Phi_\theta(\xq,t)$ over $[10,50]\,M$. Truth is
+$\tau_0/M = 11.241$ \citep{Leaver1985}. ``Bias gap'' is
+$|\tau_{\mathrm{learned}} - \tau_{\mathrm{M2}}^{\mathrm{wide}}|/M$.
+For variant E, $\tau_{\mathrm{learned}}$ refers to the fundamental
+template mode (mode 0).}
+\label{tab:tau-degeneracy}
+\small
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Variant & $\tau_{\mathrm{learned}}/M$ & $\tau_{\mathrm{M2}}^{\mathrm{wide}}/M$ & Bias gap \\
+\midrule
+baseline & $11.89$ & $11.83$ & $0.06$ \\
+A        & $10.10$ & $11.29$ & $1.19$ \\
+B        & $8.62$  & $8.63$  & $0.01$ \\
+C        & $11.84$ & $11.82$ & $0.02$ \\
+D        & $9.48$  & $11.06$ & $1.58$ \\
+E        & $9.22$  & $11.10$ & $1.88$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{FNO: observer-position sweep}
+\label{app:supp-xq}
+
+Figure~\ref{fig:fno-xq-sweep} reports all four estimators at
+observer positions $\xq \in \{0,2,5,10\}\,M$ on the canonical
+BH, for the FNO and the FD reference alike. The plateau
+estimator validates at $\xq = 2\,M$ on both fields; at
+$\xq = 10\,M$ the ringdown amplitude falls below the FD
+reference's own error floor within the $[10,100]\,M$ window and
+neither field yields a plateau --- the failure is a property of
+the window--observer geometry, not of the surrogate.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{../outputs/qnm/fno_xq2_comparison/figs_v4/fno_v4_xq_sweep.png}
+\caption{QNM extraction across observer positions
+$\xq \in \{0,2,5,10\}\,M$ on the canonical BH for the FNO
+(blue) and the FD reference (red), for all four estimators.
+At $\xq = 0$ and $\xq = 5$, M1 (FFT) is the strongest estimator;
+at $\xq = 2$, M1/M2 saturate at $\sim 100\%$ (the field
+sign-changes inside the prompt pulse support) and M4 dominates
+at permille-level precision; at $\xq = 10$, M4 returns no plateau
+on either the FNO field or the FD reference field within the
+$t \in [10,100]\,M$ window, indicating that the M4 failure mode
+is a property of the window--observer geometry rather than of
+the operator surrogate.}
+\label{fig:fno-xq-sweep}
+\end{figure}
+
+\subsection{FNO: design ablation, homogeneity, resolution transfer and cost}
+\label{app:supp-fno}
+
+Table~\ref{tab:fno-versions} reports the three-configuration
+design ablation. Configuration I ($t_{\max} = 50\,M$) attains
+the best canonical field RMSD but cannot resolve the damping
+time ($344\%$ canonical $\tau$ error): fifty $M$ is fewer than
+five fundamental damping times. Configuration II doubles the
+window and the temporal modes, recovering the population-median
+QNM to sub-percent level; the deployed configuration III adds
+the observer-slice and time-weighted loss terms, recovering the
+canonical-BH extraction by two orders of magnitude at a
+marginal ($\sim\!25\%$) increase in canonical field RMSD.
+
+\begin{table}[!htbp]
+\centering
+\caption{FNO configuration ablation. ``Modes $(t,x)$'' are the
+retained Fourier modes per dimension; $t_{\max}$ is the upper
+edge of the training time window; the rightmost four columns
+report the canonical-BH field RMSD, the canonical-BH M4
+$\omega$ error, and the $100$-BH population-median M4
+$\omega$ and $\tau$ errors. \texttt{NEW} denotes the two
+loss terms introduced in configuration III (see text). Bold entries mark
+the best value in each metric column.}
+\label{tab:fno-versions}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lcccccccccc@{}}
+\toprule
+Tag & $t_{\max}/M$ & Modes $(t,x)$ & $\lambda_{\mathrm{ring}}$ & $\lambda_{\mathrm{obs}}$ & $\lambda_{\mathrm{tw}}$ & canon.\ RMSD & canon.\ $\omega$\% & pop.\ $\omega$\% & pop.\ $\tau$\% \\
+\midrule
+I   & $50$  & $(32,64)$        & $2$          & ---          & ---           & $\mathbf{5.80{\times}10^{-4}}$ & $5.14$  & $2.11$ & $6.95$ \\
+II  & $\mathbf{100}$ & $\mathbf{(64,64)}$ & $2$          & ---          & ---           & $7.48{\times}10^{-4}$ & $19.25$ & $0.44$ & $1.31$ \\
+III & $100$ & $(64,64)$        & $\mathbf{10}$ & $\mathbf{5}$ & $\mathbf{1}$ & $9.30{\times}10^{-4}$ & $\mathbf{0.114}$ & $\mathbf{0.34}$ & $\mathbf{0.94}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Tables~\ref{tab:fno-pop-heatmap}--\ref{tab:fno-pinn-cost}
+report the population homogeneity (late-time residual within a
+factor of $\sim\!3$ across the training box, no isolated
+failure region), zero-shot resolution transfer ($\omega$ within
+$0.05$ percentage points from $201^{2}$ to $801^{2}$, field
+RMSD minimised at the training resolution), and the
+amortisation break-even against per-BH PINN training
+($N_{\mathrm{BH}} \approx 7$).
+
+\begin{table}[!htbp]
+\centering
+\caption{FNO late-time field RMSD,
+$\sqrt{\langle(\Phi_{\rm FNO}-\Phi_{\rm FD})^{2}\rangle}_{t>T/2}$,
+across the $100$-BH test population, binned into equal-width
+bins along each axis of the initial-data manifold
+$(M, x_{0}, \sigma) \in [0.8,1.2] \times [-10,30] \times [3,8]$.
+Each row gives the bin definition, the count $n$ of test BHs
+falling in the bin, the median RMSD, and the worst-case RMSD
+in the bin. The residual sits in a $\sim 3\times$ band across
+the entire training box with no isolated failure region.}
+\label{tab:fno-pop-heatmap}
+\small
+\setlength{\tabcolsep}{6pt}
+\begin{tabular}{@{}llcccc@{}}
+\toprule
+Axis & Bin & $n$ & median & max \\
+\midrule
+$M$       & $[0.80,0.93]$  & $30$ & $1.15\times 10^{-3}$ & $1.82\times 10^{-3}$ \\
+          & $[0.93,1.07]$  & $41$ & $8.71\times 10^{-4}$ & $1.41\times 10^{-3}$ \\
+          & $[1.07,1.20]$  & $29$ & $8.82\times 10^{-4}$ & $1.13\times 10^{-3}$ \\
+\midrule
+$x_{0}/M$ & $[-10.0, 3.33]$ & $34$ & $1.01\times 10^{-3}$ & $1.82\times 10^{-3}$ \\
+          & $[3.33, 16.67]$ & $39$ & $8.90\times 10^{-4}$ & $1.68\times 10^{-3}$ \\
+          & $[16.67, 30.0]$ & $27$ & $9.06\times 10^{-4}$ & $1.54\times 10^{-3}$ \\
+\midrule
+$\sigma/M$ & $[3.00, 4.67]$ & $32$ & $1.07\times 10^{-3}$ & $1.82\times 10^{-3}$ \\
+           & $[4.67, 6.33]$ & $35$ & $8.20\times 10^{-4}$ & $1.54\times 10^{-3}$ \\
+           & $[6.33, 8.00]$ & $33$ & $9.80\times 10^{-4}$ & $1.35\times 10^{-3}$ \\
+\midrule
+all       & --              & $100$ & $9.40\times 10^{-4}$ & $1.82\times 10^{-3}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[!htbp]
+\centering
+\caption{FNO zero-shot resolution transfer for the
+canonical BH ($M=1,\,x_{0}=4,\,\sigma=5$). The model trained
+at $401\times 401$ is evaluated at five grid resolutions over
+the same physical domain with no retraining. Columns: grid
+size $N_{t}\!=\!N_{x}$; late-time field RMSD against an
+independent FD reference at the same resolution; M3 ESPRIT
+$M\omega_{0}$ at $x_{q}\!=\!2\,M$ on the FNO field, and its
+percentage error relative to the Leaver value $0.3737$.
+The QNM observable is essentially resolution-invariant
+($\Delta\!\le\!0.05$ pp across the table); field RMSD shows
+the expected V-shape minimum at training resolution.}
+\label{tab:fno-resolution}
+\small
+\setlength{\tabcolsep}{8pt}
+\begin{tabular}{@{}cccc@{}}
+\toprule
+$N_{t}\!=\!N_{x}$ & late-time field RMSD & $M\omega_{0}$ (FNO) & $\omega$ \% err \\
+\midrule
+$201$  & $2.53\times 10^{-2}$ & $0.37150$ & $0.590$ \\
+$301$  & $6.33\times 10^{-3}$ & $0.37142$ & $0.609$ \\
+$401^{\star}$ & $8.41\times 10^{-4}$ & $0.37147$ & $0.596$ \\
+$601$  & $5.46\times 10^{-3}$ & $0.37156$ & $0.573$ \\
+$801$  & $7.19\times 10^{-3}$ & $0.37162$ & $0.557$ \\
+\bottomrule
+\end{tabular}
+\\[2pt]
+{\footnotesize $^{\star}$ training resolution.}
+\end{table}
+
+\begin{table}[!htbp]
+\centering
+\caption{Wall-clock cost in A100-hours for delivering field
+predictions on $N_{\mathrm{BH}}$ unseen $(M,x_{0},\sigma)$
+triples drawn from the FNO training distribution. PINN cost is
+$N_{\mathrm{BH}}\!\times\!1.5$~h per BH; FNO cost is
+$10$~h training (one-time) plus $\sim\!1$~s$\!\approx\!3{\times}10^{-4}$~h
+inference per BH. The ``speed-up'' column is
+$T^{\mathrm{PINN}}/T^{\mathrm{FNO}}$.}
+\label{tab:fno-pinn-cost}
+\small
+\setlength{\tabcolsep}{8pt}
+\begin{tabular}{@{}rcccc@{}}
+\toprule
+$N_{\mathrm{BH}}$ & PINN (A100-h) & FNO (A100-h) & speed-up \\
+\midrule
+$1$    & $1.5$   & $10.0$  & $0.15\times$ \\
+$10$   & $15$    & $10.0$  & $1.5\times$  \\
+$50$   & $75$    & $10.0$  & $7.5\times$  \\
+$100$  & $150$   & $10.0$  & $15\times$   \\
+$1000$ & $1500$  & $10.3$  & $146\times$  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Hybrid: gradient-gate diagnostics}
+\label{app:supp-gate}
+
+Figure~\ref{fig:hyb-grad} shows the per-cell scatter of
+coarse-prior error against prior gradient magnitude on the
+canonical BH (log--log Pearson $r = 0.917$), the empirical
+basis of the gradient gate, and
+Table~\ref{tab:hyb-gate-decile} the decile stratification: the
+gated correction reduces the mean error by $12.3\times$ in the
+top gradient decile, declining monotonically to $2.6\times$ in
+the sixth, with the sub-median cells left at the prior floor.
+The gate scale itself is fixed label-free in
+Appendix~\ref{app:gate-scale}.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.82\textwidth]{../outputs/hybrid/fno_sw_gate_s1em3/figs/grad_vs_error.png}
+\caption{Coarse-prior error versus prior gradient on the
+canonical BH, the diagnostic motivating the gradient gate.
+Each point is one $(x,t)$ cell; the horizontal axis is the
+prior gradient magnitude $|\nabla\mathcal{U}\Phi^{\mathrm{c}}|$
+and the vertical axis the coarse-up baseline error
+$|\Phi^{\mathrm{f}} - \mathcal{U}\Phi^{\mathrm{c}}|$, both on
+log scales. The log--log Pearson correlation is $r = 0.917$:
+the prior error is large precisely on the high-gradient
+wavefronts and small in the low-gradient interior and causal
+exterior, so the gate $g$ (Eq.~\eqref{eq:hyb-gate}) routes the
+network correction to the cells that need it.}
+\label{fig:hyb-grad}
+\end{figure}
+
+\begin{table}[!htbp]
+\centering
+\caption{Hybrid error reduction stratified by coarse-prior
+gradient on the canonical BH. Cells are sorted into deciles of
+$|\nabla\mathcal{U}\Phi^{\mathrm{c}}|$; for the top four
+deciles (the wavefront-bearing cells) the table lists the
+decile-mean gradient, the mean coarse-up baseline error, the
+mean hybrid error, and their ratio. Below the median the prior
+gradient is $\lesssim 10^{-12}$ (smooth interior and causal
+exterior) and both errors are at the field floor.}
+\label{tab:hyb-gate-decile}
+\small
+\setlength{\tabcolsep}{6pt}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Gradient decile & $\overline{|\nabla\mathcal{U}\Phi^{\mathrm{c}}|}$
+ & baseline err & hybrid err & ratio \\
+\midrule
+90--100\% (wavefronts) & $3.15\times 10^{-2}$ & $1.30\times 10^{-2}$ & $1.06\times 10^{-3}$ & $12.3$ \\
+80--90\%               & $1.01\times 10^{-2}$ & $4.37\times 10^{-3}$ & $4.77\times 10^{-4}$ & $9.2$  \\
+70--80\%               & $3.56\times 10^{-3}$ & $2.21\times 10^{-3}$ & $3.07\times 10^{-4}$ & $7.2$  \\
+60--70\%               & $4.37\times 10^{-4}$ & $6.81\times 10^{-4}$ & $2.62\times 10^{-4}$ & $2.6$  \\
+\bottomrule
+\end{tabular}
+\end{table}

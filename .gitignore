@@ -17,7 +17,7 @@ venv_*/
 *.out
 
 # RDS scratch symlink for live datasets/outputs (never commit the data pointer)
-/outputs
+# /outputs   (un-ignored 2026-07-03: contains recovered paper figures, irreplaceable)
 
 # LaTeX build artifacts
 *.aux
@@ -27,3 +27,8 @@ venv_*/
 *.toc
 *.synctex.gz
 .pip.lock
+
+# course materials / other students' work - never publish
+DIS_Project_Report__Multimessenger_ML_.pdf
+handbook.pdf
+notes/thesis_refs/

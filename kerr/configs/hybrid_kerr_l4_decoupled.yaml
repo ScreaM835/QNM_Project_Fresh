@@ -1,0 +1,61 @@
+# Kerr hybrid FNO — ell=4, DECOUPLED prior/target train+eval+plot job.
+#
+# Replicates the supervised dual-win (field ~60x, QNM 18.3 -> ~0.8% at high
+# spin) with a LABEL-FREE, cheaper-than-fine teacher, by decoupling the model
+# input from the Richardson rungs:
+#
+#   * input/prior  : k8 = N=101, ORDER 2  (keeps the ~18% QNM + ~77% field
+#                    headroom -- identical prior to the n101 corpus);
+#   * target/label : ORDER-4 Richardson of the finer pair
+#                    (16*up(k2=401) - up(k4=201))/15  -- field 0.04-0.21%,
+#                    QNM 0.1-0.6% (measured by probe_fd_order_l4), built from
+#                    coarse solves only (no fine in the label), cost ~0.32x a
+#                    fine 801 solve;
+#   * eval truth   : fine = N=801 (order 4), used only to SCORE the hybrid.
+#
+# Rationale: the supervised run proved the model's field floor is input-limited
+# at ~0.77% (it reached 0.77% from a perfect 0% target), so ANY target below
+# that floor lets the model hit it. The order-4 Richardson target (0.21%) is
+# below the floor, so the hybrid lands where supervised did -- but label-free,
+# ~3x cheaper than a fine solve. The cheaper 201/101 order-4 target (6.6%) sits
+# ABOVE the floor and is insufficient; the 401/201 rung is what crosses it.
+#
+# Corpus built by build_kerr_dataset_lscan.py with
+#   --coarse-n '2:401,4:201,8:101' --ks 2 4 8 --grid-order '1:4,2:4,4:4,8:2'.
+# Same FNO recipe as the n101 hybrid (all grids upsample to fine N=801 before
+# the FNO, so the network is unchanged). QNM scoring uses the mode-selective
+# m1-m5 consensus ensemble (omega_target from the per-sample Leaver).
+
+seed: 1234
+
+data:
+  dir: kerr/outputs/phase_c_l4_decoupled
+  target_mode: richardson        # 'supervised' = fine-label A/B upper bound
+  prior_grid: k8                 # decoupled input grid (N=101, order 2); null = coupled k4
+  richardson_p: 4                # order-4 Richardson on the k2/k4 (401/201) pair
+
+fno:
+  modes_tau: 64                  # tau-heavy: residual needs ~41 modes here
+  modes_sigma: 24                # sigma is radially smooth: ~9 modes suffice
+  hidden_channels: 48
+  n_layers: 4
+  domain_padding: [0.08, 0.08]   # non-periodic hyperboloidal domain, both axes
+  positional_embedding: grid
+
+train:
+  epochs: 200
+  lr: 1.0e-3
+  weight_decay: 1.0e-6
+  batch_size: 8
+  patience: 30
+
+acceptance:                      # informational gate (decoupled regime)
+  field_rl2: 0.05                # held-out field rel-L2 <= 5%
+  qnm_Mw: 0.01                   # M*omega <= 1% vs Leaver
+  qnm_tau: 0.05                  # tau <= 5% vs Leaver
+
+eval:
+  qnm_workers: 16                # parallel mode-selective ensemble extraction
+
+logging:
+  out_dir: kerr/outputs/phase_c_l4_decoupled/fno_hybrid_kerr

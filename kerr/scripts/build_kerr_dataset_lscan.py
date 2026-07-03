@@ -83,6 +83,31 @@ def _parse_coarse_n(spec: str) -> dict:
     return out
 
 
+def set_grid_order(grid_order: dict) -> None:
+    """Override the per-grid FD order on the kerr_dataset module BEFORE evolving.
+
+    Same pre-fork pattern as ``set_grids``/``set_ell``: ``evolve_full_field`` (via
+    ``_evolve_one``) reads ``kd.GRID_ORDER.get(k, 2)`` per grid, so mutating the
+    module global here changes which order each grid is solved at without editing
+    the audited module. Keys are grid keys (1 = fine, else the coarse refinement
+    factor); values are 2 or 4. Used to evolve the Richardson target rungs at
+    4th order while the headroom-bearing coarse prior stays 2nd order.
+    """
+    for k, o in grid_order.items():
+        if int(o) not in (2, 4):
+            raise ValueError(f"grid order for k={k} must be 2 or 4, got {o}")
+    kd.GRID_ORDER = {int(k): int(v) for k, v in grid_order.items()}
+
+
+def _parse_grid_order(spec: str) -> dict:
+    """Parse a 'k:order' map, e.g. '1:4,2:4,4:4,8:2'."""
+    out = {}
+    for tok in spec.split(","):
+        k, o = tok.split(":")
+        out[int(k)] = int(o)
+    return out
+
+
 def verify_corpus(out_dir: str, ell: int) -> bool:
     """Load every split, check finiteness/shapes/disjointness; emit a manifest.
 
@@ -159,6 +184,10 @@ def main() -> None:
                     help="override coarse grid sizes, e.g. '2:201,4:101' (the "
                          "coarser ell=4 ladder with QNM headroom). Must nest in "
                          "fine N=801. Default keeps the module's {2:401,4:201}.")
+    ap.add_argument("--grid-order", type=str, default=None,
+                    help="per-grid FD order map 'k:order', e.g. '1:4,2:4,4:4,8:2' "
+                         "(fine + Richardson rungs at 4th order, coarse prior at "
+                         "2nd order). Unset grids default to order 2.")
     ap.add_argument("--out", type=str, required=True)
     ap.add_argument("--workers", type=int, default=1)
     ap.add_argument("--smoke", action="store_true")
@@ -168,7 +197,10 @@ def main() -> None:
     set_ell(args.ell, args.m)
     if args.coarse_n:
         set_grids(_parse_coarse_n(args.coarse_n))
+    if args.grid_order:
+        set_grid_order(_parse_grid_order(args.grid_order))
     print(f"[L-SCAN] ELL={kd.ELL} MM={kd.MM}  COARSE_N={kd.COARSE_N}  "
+          f"GRID_ORDER={kd.GRID_ORDER or '{all:2}'}  "
           f"(kerr_dataset module globals set)")
 
     if args.verify_corpus:
@@ -197,6 +229,7 @@ def main() -> None:
         ell=args.ell, m=args.m,
         t_store=t_store, dt_store=dt_store, ntau=int(grids.tau.size),
         fine_N=FINE_N, coarse_N={k: kd.COARSE_N[k] for k in args.ks},
+        grid_order={k: kd.GRID_ORDER.get(k, 2) for k in (1, *args.ks)},
         spin_range=(0.0, 0.95), r0_range=(8.0, 11.0), w_range=(1.0, 1.5),
         amp_fixed=1.0, workers=args.workers, elapsed_s=elapsed,
     )

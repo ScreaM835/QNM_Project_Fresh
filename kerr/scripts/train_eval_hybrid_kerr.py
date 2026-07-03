@@ -283,13 +283,14 @@ def evaluate(model, test, asm_test, split_test, cfg, device, out_dir) -> dict:
     qnm = np.asarray(split_test["qnm"])       # (N,3) Mw_R, Mw_I, tau/M
     N = P.shape[0]
 
-    scale = asm_test["scale"]                 # (N,)
+    scale = asm_test["scale"]                 # (N,) scalar-norm or (N,Ntau) envelope-norm
     Yn = asm_test["Y"]                         # (N,2,Ntau,Nf) normalised Richardson target
     up4_re = asm_test["up4_re"]; up4_im = asm_test["up4_im"]
     fine_re = asm_test["fine_re"]; fine_im = asm_test["fine_im"]
 
     pred = predict(model, asm_test["X"], device, batch=int(cfg["train"].get("batch_size", 8)))
-    sB = scale[:, None, None]
+    # scalar norm -> scale is (N,); envelope norm -> (N, Ntau), a per-time scale.
+    sB = scale[:, :, None] if scale.ndim == 2 else scale[:, None, None]
     # reconstruct physical fields
     hyb_re = up4_re + sB * pred[:, 0]
     hyb_im = up4_im + sB * pred[:, 1]
@@ -505,11 +506,17 @@ def main():
 
     data_dir = cfg["data"]["dir"]
     target_mode = cfg["data"].get("target_mode", "richardson")
+    prior_grid = cfg["data"].get("prior_grid")          # e.g. "k8" (decoupled) or None
+    richardson_p = int(cfg["data"].get("richardson_p", 2))
+    norm_mode = cfg["data"].get("norm_mode", "scalar")  # "envelope" = per-time tau fix
+    envelope_floor = float(cfg["data"].get("envelope_floor", 1.0e-5))
     out_dir = cfg["logging"]["out_dir"]
     os.makedirs(out_dir, exist_ok=True)
 
     device = "cuda" if torch.cuda.is_available() and not args.smoke else "cpu"
-    print(f"[KERR-HYBRID] device={device} target_mode={target_mode} out_dir={out_dir}", flush=True)
+    print(f"[KERR-HYBRID] device={device} target_mode={target_mode} "
+          f"prior_grid={prior_grid or 'k4(coupled)'} richardson_p={richardson_p} "
+          f"norm_mode={norm_mode} out_dir={out_dir}", flush=True)
 
     # ---- load splits ----
     t0 = time.time()
@@ -537,12 +544,20 @@ def main():
     # ---- upsample matrices (once) ----
     W_k4 = build_upsample_matrix(tr["sigma_k4"], tr["sigma_fine"])
     W_k2 = build_upsample_matrix(tr["sigma_k2"], tr["sigma_fine"])
+    # Decoupled prior: input grid (k8, N=101) is separate from the k2/k4
+    # Richardson rungs so the cheap headroom-bearing prior is upsampled with its
+    # own matrix while the order-p label is built on the finer pair.
+    W_prior = (build_upsample_matrix(tr[f"sigma_{prior_grid}"], tr["sigma_fine"])
+               if prior_grid else None)
 
     # ---- assemble ----
     t0 = time.time()
-    asm_tr = assemble(tr, W_k4, W_k2, target_mode=target_mode, return_eval=False)
-    asm_va = assemble(va, W_k4, W_k2, target_mode=target_mode, return_eval=False)
-    asm_te = assemble(te, W_k4, W_k2, target_mode=target_mode, return_eval=True)
+    _asm_kw = dict(W_prior=W_prior, prior_key=(prior_grid or "k8"),
+                   richardson_p=richardson_p, norm_mode=norm_mode,
+                   envelope_floor=envelope_floor)
+    asm_tr = assemble(tr, W_k4, W_k2, target_mode=target_mode, return_eval=False, **_asm_kw)
+    asm_va = assemble(va, W_k4, W_k2, target_mode=target_mode, return_eval=False, **_asm_kw)
+    asm_te = assemble(te, W_k4, W_k2, target_mode=target_mode, return_eval=True, **_asm_kw)
     print(f"[KERR-HYBRID] assembled tensors in {time.time()-t0:.0f}s  "
           f"X_train {asm_tr['X'].shape}", flush=True)
     # free raw fields we no longer need (keep test meta)

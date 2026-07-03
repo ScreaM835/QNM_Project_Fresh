@@ -128,37 +128,65 @@ def assemble(
     target_mode: str = "richardson",
     return_eval: bool = False,
     chunk: int = 64,
+    W_prior: "np.ndarray | None" = None,
+    prior_key: str = "k8",
+    richardson_p: int = 2,
+    norm_mode: str = "scalar",
+    envelope_floor: float = 1.0e-5,
 ) -> Dict[str, np.ndarray]:
     """Assemble normalised training tensors for one split (fast matrix path).
 
     Returns a dict with:
         X      (N, 4, Ntau, Nf) float32   normalised input channels
         Y      (N, 2, Ntau, Nf) float32   normalised Richardson (or fine) target
-        scale  (N,)             float32   per-sample s = rms(|up4|)
+        scale  (N,) or (N,Ntau) float32   per-sample (scalar) / per-time (envelope) norm
     and, if ``return_eval`` (kept for the test split only -- memory):
         up4_re, up4_im   (N, Ntau, Nf) float32   physical prior (eval baseline)
         fine_re, fine_im (N, Ntau, Nf) float32   physical fine FD (eval target)
 
-    The prior is the quintic-upsampled k4 solve; the Richardson target uses
-    k2 + k4 only (label-free). ``chunk`` bounds peak memory by streaming over
-    samples. With ``target_mode='supervised'`` the target is ``fine - up4`` (fine
-    label, A/B baseline only); the fine field is otherwise never in the target.
+    The model **prior** (input / scale / eval baseline) is the quintic-upsampled
+    coarse solve. By default (``W_prior is None``) the prior is the ``k4`` rung,
+    so prior and the coarse Richardson rung coincide (the original coupled
+    pipe). Passing ``W_prior`` + ``prior_key`` **decouples** the input grid from
+    the Richardson rungs: the prior is upsampled from a separate (coarser,
+    headroom-bearing) grid -- e.g. ``k8`` (N=101) -- while the label is built
+    from the finer ``k2``/``k4`` pair. The Richardson order is set by
+    ``richardson_p`` (2 -> (4 u2 - u4)/3; 4 -> (16 u2 - u4)/15); ``k2`` is the
+    finer rung. ``norm_mode='envelope'`` swaps the single per-sample scale for a
+    per-time envelope ``w(tau)=max(rms_sigma|prior|, envelope_floor*peak)`` (the
+    tau fix: the low-amplitude late ringdown becomes O(1) so the FNO/loss can
+    see it); ``scale`` is then ``(N, Ntau)`` and the hybrid is reconstructed as
+    ``prior + w(tau)*FNO``. ``chunk`` bounds peak memory by streaming over
+    samples. With
+    ``target_mode='supervised'`` the target is ``fine - prior`` (fine label, A/B
+    baseline only); the fine field is otherwise never in the target.
     """
     if target_mode not in ("richardson", "supervised"):
         raise ValueError(
             f"target_mode must be 'richardson' or 'supervised', got {target_mode!r}")
+    if richardson_p not in (2, 4):
+        raise ValueError(f"richardson_p must be 2 or 4, got {richardson_p}")
+    if norm_mode not in ("scalar", "envelope"):
+        raise ValueError(f"norm_mode must be 'scalar' or 'envelope', got {norm_mode!r}")
 
     k4_re = split["psi_k4_re"]; k4_im = split["psi_k4_im"]
     k2_re = split["psi_k2_re"]; k2_im = split["psi_k2_im"]
     fn_re = split["psi_fine_re"]; fn_im = split["psi_fine_im"]
     aM = np.asarray(split["P"][:, 0], dtype=np.float32)
 
+    if W_prior is not None:
+        pr_re = split[f"psi_{prior_key}_re"]; pr_im = split[f"psi_{prior_key}_im"]
+    else:
+        pr_re = pr_im = None
+
     N, Ntau, _ = k4_re.shape
     Nf = W_k4.shape[0]
+    coef = (2.0 ** richardson_p) / (2.0 ** richardson_p - 1.0)
 
     X = np.empty((N, HYBRID_IN_CHANNELS, Ntau, Nf), dtype=np.float32)
     Y = np.empty((N, HYBRID_OUT_CHANNELS, Ntau, Nf), dtype=np.float32)
-    scale = np.empty(N, dtype=np.float32)
+    # scalar norm -> one scale per sample; envelope norm -> a scale per (sample, tau)
+    scale = np.empty((N, Ntau) if norm_mode == "envelope" else N, dtype=np.float32)
     eval_out: Dict[str, np.ndarray] = {}
     if return_eval:
         for key in ("up4_re", "up4_im", "fine_re", "fine_im"):
@@ -169,28 +197,52 @@ def assemble(
         up4_re = _apply_W(W_k4, k4_re[lo:hi]); up4_im = _apply_W(W_k4, k4_im[lo:hi])
         up2_re = _apply_W(W_k2, k2_re[lo:hi]); up2_im = _apply_W(W_k2, k2_im[lo:hi])
 
-        s = np.sqrt(np.mean(up4_re ** 2 + up4_im ** 2, axis=(1, 2))).astype(np.float32)
-        s = np.maximum(s, 1e-30)
-        sB = s[:, None, None]
+        if W_prior is not None:
+            prior_re = _apply_W(W_prior, pr_re[lo:hi])
+            prior_im = _apply_W(W_prior, pr_im[lo:hi])
+        else:
+            prior_re = up4_re; prior_im = up4_im
+
+        if norm_mode == "envelope":
+            # Per-time envelope w(tau) = rms_sigma|prior(tau,.)|, floored at
+            # envelope_floor * peak. Dividing by it lifts the low-amplitude late
+            # ringdown to O(1) so the FNO/loss can see it (the tau fix), while
+            # the floor stops the deep tail (noise floor) from being amplified.
+            w_raw = np.sqrt(np.mean(prior_re ** 2 + prior_im ** 2, axis=2)).astype(np.float32)
+            peak = np.maximum(w_raw.max(axis=1), 1e-30)               # (n,)
+            w = np.maximum(w_raw, envelope_floor * peak[:, None])     # (n, Ntau)
+            sB = np.maximum(w, 1e-30)[:, :, None]                     # field scale (n, Ntau, 1)
+            s0 = sB[:, 0:1, :]                                        # psi0 scale = w(tau=0)
+            scale[lo:hi] = sB[:, :, 0]
+        else:
+            s = np.sqrt(np.mean(prior_re ** 2 + prior_im ** 2, axis=(1, 2))).astype(np.float32)
+            s = np.maximum(s, 1e-30)
+            sB = s[:, None, None]                                     # (n, 1, 1)
+            s0 = sB
+            scale[lo:hi] = s
 
         if target_mode == "richardson":
-            y_re = (4.0 / 3.0) * (up2_re - up4_re)
-            y_im = (4.0 / 3.0) * (up2_im - up4_im)
+            # p-th order Richardson extrapolant minus prior. k2 is the finer
+            # rung: (2^p u2 - u4)/(2^p-1) = coef*u2 - (coef-1)*u4. With the
+            # coupled prior (== up4) this reduces to coef*(u2 - u4) exactly.
+            rich_re = coef * up2_re - (coef - 1.0) * up4_re
+            rich_im = coef * up2_im - (coef - 1.0) * up4_im
+            y_re = rich_re - prior_re
+            y_im = rich_im - prior_im
         else:
-            y_re = fn_re[lo:hi] - up4_re
-            y_im = fn_im[lo:hi] - up4_im
+            y_re = fn_re[lo:hi] - prior_re
+            y_im = fn_im[lo:hi] - prior_im
 
-        X[lo:hi, 0] = up4_re / sB
-        X[lo:hi, 1] = up4_im / sB
+        X[lo:hi, 0] = prior_re / sB
+        X[lo:hi, 1] = prior_im / sB
         X[lo:hi, 2] = aM[lo:hi, None, None]
-        X[lo:hi, 3] = up4_re[:, 0:1, :] / sB           # psi0.real broadcast over tau
+        X[lo:hi, 3] = prior_re[:, 0:1, :] / s0          # psi0.real broadcast over tau
         Y[lo:hi, 0] = y_re / sB
         Y[lo:hi, 1] = y_im / sB
-        scale[lo:hi] = s
 
         if return_eval:
-            eval_out["up4_re"][lo:hi] = up4_re
-            eval_out["up4_im"][lo:hi] = up4_im
+            eval_out["up4_re"][lo:hi] = prior_re
+            eval_out["up4_im"][lo:hi] = prior_im
             eval_out["fine_re"][lo:hi] = fn_re[lo:hi]
             eval_out["fine_im"][lo:hi] = fn_im[lo:hi]
 
@@ -203,18 +255,22 @@ def load_split(path: str, split: str) -> Dict[str, np.ndarray]:
     """Load one Kerr corpus split npz into a flat dict with split-prefix stripped.
 
     Returns the Re/Im field stacks, sigma axes, tau, params ``P`` (a/M, r0, w),
-    the Leaver reference ``qnm``, and the scri indices, as plain arrays.
+    the Leaver reference ``qnm``, and the scri indices, as plain arrays. Every
+    grid present in the npz is loaded (``fine``, ``k2``, ``k4``, and -- for the
+    decoupled corpus -- the coarse prior ``k8``), so a 4-grid corpus round-trips
+    without changing this loader.
     """
     d = np.load(path, allow_pickle=True)
     out: Dict[str, np.ndarray] = {
         "tau": d["tau"],
-        "sigma_fine": d["sigma_fine"], "sigma_k2": d["sigma_k2"],
-        "sigma_k4": d["sigma_k4"],
-        "scri_idx_fine": d["scri_idx_fine"], "scri_idx_k2": d["scri_idx_k2"],
-        "scri_idx_k4": d["scri_idx_k4"],
         "P": d[f"{split}_P"], "qnm": d[f"{split}_qnm"],
     }
-    for grid in ("fine", "k2", "k4"):
+    grids = [k[len("sigma_"):] for k in d.files if k.startswith("sigma_")]
+    for grid in grids:
+        out[f"sigma_{grid}"] = d[f"sigma_{grid}"]
+        out[f"scri_idx_{grid}"] = d[f"scri_idx_{grid}"]
         for part in ("re", "im"):
-            out[f"psi_{grid}_{part}"] = d[f"{split}_psi_{grid}_{part}"]
+            key = f"{split}_psi_{grid}_{part}"
+            if key in d.files:
+                out[f"psi_{grid}_{part}"] = d[key]
     return out

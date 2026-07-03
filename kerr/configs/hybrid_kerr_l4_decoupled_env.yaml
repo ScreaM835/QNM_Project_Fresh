@@ -1,0 +1,58 @@
+# Kerr hybrid FNO — ell=4 DECOUPLED + ENVELOPE normalisation (tau fix A/B).
+#
+# Identical to hybrid_kerr_l4_decoupled.yaml (same corpus, same FNO, same
+# label-free order-4 Richardson target) EXCEPT the normalisation:
+#
+#   norm_mode: envelope  ->  the single per-sample scale s = rms(|prior|) is
+#   replaced by a per-time envelope  w(tau) = max(rms_sigma|prior(tau,.)|,
+#   envelope_floor * peak).  Dividing by w lifts the low-amplitude late ringdown
+#   to O(1) so the FNO/loss can see it; the hybrid is reconstructed as
+#   psi_hyb = prior + w(tau) * FNO.  This targets the tau (decay-time) error,
+#   which the scalar-norm model leaves at ~6.6% (the late ringdown was invisible
+#   to the amplitude-weighted loss).
+#
+#   envelope_floor: 1e-5  -- principled: eta_float32 (1.2e-7) / model field
+#   accuracy (1e-2). Equalises down to where the signal is still ~1000x above
+#   the float32 noise floor; below it we fall back to the prior (no amplifying
+#   noise). w is computed from the PRIOR (recomputed for every input) so it
+#   generalises -- no Leaver, no fine, no leakage.
+#
+# A/B against hybrid_kerr_l4_decoupled.yaml (scalar norm, the current model):
+# expect field to hold ~0.78% and tau to improve from ~6.6% toward fine (~2%),
+# WITHOUT touching the Mw or field wins.
+
+seed: 1234
+
+data:
+  dir: kerr/outputs/phase_c_l4_decoupled
+  target_mode: richardson
+  prior_grid: k8
+  richardson_p: 4
+  norm_mode: envelope            # per-time envelope normalisation (the tau fix)
+  envelope_floor: 1.0e-5         # eta_float32 / model field accuracy
+
+fno:
+  modes_tau: 64
+  modes_sigma: 24
+  hidden_channels: 48
+  n_layers: 4
+  domain_padding: [0.08, 0.08]
+  positional_embedding: grid
+
+train:
+  epochs: 200
+  lr: 1.0e-3
+  weight_decay: 1.0e-6
+  batch_size: 8
+  patience: 30
+
+acceptance:
+  field_rl2: 0.05
+  qnm_Mw: 0.01
+  qnm_tau: 0.05
+
+eval:
+  qnm_workers: 16
+
+logging:
+  out_dir: kerr/outputs/phase_c_l4_decoupled/fno_hybrid_kerr_env

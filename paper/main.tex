@@ -68,8 +68,8 @@
 \newtheorem{definition}{Definition}[section]
 
 % --- Title block -------------------------------------------------------
-\title{\bfseries A Unified Physics-Informed Neural Network Framework
-for Schwarzschild Quasi-Normal Modes Extraction}
+\title{\bfseries A Unified Deep-Learning Framework for
+Schwarzschild Quasi-Normal-Mode Extraction}
 
 \author{%
   Jonathan Chung\\
@@ -84,209 +84,122 @@ for Schwarzschild Quasi-Normal Modes Extraction}
 
 \begin{abstract}
 \noindent
-We apply physics-informed neural networks (PINNs), an
-end-to-end Fourier neural operator (FNO) surrogate, and a
-hybrid coarse-FD + neural-residual surrogate to the Schwarzschild
-$\ell = 2$ Zerilli equation in the time domain in five settings:
-the forward problem, the inverse problem, a curriculum-learning
-extension of the forward problem, an amortised FNO operator
-trained over a population of $1{,}000$ initial-data draws, and
-a hybrid surrogate that runs a coarse finite-difference solve
-and learns only its discretisation residual from a label-free
-Richardson-extrapolated target. The forward PINN reproduces a
-finite-difference reference field with relative $L^2$ error
-$0.58\%$, compared with $28.06\%$ in the closest prior PINN study
-of the same equation \citep{Patel2024pinn}, and recovers the
-fundamental quasi-normal mode (QNM) frequency $\omega$ to
-$0.029\%$ of the Leaver continued-fraction value. The inverse
-PINN jointly trains the network field, the black-hole mass $M$,
-and a damped-sinusoid ringdown template against $500$ noisy
-observations of the field at $1\%$ Gaussian noise, recovering
-$M$ to $0.34\%$, $\omega$ to $0.30\%$, and the damping time
-$\tau$ to $1.6\%$. We show analytically and empirically that the
-embedded template loss admits an amplitude--damping-time degeneracy along
-which $\tau$ drifts by ten to twenty percent from the Leaver
-value with the loss almost stationary; quoting $\tau$ from a
-post-hoc fit to the converged network field, rather than from
-the learned template scalar, removes this drift. The curriculum
-PINN partitions the temporal domain into two or three windows
-trained sequentially with numerical-IC transfer between them, in
-both hard-stitched and soft-overlap blended forms; we find that
-it lowers the per-window error on the earliest sub-domain by
-$\sim\!37\%$ but does not improve the full-domain RMSD once the
-windows are stitched, because an interpolation error
-compounds at every splice. We also
-introduce two plateau-based fit-window estimators that scan,
-respectively, the start time alone and both edges of the QNM fit
-window, and report the plateau standard deviation
-$\sigma_\omega$ as a fit-window systematic uncertainty on $\omega$.
-The plateau width separates inverse-PINN configurations on which
-the two-mode nonlinear least-squares fit converges from those on
-which it does not, and therefore also serves as a deterministic
-quality flag computed from the same scan. The FNO surrogate,
-trained once on a population of $1{,}000$ $(M, x_0, \sigma)$
-draws, recovers $\omega$ to $0.11\%$ and $\tau$ to $0.10\%$ on
-the canonical evaluation black hole, and matches the
-finite-difference reference's own QNM extraction across a
-$100$-BH in-distribution population at population-median
-$\omega$ error $0.34\%$, identical to the finite-difference
-reference's own extraction error to two significant figures,
-amortising the per-event PINN training cost to a single forward
-pass per black hole. The hybrid surrogate, a $1.13\times 10^{6}$
-parameter 2-D FNO almost two orders of magnitude smaller than the
-end-to-end operator, learns the discretisation residual of a
-deliberately weak $k = 4$ coarse solve --- one sixty-fourth of
-the fine-FD cost --- from a label-free Richardson-extrapolated
-target, with a parameter-free gradient gate that confines the
-neural correction to the under-resolved wavefronts; it cuts the
-canonical-BH bulk-field RMSD
-against the fine-FD reference from $6.95\times 10^{-3}$ on a
-quintic-spline upsampling of the coarse solve to
-$6.85\times 10^{-4}$ (a factor of $10$) and reduces the population
-mean-squared error by a factor of $\sim\!79$; at the QNM
-observer $\xq = 2\,M$ all three sources sit at the same M4
-plateau floor, so the gain is in the global field rather than
-in the single-observer QNM, which the coarse prior
-already resolves.
+Time-domain quasi-normal-mode (QNM) extraction is limited by the
+accuracy of the underlying field solution and by fit-window
+systematics that are rarely quantified. We benchmark
+physics-informed neural networks (PINNs), a Fourier neural
+operator (FNO), and a hybrid surrogate that learns the residual
+of a coarse finite-difference (FD) solve, on the Schwarzschild
+$\ell = 2$ master equations against Leaver's continued-fraction
+values. A faithful, architecture-matched reproduction of the
+most closely comparable prior study --- the only previous
+time-domain PINN treatment of these equations
+\citep{Patel2024pinn} --- reduces its reported field error by an
+order of magnitude on both isospectral potentials;
+residual-greedy sampling and a doubled quasi-Newton budget then
+reach $0.58\%$ relative field error, from which the fundamental
+QNM frequency is recovered to $0.029\%$ using a new plateau-scan
+estimator that quantifies the fit-window systematic and flags
+its own validity. An inverse PINN jointly recovers the
+black-hole mass to $0.34\%$ from noisy observations, after
+isolating an amplitude--damping-time degeneracy of the embedded
+ringdown template. The FNO, trained once over $1{,}000$
+initial-data draws, matches the FD reference's own extraction
+floor at a single forward pass per black hole, and the hybrid
+surrogate reduces the population mean-squared field error by a
+factor of $79$ at one sixty-fourth of the fine-solve cost. The
+plateau estimator, the degeneracy diagnosis and the
+amortisation trade-offs are designed to carry over to Kerr.
 \end{abstract}
 
 % =====================================================================
 \section{Introduction}\label{sec:intro}
 
 The ringdown phase of a perturbed black hole carries a discrete
-spectrum of complex frequencies, the quasi-normal modes (QNMs),
-whose values are fixed by the background geometry alone and so
-provide a direct spectroscopic probe of the underlying spacetime
+spectrum of complex frequencies, the quasi-normal modes (QNMs)
+\citep{Vishveshwara1970}, fixed by the background geometry
+alone and hence a direct spectroscopic probe of the spacetime
 \citep{Berti2009review,KonoplyaZhidenko2011}. The ringdown
-analysis of GW150914 \citep{LIGO2016ringdown} turned QNM-based
-black-hole spectroscopy into an observational discipline.
-Tests of the no-hair conjecture, of general relativity in the
-strong-field regime, and of beyond-GR or environmental
-modifications all turn on how accurately the QNM frequencies are
-extracted from a measured ringdown, and how reliably the
-associated systematics are quantified
-\citep{Berti2007ringdown,Isi2021priors}.
+analysis of GW150914 \citep{LIGO2016ringdown} made QNM
+spectroscopy an observational discipline: tests of the no-hair
+conjecture and of strong-field general relativity turn on how
+accurately the QNM frequencies are extracted and how reliably
+the associated systematics are quantified
+\citep{Berti2007ringdown,Isi2021priors}. In the frequency
+domain, Leaver's continued-fraction method \citep{Leaver1985}
+tabulates QNMs to arbitrary precision and calibrates every
+other approach; in the time domain --- adopted here, mirroring
+gravitational-wave data analysis
+\citep{Buonanno2007ringdown,LIGO2016ringdown,Isi2021priors} ---
+the master equation is integrated numerically and the QNMs are
+read off the late-time waveform by fitting damped sinusoids
+\citep{Berti2009review}.
 
-QNMs are computed in two ways, in the frequency domain and in
-the time domain. In the frequency domain, Leaver's continued-fraction method
-\citep{Leaver1985} and its later refinements tabulate QNMs to
-arbitrary numerical precision for Schwarzschild and Kerr
-backgrounds and serve as the reference values against which any
-other method is calibrated. In the time domain, the master
-equation (the Zerilli equation for even-parity perturbations of a
-Schwarzschild background) is integrated numerically and the QNMs
-are read off the late-time waveform by fitting one or more damped
-sinusoids \citep{Berti2009review}. The time-domain approach more
-closely mirrors how QNMs are extracted from gravitational-wave
-data \citep{Buonanno2007ringdown,LIGO2016ringdown,Isi2021priors},
-and it is the approach we adopt here.
-
-The principal methodological issue in the time-domain pipeline is
-the choice of fit window. The damped-sinusoid template is
-misspecified outside the QNM regime, and the recovered
-$(\omega,\tau)$ then carry a window-dependent bias that does not
-vanish with more data. Existing analyses generally quote a single
-fixed window without a sensitivity scan; in some cases this
-systematic is comparable to the quoted statistical errors
+The principal methodological issue in the time-domain pipeline
+is the choice of fit window: the damped-sinusoid template is
+misspecified outside the QNM regime, so the recovered
+$(\omega,\tau)$ carry a window-dependent bias that no amount of
+data removes and that existing analyses rarely quantify --- in
+some cases comparable to the quoted statistical errors
 \citep{Isi2021priors}.
 
-Physics-informed neural networks \citep{Raissi2017} are a
-mesh-free PDE solver in which a neural network is trained to
-satisfy the equations of motion together with initial and
-boundary conditions through a composite loss. PINNs have been
-applied to the QNM problem on Schwarzschild and Kerr backgrounds
-in both the frequency and time domains; we survey this literature
-in Sec.~\ref{sec:bg-prior}.
+Two limitations of the prior PINN-for-QNM literature
+(Sec.~\ref{sec:bg-pinn}) motivate the present work:
+\citet{Patel2024pinn}, the only prior PINN study of the
+time-domain Zerilli problem, report a $28.06\%$ relative field
+error that dominates their QNM error budget, with a fit window
+fixed by hand; and no prior PINN study recovers the black-hole
+mass and a ringdown template jointly from noisy observations.
 
-Two limitations of that literature motivate the present work.
-First, \citet{Patel2024pinn}, the only prior PINN study of the
-time-domain Zerilli problem, report a relative $L^{2}$ field
-error of $28.06\%$ against their finite-difference reference,
-which dominates the resulting QNM error budget; their fit window
-is also fixed by hand without a sensitivity scan. Second, no
-prior PINN-for-QNM study performs the inverse task of jointly
-recovering the black-hole mass and a damped-sinusoid ringdown
-template from noisy observations of the field. The embedded
-template loss admits an amplitude--damping-time degeneracy that, if
-uncontrolled, biases the learned $\tau$.
+We address both points on the Schwarzschild $\ell = 2$ master
+equations, evaluating five models under a single extraction
+protocol. The architecture-matched reproduction of
+\citet{Patel2024pinn} reduces their reported field errors by an
+order of magnitude on both isospectral potentials
+($28.06\% \to 1.30\%$ Zerilli, $23.59\% \to 2.67\%$
+Regge--Wheeler); the extensions below are reported on the
+Zerilli equation. An enhanced forward PINN --- doubled L-BFGS
+budget and residual-greedy adaptive sampling --- reaches
+$0.58\%$ relative field error, from which a new plateau-scan
+estimator that reports its own fit-window systematic recovers
+the fundamental frequency to $0.029\%$. An inverse PINN with an
+embedded ringdown template jointly recovers the black-hole mass
+to $0.34\%$ from $500$ observations at $1\%$ noise, after an
+analytic and empirical isolation of the template's
+amplitude--damping-time degeneracy; a six-variant ablation
+identifies the configuration that also recovers $\omega$ to
+$0.30\%$ and $\tau$ to $1.6\%$. (A curriculum-learning
+extension of the forward problem does not improve the global
+extraction, Appendix~\ref{sec:res-cur}.) An
+FNO surrogate trained once on $1{,}000$ initial-data draws
+predicts the field for an unseen draw in a single forward pass
+and matches the FD reference's own extraction floor. Finally, a
+hybrid surrogate runs a $1/64$-cost coarse FD solve and trains
+a small FNO on a label-free, Richardson-extrapolated estimate
+of its discretisation error, confined to the under-resolved
+wavefronts by a parameter-free gradient gate; it cuts the
+population field MSE by $79\times$ while no fine-grid field
+enters its training loss.
 
-We address both points with a forward and inverse PINN for the
-Schwarzschild $\ell=2$ Zerilli equation, supplemented by a
-curriculum-learning extension of the forward problem and a
-Fourier neural operator surrogate \citep{Li2021fno,Kovachki2023neuralop}
-trained once over a population of $1{,}000$ initial-data draws.
-For the forward problem we extend the architecture-matched
-\citet{Patel2024pinn} baseline by doubling the number of L-BFGS
-iterations (from $15{,}000$ to $30{,}000$) and adding
-residual-greedy adaptive sampling, reaching relative $L^{2}$
-field error $0.58\%$ against the finite-difference reference, a
-factor of approximately $50$ smaller than the prior work.
-We apply five post-hoc QNM extraction methods to the converged
-network field. Two of them replace the conventional single-window
-fit with a plateau scan (defined in Sec.~\ref{sec:plateau}) over the fit-window edges and report the
-plateau standard deviation $\sigma_\omega$ of $(\omega,\tau)$ as the
-fit-window systematic uncertainty.
-Under this convention the forward PINN
-recovers the fundamental QNM frequency to $0.029\%$. For the inverse problem we train under
-$1\%$ Gaussian observation noise on $500$ field samples, isolate
-the amplitude--damping-time degeneracy of the embedded ringdown template
-analytically and empirically, and adopt a reporting convention
-that extracts $\tau$ post-hoc from the converged network field
-rather than from the learned template scalar. A six-variant
-ablation of the template-loss hyperparameters identifies a
-configuration that recovers the black-hole mass to $0.34\%$,
-$\omega$ to $0.30\%$ with plateau standard deviation
-$\sigma_\omega = 4\times 10^{-5}$, and $\tau$ to $1.6\%$. The
-curriculum-learning extension partitions the temporal domain
-into $K = 2$ or $K = 3$ windows trained sequentially, with the
-trained $k$-th network supplying the initial condition for the
-$(k{+}1)$-th, in both hard-stitched and soft-overlap blended
-forms. The strategy is motivated by the observation that the
-full-domain forward PINN concentrates $\sim\!41\%$ of its RMSD
-on the late-time band $t \in [37.5,50]\,M$, despite that band
-occupying only one quarter of the temporal domain.
-The FNO surrogate, finally, learns the parametric solution
-operator $\mathcal{G}_\theta\colon
-(\Phi_0, \partial_t\Phi_0, V_\ell, M) \mapsto \Phi(x,t)$
-on a $401\times 401$ grid covering
-$(x,t) \in [-50,150]\,M \times [0,100]\,M$ from $1{,}000$
-finite-difference training trajectories. Two QNM-targeted
-loss terms are critical for the QNM accuracy reported above.
-The first is a direct $L^{2}$ supervision on the 1-D observer
-slice $\Phi(\xq,t)$ that the QNM extractor reads. The second is a
-ramp-weighted field $L^{2}$ that puts $\sim 50\times$ more weight
-on the ringdown tail than on the prompt pulse. After amortised
-training the FNO predicts the field for an unseen draw in a
-single forward pass, and the same post-hoc QNM extractors used
-for the PINN modalities apply unchanged.
+A remark on scope. This is a controlled extraction benchmark
+against known continued-fraction reference values, not an
+observational pipeline: the fields are simulated, the ground
+truth is known, and the objective is the accuracy with which
+each model recovers it. Observer position and extraction window
+are configuration parameters of the benchmark, fixed per
+pipeline by a validity criterion evaluated on the FD reference
+alone (the plateau flag of Sec.~\ref{sec:plateau}), never by
+proximity of any extracted value to the known answer.
 
-The remainder of the paper is organised as follows.
-Section~\ref{sec:background} reviews the Schwarzschild perturbation
-problem, the standard QNM extraction methods, the PINN framework,
-and the prior PINN-for-QNM literature. Section~\ref{sec:methods}
-states the forward, inverse and curriculum PINNs, the
-end-to-end FNO surrogate, and the hybrid coarse-FD +
-neural-residual surrogate, and defines the five extraction
-methods.
-Section~\ref{sec:results} reports the forward PINN field accuracy,
-the six inverse PINN variants, the three curriculum PINN variants,
-the end-to-end FNO surrogate on a canonical BH and on a $100$-BH
-population including a three-version loss-design ablation, and
-the hybrid surrogate on a canonical BH and on a $100$-BH
-in-distribution test set.
-Section~\ref{sec:discussion} discusses the relation to prior work,
-the role of the plateau as a quality diagnostic, the residual
-gap between forward and inverse precision, why the
-curriculum extension fails to improve on the single-window
-baseline, and the position of the FNO surrogate within the
-four-way modality comparison.
-Section~\ref{sec:conclusion} concludes. Full hyperparameter tables
-and per-window extraction tables are collected in the appendices.
+The remainder of this section reviews the perturbation problem,
+time-domain extraction, and the prior machine-learning
+literature. Section~\ref{sec:methods} states the five models
+and the extraction protocol, Sec.~\ref{sec:results} reports
+their results, Sec.~\ref{sec:discussion} discusses them, and
+Sec.~\ref{sec:conclusion} concludes; hyperparameter tables and
+supporting scans are collected in the appendices.
 
-% =====================================================================
-\section{Background and related work}\label{sec:background}
-
-\subsection{Schwarzschild perturbations and the QNM spectrum}
+\subsection{Schwarzschild QNMs and time-domain extraction}
 \label{sec:bg-zerilli}
 
 Throughout this paper we work with a non-rotating, uncharged,
@@ -304,67 +217,35 @@ Schwarzschild line element
 in geometric units $G = c = 1$. The horizon is at $r = 2M$ and
 spatial infinity at $r \to \infty$.
 
-The ringdown of the black hole is described by small perturbations
-of Eq.~\eqref{eq:schwarzschild}. We write the perturbed metric as
-$g_{\mu\nu} = g_{\mu\nu}^{\mathrm{Schw}} + h_{\mu\nu}$ with
-$|h_{\mu\nu}| \ll |g_{\mu\nu}^{\mathrm{Schw}}|$, keep only terms
-linear in $h_{\mu\nu}$ in the vacuum Einstein equations
-$R_{\mu\nu}[g] = 0$, and look for the dynamics of $h_{\mu\nu}$ on
-the fixed Schwarzschild background
-\citep{ReggeWheeler1957,Berti2009review}. Because the background
-is spherically symmetric, every component of $h_{\mu\nu}$ admits
-a tensor-spherical-harmonic expansion of the schematic form
+The ringdown is described by linear perturbations
+$g_{\mu\nu} = g_{\mu\nu}^{\mathrm{Schw}} + h_{\mu\nu}$ of
+Eq.~\eqref{eq:schwarzschild}, expanded in tensor spherical
+harmonics,
 \begin{equation}
   h_{\mu\nu}(t,r,\theta,\varphi)
   \;=\; \sum_{\ell, m}
   h_{\mu\nu}^{(\ell m)}(t,r)\;Y^{(\ell m)}_{\mu\nu}(\theta,\varphi),
   \label{eq:harmonic-expansion}
 \end{equation}
-where $Y^{(\ell m)}_{\mu\nu}$ denotes the appropriate set of
-tensor harmonics on the unit two-sphere
-\citep{ReggeWheeler1957,Berti2009review}. Substituting
-Eq.~\eqref{eq:harmonic-expansion} into the linearised vacuum
-equations decouples them between distinct $(\ell, m)$. Within
-each $(\ell, m)$ the system further decouples by parity. Under
-the reflection $(\theta,\varphi)\to(\pi-\theta,\varphi+\pi)$
-the tensor harmonics split into two classes,
-\begin{equation}
-  \mathcal{P}\,h_{\mu\nu}^{\mathrm{axial}} \;=\; (-1)^{\ell+1}\,h_{\mu\nu}^{\mathrm{axial}},
-  \qquad
-  \mathcal{P}\,h_{\mu\nu}^{\mathrm{polar}} \;=\; (-1)^{\ell}\,h_{\mu\nu}^{\mathrm{polar}},
-  \label{eq:parity}
-\end{equation}
-the \emph{axial} (odd-parity) and \emph{polar} (even-parity)
-sectors. Since the background and the linearised operator
-commute with $\mathcal{P}$, the two sectors are independent and
-are analysed separately.
-
-General relativity has gauge freedom, so the components of
-$h_{\mu\nu}$ can be changed by an infinitesimal coordinate
-transformation $x^{\mu} \to x^{\mu} + \xi^{\mu}$ that induces
-$h_{\mu\nu} \to h_{\mu\nu} - \nabla_{\mu}\xi_{\nu} - \nabla_{\nu}\xi_{\mu}$ without changing any physical quantity. The
-physical content of each sector is captured by a single
-gauge-invariant scalar function of $(t,r)$, constructed from the
-metric perturbation components. For the polar sector, in the
-Regge--Wheeler gauge the perturbation is described by four metric
-functions $H_0, H_1, H_2, K$ of $(t,r)$ at each $(\ell, m)$; the
-linearised vacuum Einstein equations relate them algebraically
-and reduce the dynamics to a single gauge-invariant scalar
-$\Phi(t,r)$ via the Moncrief construction
-\citep{Moncrief1974,Berti2009review,KonoplyaZhidenko2011}. The
-full metric perturbation is reconstructed from $\Phi$ via
+which decouples the linearised vacuum equations between
+multipoles $(\ell, m)$ and, under parity, between the
+\emph{axial} (odd) and \emph{polar} (even) sectors
+\citep{ReggeWheeler1957,Berti2009review}. Each sector reduces
+to a single gauge-invariant master scalar $\Phi(t,r)$ --- for
+the polar sector via the Moncrief reduction
+\citep{Moncrief1974} --- from which the metric perturbation is
+reconstructed as
 \begin{equation}
   h_{\mu\nu}(t,r,\theta,\varphi)
   \;=\; \frac{1}{r}\sum_{\ell, m}
   \Phi^{(\ell m)}(t,r)\;
-  T^{(\ell m)}_{\mu\nu}(\theta,\varphi),
+  T^{(\ell m)}_{\mu\nu}(\theta,\varphi)
   \label{eq:moncrief-ansatz}
 \end{equation}
-where $T^{(\ell m)}_{\mu\nu}$ is a known tensor-harmonic
-template \citep{Moncrief1974,Berti2009review}. For the axial
-sector the analogous reduction yields the
-Regge--Wheeler equation; for the polar sector it yields the
-Zerilli equation. Both equations take the form
+with $T^{(\ell m)}_{\mu\nu}$ a known tensor-harmonic template.
+The axial reduction yields the Regge--Wheeler equation and the
+polar reduction the Zerilli equation
+\citep{Zerilli1970,Chandrasekhar1975}; both take the form
 \begin{equation}
   \partial_{t}^{2}\Phi
   - \partial_{x}^{2}\Phi
@@ -379,20 +260,10 @@ in the tortoise coordinate $x$, defined by
   x \;=\; r + 2M\,\ln\!\left(\frac{r}{2M} - 1\right).
   \label{eq:tortoise}
 \end{equation}
-The reason for the change of variable in Eq.~\eqref{eq:tortoise}
-is that the curved-background wave operator acting on $\Phi(t,r)$
-contains a position-dependent factor $f(r)$,
-$g^{\mu\nu}\partial_{\mu}\partial_{\nu}\Phi
-= -f^{-1}\partial_{t}^{2}\Phi + f\,\partial_{r}^{2}\Phi + \ldots$,
-and the substitution $\partial_{r} = f^{-1}\partial_{x}$ converts
-$f\,\partial_{r}^{2}$ into $f^{-1}\partial_{x}^{2}$ up to lower
-order terms that are absorbed into the effective potential. Multiplying through by
-$-f$ then leaves the d'Alembertian in the flat 1+1 form
-$-\partial_{t}^{2} + \partial_{x}^{2}$ that appears in
-Eq.~\eqref{eq:zerilli}. Eq.~\eqref{eq:tortoise} sends the horizon
-at $r = 2M$ to $x \to -\infty$ and leaves spatial infinity at
-$x \to +\infty$, so the physical region $r > 2M$ maps onto the
-full real line in $x$. The Zerilli potential for the polar sector
+The substitution absorbs the metric factor $f(r)$, leaving the
+flat-space d'Alembertian of Eq.~\eqref{eq:zerilli}, and sends
+the horizon to $x \to -\infty$, so the exterior $r > 2M$ covers
+the full real line. The Zerilli potential for the polar sector
 at multipole $\ell$ is
 \begin{equation}
   V_{\ell}^{\mathrm{Z}}(r) \;=\;
@@ -402,10 +273,7 @@ at multipole $\ell$ is
   \qquad n \;\equiv\; \tfrac{1}{2}(\ell - 1)(\ell + 2),
   \label{eq:V-zerilli}
 \end{equation}
-and vanishes both at the horizon and at infinity, since
-$f(2M) = 0$ at the horizon and $f \to 1$ with $V \sim r^{-2}$ at
-infinity \citep{Berti2009review}. Quantitatively, the
-asymptotic behaviour is
+and vanishes in both asymptotic regions,
 \begin{equation}
   V_{\ell}^{\mathrm{Z}}(r(x)) \;\sim\;
   \begin{cases}
@@ -414,27 +282,20 @@ asymptotic behaviour is
       & x \to +\infty,\\[2pt]
     \;\propto\; e^{x/(2M)}
       \;\xrightarrow[x\to-\infty]{}\; 0,
-      & x \to -\infty.
+      & x \to -\infty,
   \end{cases}
   \label{eq:V-asymptotic}
 \end{equation}
-In both asymptotic regions Eq.~\eqref{eq:zerilli} therefore
-reduces to the free wave equation
-$(\partial_{t}^{2} - \partial_{x}^{2})\Phi = 0$, whose general
-solution is a sum of left- and right-movers,
-$\Phi(t,x) = F(t-x) + G(t+x)$. Equation~\eqref{eq:zerilli} is
-therefore a wave equation on a finite-height potential barrier
-centred near $r \simeq 3M$, the photon-sphere radius for
-Schwarzschild, with free propagation on either side; this
-barrier is what gives the QNM spectrum its
-characteristic ringdown structure. Figure~\ref{fig:bg-potential}
-shows $V_{\ell}^{\mathrm{Z}}(r(x))$ as a function of the tortoise
-coordinate for $\ell = 2, 3, 4$, and Figure~\ref{fig:bg-tortoise}
-shows the tortoise map $r(x)$ used in
-Eqs.~\eqref{eq:zerilli}--\eqref{eq:tortoise}. The present paper
-studies the \emph{polar} ($\ell = 2$) sector and uses
-Eq.~\eqref{eq:V-zerilli} throughout. We adopt $M = 1$ as our unit
-of mass and time.
+so Eq.~\eqref{eq:zerilli} is a wave equation on a finite
+barrier peaked near the photon sphere $r \simeq 3M$
+(Figs.~\ref{fig:bg-potential} and~\ref{fig:bg-tortoise}), with
+free propagation on either side --- the barrier that gives the
+ringdown its QNM structure. This paper studies the polar
+$\ell = 2$ sector with $M = 1$ as the unit of mass and time;
+the classical reduction to the master equations
+\citep{ReggeWheeler1957,Zerilli1970,Moncrief1974,Chandrasekhar1975}
+is used as stated, with a self-contained derivation reproduced
+in the repository documentation.
 
 \begin{figure}[!htbp]
 \centering
@@ -454,75 +315,47 @@ of mass and time.
   \includegraphics[width=\linewidth]{../outputs/background/tortoise_map.pdf}
   \caption{Tortoise map $r(x)$ for Schwarzschild,
   Eq.~\eqref{eq:tortoise}. The horizon at $r = 2M$ is pushed to
-  $x \to -\infty$, and $r(x) \to x$ at large $x$. The QNM
-  observer position used throughout this paper,
-  $\xq = 10\,M$, lies in the asymptotic region.}
+  $x \to -\infty$, and $r(x) \to x$ at large $x$. The PINN
+  observer position $\xq = 10\,M$ lies in the asymptotic
+  region; the surrogate sections extract at $\xq = 2\,M$,
+  adjacent to the barrier peak.}
   \label{fig:bg-tortoise}
 \end{minipage}
 \end{figure}
 
-A quasi-normal mode is a solution of Eq.~\eqref{eq:zerilli} of
-separated form $\Phi(t,x) = \mathrm{e}^{-\mathrm{i}\omega t}\,
-\psi(x)$. Substituting this ansatz turns Eq.~\eqref{eq:zerilli}
-into the time-independent Schr\"odinger-like equation
+A quasi-normal mode is a separated solution
+$\Phi(t,x) = \mathrm{e}^{-\mathrm{i}\omega t}\,\psi(x)$ of
+Eq.~\eqref{eq:zerilli}, which turns it into the
+time-independent Schr\"odinger-like equation
 \begin{equation}
   \frac{\mathrm{d}^{2}\psi}{\mathrm{d}x^{2}}
   + \bigl(\omega^{2} - V_{\ell}(r(x))\bigr)\psi(x) \;=\; 0.
   \label{eq:zerilli-freq}
 \end{equation}
-In the asymptotic regions where $V_{\ell} \to 0$,
-Eq.~\eqref{eq:zerilli-freq} reduces to
-$\psi'' + \omega^{2}\psi = 0$ with general solution
-$\psi(x) = a_{\pm}\,\mathrm{e}^{+\mathrm{i}\omega x}
-+ b_{\pm}\,\mathrm{e}^{-\mathrm{i}\omega x}$. Combined with the
-time factor $\mathrm{e}^{-\mathrm{i}\omega t}$, the basis
-$\mathrm{e}^{-\mathrm{i}\omega(t \mp x)}$ describes waves moving
-to the right (sign $-$) or to the left (sign $+$). The QNM
-boundary conditions select the modes that are purely ingoing at
-the horizon (left-moving as $x \to -\infty$) and purely outgoing
-at infinity (right-moving as $x \to +\infty$),
+In the asymptotic regions Eq.~\eqref{eq:zerilli-freq} has
+plane-wave solutions $\mathrm{e}^{\pm\mathrm{i}\omega x}$, and
+the QNM boundary conditions select modes purely ingoing at the
+horizon and purely outgoing at infinity,
 \begin{equation}
   \psi(x) \;\to\; \mathrm{e}^{-\mathrm{i}\omega x}\;\;(x \to -\infty),
   \qquad
-  \psi(x) \;\to\; \mathrm{e}^{+\mathrm{i}\omega x}\;\;(x \to +\infty),
+  \psi(x) \;\to\; \mathrm{e}^{+\mathrm{i}\omega x}\;\;(x \to +\infty).
   \label{eq:qnm-bc}
 \end{equation}
-with no incoming radiation from either asymptotic region
-\citep{Berti2009review,KonoplyaZhidenko2011}. The boundary
-conditions Eq.~\eqref{eq:qnm-bc} state that radiation is allowed
-to leave through both ends but never to enter; energy is
-therefore continuously lost from the system, and the associated
-linear operator is non-Hermitian. Non-Hermitian eigenvalue
-problems do not in general have real eigenvalues, and the
-spectrum $\{\omega_{n}\}$ of admissible frequencies is instead
-discrete and complex,
+Radiation leaves but never enters, so the operator is
+non-Hermitian and the admissible frequencies form a discrete
+complex spectrum \citep{Berti2009review,KonoplyaZhidenko2011},
 \begin{equation}
   \omega_{n} \;=\; \omega_{n}^{R} - \mathrm{i}/\tau_{n},
   \qquad \omega_{n}^{R}, \tau_{n} > 0,
   \label{eq:qnm-omega}
 \end{equation}
 ordered by overtone index $n = 0, 1, 2, \ldots$ in increasing
-imaginary part. The real part $\omega_{n}^{R}$ is the oscillation
-frequency of the mode and the imaginary part sets the damping
-time $\tau_{n}$, the e-folding time over which the mode
-amplitude decays. Substituting Eq.~\eqref{eq:qnm-omega} into
-$\Phi = \mathrm{e}^{-\mathrm{i}\omega_{n} t}\psi_{n}(x)$ gives
-$\Phi \propto \mathrm{e}^{-t/\tau_{n}}\,\mathrm{e}^{-\mathrm{i}\omega_{n}^{R} t}\psi_{n}(x)$,
-and taking the real part with an arbitrary complex amplitude
-$A_{n}\,\mathrm{e}^{\mathrm{i}\phi_{n}}\psi_{n}(\xq)$ yields the
-real damped sinusoid
-$A_{n}\,\mathrm{e}^{-t/\tau_{n}}\cos(\omega_{n}^{R} t + \phi_{n})$
-at the observer position. The time-domain field at a fixed
-observer position is, in the QNM regime (after the prompt
-response of the initial data and before the late-time power-law
-tail), well approximated by a sum of these damped sinusoids,
-$\Phi(\xq, t) \approx \sum_n A_n e^{-(t-t_0)/\tau_n}
-\cos(\omega_n^R(t-t_0) + \phi_n)$. This representation is the
-basis for every extraction method discussed below.
+imaginary part: the real part is the oscillation frequency, the
+imaginary part the damping rate.
 
-\label{sec:bg-spectrum}
-For Schwarzschild $\ell = 2$ the fundamental QNM ($n = 0$) and the
-first overtone ($n = 1$) have the values
+For Schwarzschild $\ell = 2$ the fundamental ($n = 0$) and
+first overtone ($n = 1$) are
 \begin{equation}
   M\omega_{0} = 0.3737, \quad \tau_{0}/M = 11.241,
   \qquad
@@ -530,87 +363,44 @@ first overtone ($n = 1$) have the values
   \label{eq:qnm-ref}
 \end{equation}
 computed to arbitrary numerical precision by Leaver's
-continued-fraction method \citep{Leaver1985} and tabulated in the
-review of \citet{Berti2009review}. These are the reference values
-against which every extraction reported in this paper is
-benchmarked. Physically, the fundamental $\ell = 2$ mode is the
-dominant component of the ringdown signal observed in
-binary-black-hole mergers and is the primary target of
-black-hole spectroscopy
-\citep{Buonanno2007ringdown,LIGO2016ringdown,Isi2021priors}; the
-first overtone enters the analysis at sufficient signal-to-noise
-ratio and is the next target.
+continued-fraction method \citep{Leaver1985} and tabulated by
+\citet{Berti2009review}; every extraction reported in this
+paper is benchmarked against them. The fundamental $\ell = 2$
+mode dominates the observed ringdown of binary mergers and is
+the primary spectroscopy target; the first overtone enters at
+sufficient signal-to-noise ratio
+\citep{Buonanno2007ringdown,LIGO2016ringdown,Isi2021priors}.
+WKB expansions
+\citep{SchutzWill1985,IyerWill1987,Konoplya2003wkb} and the
+asymptotic-iteration method \citep{Cho2010aim} provide
+semi-analytic alternatives \citep{Leaver1985,Nollert1993}.
 
-\label{sec:bg-methods}
-Frequency-domain methods compute the QNM spectrum of
-Eq.~\eqref{eq:qnm-bc} from the master equation directly. The
-semi-analytic WKB approximation, originally due to
-\citet{SchutzWill1985} and extended to higher orders by
-\citet{IyerWill1987} and \citet{Konoplya2003wkb}, expands
-$\psi(x)$ around the peak of $V_{\ell}$ and produces closed-form
-expressions for $\omega_{n}$ that are accurate at low overtone
-index but degrade for $n \gtrsim \ell$. The asymptotic-iteration
-method (AIM) of \citet{Cho2010aim} recasts the time-independent
-form of Eq.~\eqref{eq:zerilli} as a two-term recursion whose
-fixed point yields $\omega_{n}$, with accuracy comparable to CFM
-on Schwarzschild and Kerr. Leaver's continued-fraction method
-(CFM) \citep{Leaver1985}, refined by \citet{Nollert1993}, expresses
-$\psi(x)$ as a power series at the horizon whose coefficients
-satisfy a three-term recursion; the QNM condition becomes a
-continued-fraction equation that can be solved to arbitrary
-numerical precision and produces the reference values quoted in
-Eq.~\eqref{eq:qnm-ref}.
-
-In the time domain the master equation Eq.~\eqref{eq:zerilli} is
-integrated forward from prescribed initial data and the QNMs are
-read off the late-time waveform $\Phi(\xq, t)$ at a fixed observer
-position $\xq$ by fitting one or more damped sinusoids using a
-spectral, nonlinear-least-squares, or signal-subspace estimator;
-the Prony \citep{Berti2007prony}, matrix-pencil
-\citep{HuaSarkar1990} and ESPRIT \citep{Roy1989esprit} methods are
-the principal subspace variants. The estimators M1--M5 introduced
-in Sec.~\ref{sec:qnm-methods} all belong to this time-domain
-family. This is the approach the present paper follows, and the
-one that mirrors how QNMs are recovered from gravitational-wave
-data \citep{Buonanno2007ringdown,LIGO2016ringdown,Isi2021priors}.
-
-\subsection{Time-domain QNM extraction and the fit-window problem}
 \label{sec:bg-extraction}
-
-A ringdown waveform $\Phi(\xq, t)$ measured at fixed observer
-position is, in the QNM regime, a sum of damped sinusoids
+A ringdown waveform $\Phi(\xq, t)$ measured at a fixed observer
+is, between the prompt response and the late-time power-law
+tail \citep{Berti2009review}, a sum of damped sinusoids
 \begin{equation}
   \Phi(\xq, t) \;\approx\;
   \sum_{n} A_n\,\mathrm{e}^{-(t-t_0)/\tau_n}
   \cos\bigl(\omega_n^{R}(t-t_0) + \phi_n\bigr),
   \label{eq:qnm-template}
 \end{equation}
-plus a prompt response at early times and a power-law tail at
-late times \citep{Berti2009review}. Three families of methods
-recover $(\omega_n,\tau_n)$ from samples of $\Phi$. Spectral
-methods locate $\omega_n^{R}$ as peaks in the discrete Fourier
-transform of $\Phi$ inside the QNM regime and recover $\tau_n$
-from the linear slope of $\log|\Phi|$ versus $t$
-\citep{Berti2009review}. The latter follows by isolating the
-fundamental mode at late times in Eq.~\eqref{eq:qnm-template},
-$|\Phi(\xq,t)| \approx A_{0}\,e^{-(t-t_{0})/\tau_{0}}$ at the
-local extrema of the cosine, so that
+Three families of methods recover $(\omega_n,\tau_n)$ from
+samples of $\Phi$. Spectral methods locate $\omega_n^{R}$ as
+peaks in the discrete Fourier transform and recover $\tau_n$
+from the log-envelope slope at the waveform extrema,
 \begin{equation}
   \log|\Phi(\xq, t_k)| \;\approx\;
-  \log A_{0} - \frac{t_k - t_0}{\tau_{0}}
+  \log A_{0} - \frac{t_k - t_0}{\tau_{0}}.
   \label{eq:logline}
 \end{equation}
-is linear in $t_k$ at the peak times $\{t_k\}$, and a least-squares
-straight-line fit returns $\tau_{0}$ as the negative reciprocal
-slope. Nonlinear least squares (NLS) methods fit
-Eq.~\eqref{eq:qnm-template} directly, jointly optimising the
-amplitudes, phases, frequencies and decay times for a
-user-specified number of modes \citep{Buonanno2007ringdown}.
-Subspace methods such as ESPRIT \citep{Roy1989esprit} treat the
-sampled waveform as the output of a linear time-invariant system
-whose poles encode $(\omega_n,\tau_n)$. Concretely, the analytic
-signal sampled at uniform spacing $\Delta t$ is modelled as a sum
-of complex exponentials,
+Nonlinear least squares (NLS) fits Eq.~\eqref{eq:qnm-template}
+directly, jointly optimising amplitudes, phases, frequencies
+and decay times for a user-specified number of modes
+\citep{Buonanno2007ringdown}. Subspace methods --- Prony
+\citep{Berti2007prony}, matrix-pencil \citep{HuaSarkar1990} and
+ESPRIT \citep{Roy1989esprit} --- model the uniformly sampled
+analytic signal as a sum of complex exponentials,
 \begin{equation}
   \Phi(\xq, k\Delta t)
   \;\approx\; \sum_{n=0}^{K-1} c_{n}\, z_{n}^{\,k},
@@ -618,35 +408,23 @@ of complex exponentials,
   z_{n} \;=\; e^{(-1/\tau_{n} + \mathrm{i}\omega_{n}^{R})\Delta t},
   \label{eq:esprit-model}
 \end{equation}
-with complex amplitudes $c_n$. The poles $\{z_{n}\}$ are recovered
-by a generalised eigendecomposition of a Hankel data matrix built
-from the samples \citep{Roy1989esprit,HuaSarkar1990}, after which
-$(\omega_{n}^{R},\tau_{n})$ are read off via
-$\omega_{n}^{R} = \Im(\log z_{n})/\Delta t$ and
-$\tau_{n} = -\Delta t/\Re(\log z_{n})$, without a nonlinear
-optimisation. All three families share a single
-hyperparameter that dominates the systematic error budget, namely
-the choice of fit window $[t_0, \tend]$. Outside the
-QNM regime the template of Eq.~\eqref{eq:qnm-template} is
-misspecified, and the recovered $(\omega_n,\tau_n)$ carry a
-window-dependent bias that does not vanish with more data.
-Existing analyses generally quote a single fixed window and do
-not scan its edges
-\citep{Buonanno2007ringdown,LIGO2016ringdown}; in the
-gravitational-wave data analysis literature this issue is known
-and has been addressed by Bayesian priors over the start time
-\citep{Isi2021priors}, but a deterministic plateau-based
-diagnostic reported alongside the primary estimate is not in
-common use. Sections~\ref{sec:qnm-methods} and \ref{sec:plateau}
-introduce five concrete estimators (M1: FFT plus log-line fit;
-M2: nonlinear least squares; M3: ESPRIT; M4: 1-D plateau scan over
-$t_0$; M5: 2-D plateau scan over $(t_0,\tend)$),
-of which M4 and M5 implement
+and recover the poles $z_{n}$ --- hence
+$(\omega_{n}^{R},\tau_{n})$ --- from a generalised
+eigendecomposition of a Hankel data matrix, without nonlinear
+optimisation. All three families share the hyperparameter that
+dominates the systematic error budget: the fit window
+$[t_0, \tend]$. Existing analyses generally quote a single
+fixed window \citep{Buonanno2007ringdown,LIGO2016ringdown};
+Bayesian priors over the start time address the issue
+probabilistically \citep{Isi2021priors}, but a deterministic
+plateau-based diagnostic reported alongside the primary
+estimate is not in common use. Methods M4 and M5
+(Secs.~\ref{sec:qnm-methods}--\ref{sec:plateau}) implement
 plateau scans over the start time alone and over both window
-edges respectively, and report the plateau standard deviation
-$\sigma_\omega$ as a fit-window systematic uncertainty. Figure~\ref{fig:bg-plateau-cartoon}
-illustrates the qualitative shape of $\omega(t_0)$ that motivates
-the plateau construction.
+edges respectively, reporting the plateau standard deviation
+$\sigma_\omega$ as a fit-window systematic uncertainty;
+Fig.~\ref{fig:bg-plateau-cartoon} illustrates the shape of
+$\omega(t_0)$ that motivates the construction.
 
 \begin{figure}[!htbp]
 \centering
@@ -710,196 +488,53 @@ Eq.~\eqref{eq:qnm-ref}.}
 \subsection{PINNs and prior PINN-for-QNM work}
 \label{sec:bg-pinn}
 
-A physics-informed neural network \citep{Raissi2017} is a
-mesh-free PDE solver. The candidate solution is a neural network
-$\Phi_\theta(x,t)$ with trainable parameters $\theta$, and
-$\theta$ is tuned so that $\Phi_\theta$ satisfies the PDE
-together with its initial and boundary conditions. Concretely,
-for a PDE written in residual form
-$\mathcal{N}[\Phi](x,t) = 0$, where $\mathcal{N}$ is a (possibly
-nonlinear) differential operator (for the Zerilli problem of
-Eq.~\eqref{eq:zerilli}, $\mathcal{N}[\Phi] \equiv \partial_{t}^{2}\Phi - \partial_{x}^{2}\Phi + V_{\ell}\,\Phi$),
-the pointwise residual
-\begin{equation}
-  r_{\theta}(x,t) \;\equiv\; \mathcal{N}[\Phi_{\theta}](x,t)
-  \label{eq:pinn-residual-bg}
-\end{equation}
-is evaluated at a finite set of \emph{collocation points}
-$\{(x_i, t_i)\}_{i=1}^{N_r}$ sampled from the spacetime domain.
-The fit is made quantitative by a composite loss
-\begin{equation}
-  \mathcal{L}(\theta) \;=\;
-  \lambda_{\mathrm{pde}}\,\mathcal{L}_{\mathrm{pde}}
-  + \lambda_{\mathrm{ic}}\,\mathcal{L}_{\mathrm{ic}}
-  + \lambda_{\mathrm{bc}}\,\mathcal{L}_{\mathrm{bc}},
-  \label{eq:pinn-loss-bg}
-\end{equation}
-in which the PDE term is the mean squared residual on the
-interior collocation set,
-\begin{equation}
-  \mathcal{L}_{\mathrm{pde}}(\theta)
-  \;=\; \frac{1}{N_r}\sum_{i=1}^{N_r} r_{\theta}(x_i, t_i)^{2},
-  \label{eq:pinn-pde-loss-bg}
-\end{equation}
-and $\mathcal{L}_{\mathrm{ic}}, \mathcal{L}_{\mathrm{bc}}$ are
-the analogous mean squared residuals of the IC and BC operators
-on collocation points sampled at $t = 0$ and at the spatial
-boundaries respectively. The weights $\lambda_*$ balance the
-three contributions and are themselves a hyperparameter; their
-choice and the gradient pathologies that follow when they are
-badly balanced are an active area of PINN research
-\citep{Wang2021gradientpath,Wang2022ntk,McClenny2023sapinn}.
-
-The spatial and temporal derivatives that appear in
-$\mathcal{L}_{\mathrm{pde}}$ are obtained by
-\emph{automatic differentiation}, which propagates exact
-analytic derivatives through the chain of operations that defines
-$\Phi_\theta$. Concretely, if $\Phi_\theta = f_{L} \circ f_{L-1} \circ \cdots \circ f_{1}(x,t)$ is the composition of
-layers $f_{\ell}(z) = \sigma(W_{\ell} z + b_{\ell})$, then any
-derivative such as $\partial_{t}^{2}\Phi_{\theta}$ is obtained by
-repeated application of the chain rule through the layers, with
-the Jacobians of each $f_{\ell}$ stored during the forward pass
-\citep{Baydin2018ad}. No spatial mesh is required and no truncation
-error is introduced at the level of the derivatives, in contrast
-to finite-difference solvers; the only discretisation error comes
-from the finite collocation set. The same property makes the
-framework apply unchanged to nonlinear and high-dimensional
-problems.
-
-The loss Eq.~\eqref{eq:pinn-loss-bg} is non-convex in $\theta$
-and is typically minimised in two phases. A first-order optimiser
-(Adam, \citealt{Kingma2015adam}) takes stochastic gradient steps
-from the random initialisation and brings the network into a
-basin of low loss. A quasi-Newton optimiser (L-BFGS,
-\citealt{Liu1989lbfgs}) then uses an approximation to the loss
-Hessian, built from a few past gradients, to take much larger
-steps inside that basin and reduce the residual by several
-further orders of magnitude on smooth PDE problems; the trade-off
-is that L-BFGS requires a near-quadratic local landscape and
-therefore needs the Adam phase first. Two further refinements
-are now standard. Gradient-enhanced PINNs (gPINN,
-\citealt{Yu2022gpinn}) add a residual on the gradient of the
-PDE residual, $\nabla \mathcal{R}_{\mathrm{pde}}$, which forces
-the residual not only to be small in absolute value but also to
-vary smoothly across the domain, suppressing the
-fit-the-residual-by-oscillation pathology of plain PINNs on
-stiff problems. Residual-adaptive (RAR/RAD) sampling
-\citep{Wu2023adaptive} concentrates collocation points where
-the current PDE residual is largest. On wave-like equations the
-residual is concentrated along the wavefront, so uniform sampling
-wastes collocation budget on the quiescent region behind the
-pulse; RAR moves points to where they are needed and empirically
-outperforms uniform random sampling on this class of problems.
-Mature implementations such as DeepXDE \citep{Lu2021deepxde}
-expose all of these features as standard options.
-The generic PINN data flow is summarised in
-Fig.~\ref{fig:bg-pinn-arch}; the specific architecture used in
-this work is given in Fig.~\ref{fig:fwd-pinn-arch} of
-Sec.~\ref{sec:fwd-pinn}.
-
-\begin{figure}[!htbp]
-\centering
-\begin{tikzpicture}[
-  node distance=10mm and 12mm,
-  every node/.style={font=\small},
-  inp/.style={circle, draw, fill=blue!10, minimum size=8mm, inner sep=0pt},
-  mlp/.style={rectangle, draw, fill=gray!12, rounded corners=2pt,
-              minimum width=24mm, minimum height=24mm, align=center,
-              inner sep=2pt},
-  outn/.style={circle, draw, fill=orange!20, minimum size=8mm, inner sep=0pt},
-  loss/.style={rectangle, draw, fill=green!10, rounded corners=2pt,
-               minimum height=7mm, minimum width=22mm, inner sep=2pt,
-               align=center, font=\footnotesize},
-  arr/.style={->, >=stealth, thick, black},
-]
-  % Inputs
-  \node[inp] (x) {$\boldsymbol{x}$};
-  \node[inp, below=6mm of x] (t) {$t$};
-
-  % MLP block
-  \node[mlp, right=12mm of x, yshift=-7mm] (mlp)
-    {fully-connected\\$\tanh$ MLP\\$f_\theta$};
-
-  % Output
-  \node[outn, right=12mm of mlp] (phi) {$u_\theta$};
-
-  % Loss boxes on the right
-  \node[loss, right=14mm of phi, yshift=14mm] (lpde)
-    {PDE residual\\$\mathcal{N}[u_\theta]\!=\!0$};
-  \node[loss, right=14mm of phi] (lic)
-    {initial condition};
-  \node[loss, right=14mm of phi, yshift=-14mm] (lbc)
-    {boundary condition};
-
-  % Edges
-  \draw[arr] (x.east) -- (mlp.west|-x.east);
-  \draw[arr] (t.east) -- (mlp.west|-t.east);
-  \draw[arr] (mlp) -- (phi);
-  \draw[arr] (phi) -- (lpde) node[midway, above, font=\scriptsize, sloped] {AD};
-  \draw[arr] (phi) -- (lic);
-  \draw[arr] (phi) -- (lbc);
-
-  % Sum to total loss
-  \node[loss, fill=green!25, right=10mm of lic] (ltot)
-    {$\mathcal{L}_{\mathrm{tot}}$};
-  \draw[arr] (lpde) -| (ltot);
-  \draw[arr] (lic) -- (ltot);
-  \draw[arr] (lbc) -| (ltot);
-\end{tikzpicture}
-\caption{Generic PINN data flow. Spatial and temporal coordinates
-$(\boldsymbol{x},t)$ are passed through a fully-connected
-$\tanh$ MLP $f_\theta$ producing a scalar field
-$u_\theta(\boldsymbol{x},t)$. Automatic differentiation (AD) of
-$u_\theta$ with respect to its inputs supplies the derivatives
-needed for the PDE residual $\mathcal{N}[u_\theta]$, while
-initial and boundary residuals enter as additional terms in the
-weighted total loss $\mathcal{L}_{\mathrm{tot}}$. Concrete loss
-weights and layer widths are problem-specific; the
-$[80,40,20,10]$ network and seven-term loss used in this work
-are detailed in Sec.~\ref{sec:fwd-pinn} and Fig.~\ref{fig:fwd-pinn-arch}.}
-\label{fig:bg-pinn-arch}
-\end{figure}
+A physics-informed neural network (PINN) \citep{Raissi2017} is
+a mesh-free PDE solver: a network $\Phi_\theta(x,t)$ is trained
+to minimise a weighted composite of mean-squared PDE,
+initial-condition and boundary-condition residuals on sampled
+collocation points, with all derivatives supplied exactly by
+automatic differentiation \citep{Baydin2018ad} and
+residual-weight balancing an active research area
+\citep{Wang2021gradientpath,Wang2022ntk,McClenny2023sapinn};
+the concrete seven-term loss used in this work is
+Eq.~\eqref{eq:loss-fwd} of Sec.~\ref{sec:fwd-pinn}
+(Fig.~\ref{fig:fwd-pinn-arch}). Training standardly proceeds in
+two phases --- Adam \citep{Kingma2015adam}, then L-BFGS
+\citep{Liu1989lbfgs} to exploit the near-quadratic local
+landscape --- and two refinements are relevant here:
+gradient-enhanced PINNs penalise the gradient of the PDE
+residual so that it vanishes smoothly \citep{Yu2022gpinn}, and
+residual-adaptive sampling concentrates collocation points
+where the residual is currently largest \citep{Wu2023adaptive}
+--- on wave-like problems, the moving front. DeepXDE
+\citep{Lu2021deepxde} implements all of these as standard
+options.
 
 \label{sec:bg-prior}
-Five prior works apply PINNs to the QNM problem; all five solve
-the forward problem (computing QNMs from a known equation), not
-the inverse problem. \citet{Ovgun2021qnmnn} use a
-feedforward network to compute QNMs of dS and AdS black holes from
-the shooting form of the eigenvalue equation. \citet{Cornell2022pinnqnm}
-introduce a frequency-domain PINN for Schwarzschild QNMs in which
-the complex eigenvalue $\omega$ is a trainable parameter alongside
-the network weights, and report sub-permille accuracy on the
-fundamental $\ell = 2$ mode against the Leaver reference.
-\citet{Luna2022teukolskypinn} extend this to time-domain Kerr
-perturbations by training a PINN on the Teukolsky equation with
-the normalisation boundary condition hard-enforced via an output
-transform, with sequential warm-starts in the spin parameter.
-\citet{Patel2024pinn} are the closest comparator. They solve the
-time-domain Zerilli and Regge--Wheeler
-equations on a Schwarzschild background with a fully-connected
-PINN, report forward-problem field accuracy of
-$\mathrm{RL2} = 28.06\%$ against an FD reference, and quote the
-M2 NLS fit on a single fixed window as the primary QNM
-estimate. \citet{Luna2024qnm} address the frequency-domain QNM
-eigenvalue problem in modified gravity, with a network
-parametrising the radial wave function and the eigenvalue
-$\omega$ trained simultaneously. Our forward PINN matches the
-setup of \citet{Patel2024pinn} closely enough for a direct
-field-accuracy comparison (Sec.~\ref{sec:discussion}). The
-eigenvalue result of \citet{Cornell2022pinnqnm} is in the
-frequency domain and is not directly comparable to our
-time-domain post-hoc fit.
-The two limitations stated in the introduction (forward field
-accuracy and absence of an inverse formulation) translate into
-four concrete gaps that we address in
-Secs.~\ref{sec:methods}--\ref{sec:res-inv}. First, no prior PINN
-recovers the mass jointly with a damped-sinusoid template. Second,
-no prior PINN reports a fit-window systematic on the recovered
-$(\omega,\tau)$. Third, no prior PINN analyses the
-amplitude--damping-time degeneracy of an embedded template.
-Fourth, no prior PINN ablates the template-loss hyperparameters.
-Figure~\ref{fig:bg-pipeline} summarises the resulting forward and
-inverse pipelines.
+Five prior works apply PINNs to the QNM problem, all in the
+forward direction. \citet{Ovgun2021qnmnn} compute dS and AdS
+QNMs from the shooting form of the eigenvalue equation;
+\citet{Cornell2022pinnqnm} train the complex eigenvalue
+$\omega$ alongside a frequency-domain network and reach
+sub-permille accuracy on the fundamental $\ell = 2$ mode ---
+an eigenvalue computation not directly comparable to a
+time-domain post-hoc fit; \citet{Luna2022teukolskypinn} solve
+the time-domain Teukolsky equation with hard-enforced boundary
+conditions and sequential warm-starts in spin;
+\citet{Luna2024qnm} treat frequency-domain QNMs in modified
+gravity. The closest comparator is \citet{Patel2024pinn}, who
+solve the time-domain Zerilli and Regge--Wheeler equations with
+a fully-connected PINN, report $\mathrm{RL2} = 28.06\%$ field
+accuracy against an FD reference, and quote a single
+fixed-window M2 fit as the primary QNM estimate.
+No prior PINN study recovers the mass jointly with a
+damped-sinusoid template, reports a fit-window systematic on
+the recovered $(\omega,\tau)$, analyses the
+amplitude--damping-time degeneracy of an embedded template, or
+ablates the template-loss hyperparameters;
+Secs.~\ref{sec:methods}--\ref{sec:res-inv} address all four
+gaps, through the forward and inverse pipelines summarised in
+Fig.~\ref{fig:bg-pipeline}.
 
 \begin{figure}[!htbp]
 \centering
@@ -954,35 +589,42 @@ uncertainty alongside the primary estimate.}
 \subsection{Neural operators and prior operator-learning work}
 \label{sec:bg-fno}
 
-A separate strand of scientific machine learning addresses a
-different problem from the PINN of Sec.~\ref{sec:bg-pinn}.
 Rather than training one network per PDE instance, a
 \emph{neural operator}
-\citep{Lu2021deeponet,Li2021fno,Kovachki2023neuralop} learns
-an approximation
-$\mathcal{G}_{\theta}\colon \mathcal{A} \to \mathcal{U}$ of the
-solution operator that maps the input function space
-$\mathcal{A}$ (initial data, coefficients, source terms) to the
-output function space $\mathcal{U}$ (the PDE solution), so that
-a single trained network amortises the cost of solving any
-instance of the parametric family in a single forward pass.
+\citep{Lu2021deeponet,Li2021fno,Kovachki2023neuralop} learns the
+solution operator
+$\mathcal{G}_{\theta}\colon \mathcal{A} \to \mathcal{U}$ of a
+parametric family, amortising every instance into a single
+forward pass.
 DeepONet \citep{Lu2021deeponet} factorises $\mathcal{G}_{\theta}$
-into a branch network on the input function evaluations and a
-trunk network on the output query points; the Fourier neural
+into branch and trunk networks; the Fourier neural
 operator (FNO) \citep{Li2021fno,Kovachki2023neuralop}
 parameterises the operator by global convolutions in
-Fourier space, which makes it discretisation-invariant and
-particularly well-suited to hyperbolic problems on regular grids.
-Operator learning has been applied to Burgers, Darcy, and
-Navier--Stokes flows
-\citep{Li2021fno,Lu2021deeponet,Kovachki2023neuralop}, but to
-the best of our knowledge has not yet been applied to the
-time-domain black-hole perturbation problem. We close that gap
-in Sec.~\ref{sec:fno-method} with an FNO surrogate for the
-Schwarzschild $\ell = 2$ Zerilli equation, trained over a
-$1{,}000$-draw population of $(M, x_0, \sigma)$ triples, and
-fed into the same post-hoc QNM extraction pipeline used for the
-PINN modalities.
+Fourier space, making it discretisation-invariant and
+well-suited to hyperbolic problems on regular grids.
+Operator learning spans the Burgers, Darcy and Navier--Stokes
+benchmarks
+\citep{Li2021fno,Lu2021deeponet,Kovachki2023neuralop} but, to
+our knowledge, has not been applied to the time-domain
+black-hole perturbation problem; Sec.~\ref{sec:fno-method}
+closes that gap with an FNO surrogate for the Schwarzschild
+$\ell = 2$ Zerilli equation, trained over a $1{,}000$-draw
+population and fed into the same post-hoc extraction pipeline
+as the PINNs.
+
+A third strand keeps a classical solver in the loop and learns
+only a correction to it: solver-in-the-loop training
+\citep{Um2020solverloop} and learned corrections to
+under-resolved fluid solvers \citep{Kochkov2021mlcfd} show that
+a small network correcting a cheap classical solve can match a
+much finer classical solution at a fraction of its cost. The
+hybrid surrogate of Sec.~\ref{sec:hyb-method} belongs to this
+strand, with two distinctions: its training target is built
+label-free by classical Richardson extrapolation
+\citep{Richardson1911} of two coarse solves, so no fine-grid
+field enters the loss, and a parameter-free gradient gate
+confines the learned correction to the under-resolved
+wavefronts.
 
 % =====================================================================
 \input{sections/methods}
@@ -996,1460 +638,87 @@ PINN modalities.
 % =====================================================================
 \section{Conclusion}\label{sec:conclusion}
 
-We applied a forward, inverse and curriculum PINN, an
-end-to-end Fourier neural operator (FNO) surrogate, and a
-hybrid coarse-FD + neural-residual surrogate to the
-Schwarzschild $\ell = 2$ Zerilli equation. On the forward
-problem, doubling the
-number of L-BFGS iterations (from $15{,}000$ to $30{,}000$) and
-adding residual-greedy adaptive sampling reduces the relative
-$L^2$ field error against the FD reference from $28.06\%$ in
-\citet{Patel2024pinn} to $0.58\%$, a factor of approximately $50$
-smaller on an architecture-matched baseline. The fundamental QNM
-is recovered from the converged field to $0.029\%$ in $\omega$
-(M4) and $1.99\%$ in $\tau$ (M2).
-
-On the inverse problem, we identify an approximate
-$A_{\mathrm{ring}}$--$\tau$ degeneracy of the embedded ringdown
-template loss that allows the learned $\tau$ to drift by ten to
-twenty percent from the Leaver value while the loss remains
-stationary. Quoting $\tau$ from a post-hoc fit to the converged
-network field rather than from the learned template scalar
-bypasses the degeneracy and recovers $\tau$ to a few percent on
-the same runs. A six-variant ablation of the template-loss hyperparameters
-identifies a configuration that recovers the black-hole mass to
-$0.34\%$, $\omega$ to $0.30\%$ with plateau standard deviation
-$\sigma_\omega = 4\times 10^{-5}$, and $\tau$ to $1.6\%$, all
-under $1\%$ Gaussian observation noise on $\Nobs = 500$ field
-samples.
+We applied five models --- a faithful-reproduction and an
+enhanced forward PINN, an inverse PINN, an end-to-end Fourier
+neural operator (FNO), and a hybrid coarse-FD +
+neural-residual surrogate --- to the Schwarzschild $\ell = 2$
+master equations, under a single post-hoc extraction protocol
+benchmarked against Leaver's continued-fraction values. The
+architecture-matched reproduction of \citet{Patel2024pinn}
+reduces their reported field error by an order of magnitude on
+both isospectral potentials, with damping-time errors symmetric
+across the pair ($1.50\%$/$1.56\%$) as isospectrality requires;
+doubling the L-BFGS budget and adding residual-greedy sampling
+then reaches $0.58\%$, from which the fundamental mode is
+recovered to $0.029\%$ in $\omega$ and $2.65\%$ in $\tau$ (M4).
 
 The main methodological contribution is the plateau-based
-extraction of Sec.~\ref{sec:plateau}. Across the six inverse
-variants the plateau standard deviation $\sigma_\omega$ separates
-configurations on which the two-mode NLS converges from those on
-which it does not, supplying a deterministic quality flag without
-an additional fit. The same diagnostic applies unchanged to the forward
-PINN and to the FD reference solver, so that no quoted number
-depends on a fixed-by-hand fit window.
+extraction of Sec.~\ref{sec:plateau}: the plateau standard
+deviation $\sigma_\omega$ quantifies the fit-window systematic
+and doubles as a deterministic validity flag, so that no quoted
+number depends on a fixed-by-hand window. On the inverse
+problem the embedded template admits an
+$A_{\mathrm{ring}}$--$\tau$ degeneracy that biases the learned
+scalar by ten to twenty percent; quoting $\tau$ post-hoc from
+the converged field bypasses it, and the best of six ablation
+variants recovers $M$ to $0.34\%$, $\omega$ to $0.30\%$ and
+$\tau$ to $1.6\%$ under $1\%$ observation noise.
 
-The curriculum PINN of Sec.~\ref{sec:cur-pinn} delivers its
-intended local benefit on the earliest sub-domain (a $37\%$
-reduction in RMSD on $t\in[0,25]\,M$ relative to the same
-sub-domain of the single-window baseline) but does not translate
-that benefit into a lower full-domain RMSD or a tighter QNM
-extraction. The cost is the per-stitch interpolation error of
-the numerical IC transfer between consecutive windows, which
-grows with the number of stitching boundaries; the soft-overlap
-blending and continuity anchors do not recover the lost
-precision and in fact perform worse than the hard-partition
-stitch on this problem. The single-window forward PINN with
-greedy adaptive sampling therefore remains the recommended
-configuration for the time-domain Zerilli QNM problem.
+The two surrogates amortise what the PINNs pay per black hole.
+The FNO, trained once on $1{,}000$ draws, matches the FD
+reference's own extraction across a $100$-BH population
+($0.343\%$ versus $0.335\%$ median $\omega$ error) at one
+forward pass per draw; its design ablation shows that the
+figure of merit for a ringdown surrogate is the estimator
+accuracy on the observer slice, not the bulk RMSD. The hybrid
+surrogate runs a $1/64$-cost coarse solve and repairs its
+discretisation error with a small gated network trained on a
+label-free Richardson target, cutting the population field MSE
+by $79\times$; at $\xq = 2\,M$ neither it nor the coarse
+baseline is extraction-limited, both sitting at the M4 plateau
+floor that the fine reference also occupies.
 
-The FNO surrogate of Sec.~\ref{sec:fno-method}, trained once
-on a $1{,}000$-draw population of $(M, x_0, \sigma)$ triples
-with two QNM-targeted loss terms (the direct $L^{2}$ supervision
-on the 1-D observer slice $\Phi(\xq, t)$ and a ramp-weighted
-field $L^{2}$ that puts $\sim\!50\times$ more weight on the
-ringdown tail than on the prompt pulse), recovers $\omega$ to
-$0.11\%$ and $\tau$ to $0.10\%$ on the canonical evaluation BH,
-and matches the FD reference's own QNM extraction across a
-$100$-BH in-distribution population at population-median
-$\omega$ error $0.34\%$ versus $0.34\%$ for the FD reference
-and $\tau$ error $0.94\%$ versus $0.66\%$. The shared
-$\xq = 10\,M$ failure mode under the $t \in [10,100]\,M$
-extraction window is the only fit-window--observer geometry on
-which M4 returns no plateau; at the working observer position
-$\xq = 2\,M$ the FNO matches the FD reference to within counting
-noise on the population. The bulk-field RMSD across the three
-ablated FNO configurations is non-monotone with the QNM accuracy,
-showing that the figure of merit for an operator surrogate
-trained for ringdown spectroscopy is the downstream estimator
-accuracy on the observer slice rather than the gridwise RMSD
-on the bulk field.
+Follow-up directions --- a
+Cram\'er--Rao bound on the inverse noise floor, a Bayesian
+posterior around the deterministic estimate, the lift to Kerr,
+and learning the inverse operator directly --- are set out in
+Sec.~\ref{sec:discussion}.
 
-The hybrid coarse-FD + neural-residual surrogate of
-Sec.~\ref{sec:hyb-method} carries the wave propagation on a
-coarse $(\Delta x,\Delta t)_{\mathrm{c}} = (0.8,0.4)\,M$ FD
-grid at refinement ratio $k = 4$ --- one sixty-fourth of the
-fine-FD cost --- and trains a $1.13\times 10^{6}$ parameter 2-D
-FNO, almost two orders of magnitude smaller than the end-to-end
-operator, to predict only the discretisation residual of this
-weak coarse solve. The training target is supplied by a
-label-free Richardson extrapolation of two coarse solves rather
-than by the fine-FD field, and a parameter-free gradient gate
-confines the neural correction to the under-resolved
-wavefronts. On the canonical BH it cuts the bulk-field RMSD
-from $6.95\times 10^{-3}$ on the quintic-spline upsampling of
-the coarse solve to $6.85\times 10^{-4}$ (a factor of $10$), and
-reduces the population MSE across the 100-BH test set by a
-factor of $\sim\!79$. At the QNM observer $\xq = 2\,M$ all three
-sources (hybrid, coarse-up baseline, fine-FD reference) hit the
-same M4 plateau floor on the canonical BH and
-on the population median, so the hybrid is not the median QNM
-winner; its demonstrated benefit is in the global field rather
-than the single-observer QNM, which the coarse
-prior already resolves. The
-hybrid therefore occupies the inference-fastest,
-smallest-network corner of the precision--amortisation plane.
+% =====================================================================
+\section*{Code availability}
 
-Five follow-up directions are immediate. A Cram\'er--Rao bound
-on $(M,\omega,\tau)$ for the noisy ringdown template would
-quantify how much of the residual factor-of-ten gap between
-forward and inverse $\omega$ accuracy is intrinsic to the
-available information and how much is training systematics. The
-deterministic point estimate plus plateau $\sigma_\omega$ can be
-embedded in a Bayesian posterior over $(M,\omega,\tau)$ in the
-spirit of \citet{Isi2021priors}, with the trained PINN as the
-forward operator. The same pipeline lifts to Kerr by substituting
-the Teukolsky operator for the Zerilli operator and to
-multi-channel ringdowns by training one head per harmonic.
-Finally, the FNO surrogate of Sec.~\ref{sec:fno-method} learns
-the forward operator $\mathcal{G}_{\theta}\colon
-(\Phi_0, \partial_t\Phi_0, V_\ell, M) \mapsto \Phi(x, t)$;
-a natural extension is to learn the inverse operator
-$\mathcal{G}^{-1}_{\theta}\colon \Phi(\xq, t)
-\mapsto (M, \omega, \tau)$
-on the same training distribution, amortising the per-event
-inverse PINN training cost of Sec.~\ref{sec:inv-pinn} to a
-single forward pass per observation in the same way that the
-forward FNO amortises the per-event forward PINN training cost.
-The hybrid coarse-FD + neural-residual surrogate of
-Sec.~\ref{sec:hyb-method} is already operated at refinement
-ratio $k = 4$, where the weak second-order coarse prior carries
-a large $\mathcal{O}(\Delta x_{\mathrm{c}}^{2})$ dispersion
-error that the label-free Richardson target and the gradient
-gate together repair to a $\sim\!79\times$ population field-MSE
-gain. Pushing to still higher $k$, and to the higher-dimensional
-Kerr problem where the $k^{d+1}$ coarse-solve saving compounds,
-is the natural next step; the open question is whether the
-gated residual can be driven to overtake the coarse-up baseline
-at the QNM observable rather than only on the bulk field.
+All configurations, run scripts, the FD reference solver, the
+five extraction methods, the plateau pipeline, and the
+per-window extraction tables and derivation notes referenced
+throughout this report are contained in the code repository
+submitted alongside it; every figure and table in the report is
+regenerated by the scripts there.
 
 % =====================================================================
 \appendix
 \section{Finite-difference reference solver}\label{app:fd}
 
-This appendix gives the full mathematical specification of the
-finite-difference (FD) reference solver used to generate
-$\Phi_{\mathrm{FD}}(x,t)$ throughout the paper.
-
-\subsection{Continuous problem}
-
-We integrate the standard stable form of the master equation
-Eq.~\eqref{eq:zerilli},
-\begin{equation}
-  \partial_t^2 \Phi(x,t) - \partial_x^2 \Phi(x,t)
-  + V_\ell(x)\,\Phi(x,t) = 0,
-  \qquad
-  (x,t) \in [x_L,x_R]\times[0,t_{\max}],
-  \label{eq:fd-pde}
-\end{equation}
-with $V_\ell$ the Zerilli potential of Eq.~\eqref{eq:V-zerilli} for
-$\ell=2$ and $M=1$, on the rectangle
-$[x_L,x_R]=[-50,150]\,M$, $t_{\max} = 50\,M$. The initial data are
-the outgoing Gaussian of Eq.~\eqref{eq:ic}, namely
-\begin{equation}
-  \Phi(x,0) = A\,\exp\!\Bigl(-\tfrac{(x-x_0)^2}{2\sigma^2}\Bigr),
-  \qquad
-  \partial_t\Phi(x,0) = -\partial_x\Phi(x,0),
-  \label{eq:fd-ic}
-\end{equation}
-with $A=1$, $x_0 = 4\,M$, $\sigma = 5\,M$. The far-field
-boundaries are the radiative Sommerfeld conditions of
-Eq.~\eqref{eq:bc-sommerfeld},
-\begin{equation}
-  (\partial_t - \partial_x)\Phi\bigr|_{x=x_L} = 0,
-  \qquad
-  (\partial_t + \partial_x)\Phi\bigr|_{x=x_R} = 0,
-  \label{eq:fd-bc}
-\end{equation}
-which transmit outgoing waves with no reflection in the limit
-$V_\ell\to 0$ that holds asymptotically far from the photon-sphere
-peak at $r \simeq 3M$.
-
-\subsection{Method of lines}
-
-We reduce Eq.~\eqref{eq:fd-pde} to a first-order system in time by
-introducing $\Pi \equiv \partial_t \Phi$, giving the pair
-\begin{equation}
-  \partial_t \Phi = \Pi,
-  \qquad
-  \partial_t \Pi  = \partial_x^2 \Phi - V_\ell\,\Phi.
-  \label{eq:fd-system}
-\end{equation}
-The spatial domain is discretised on the uniform grid
-$x_i = x_L + i\,\Delta x$ for $i=0,\dots,N_x-1$, with
-$\Delta x = 0.2\,M$ and $N_x = 1001$ points. Let
-$\Phi_i^n \approx \Phi(x_i, t_n)$ and
-$\Pi_i^n \approx \Pi(x_i, t_n)$. The interior second derivative is
-the standard three-point centred stencil,
-\begin{equation}
-  (\partial_x^2 \Phi)_i
-  = \frac{\Phi_{i+1} - 2\Phi_i + \Phi_{i-1}}{(\Delta x)^2}
-  + \mathcal{O}\bigl((\Delta x)^2\bigr),
-  \qquad i = 1,\dots,N_x-2.
-  \label{eq:fd-d2-interior}
-\end{equation}
-At the two endpoints we use the four-point second-order one-sided
-formulas
-\begin{align}
-  (\partial_x^2 \Phi)_0 &= \frac{2\Phi_0 - 5\Phi_1 + 4\Phi_2 - \Phi_3}{(\Delta x)^2}
-    + \mathcal{O}\bigl((\Delta x)^2\bigr),
-  \label{eq:fd-d2-left}\\
-  (\partial_x^2 \Phi)_{N_x-1} &= \frac{2\Phi_{N_x-1} - 5\Phi_{N_x-2} + 4\Phi_{N_x-3} - \Phi_{N_x-4}}{(\Delta x)^2}
-    + \mathcal{O}\bigl((\Delta x)^2\bigr),
-  \label{eq:fd-d2-right}
-\end{align}
-so that the global spatial truncation error of the discrete
-operator $L_h \Phi \equiv \partial_x^2 \Phi - V_\ell\,\Phi$ is
-$\mathcal{O}((\Delta x)^2)$ uniformly in $i$.
-
-The semi-discrete system is then the $2N_x$-dimensional ODE
-\begin{equation}
-  \frac{\mathrm{d}}{\mathrm{d} t}\!
-  \begin{pmatrix} \Phi \\ \Pi \end{pmatrix}
-  =
-  \begin{pmatrix} \Pi \\ L_h \Phi \end{pmatrix}
-  \equiv
-  F(\Phi,\Pi),
-  \label{eq:fd-mol}
-\end{equation}
-on which we apply classical fourth-order Runge--Kutta time
-integration with step $\Delta t = 0.1\,M$ and
-$N_t = 500$ steps,
-\begin{equation}
-  \begin{aligned}
-    k_1 &= F(y^n), \\
-    k_2 &= F(y^n + \tfrac12\Delta t\,k_1), \\
-    k_3 &= F(y^n + \tfrac12\Delta t\,k_2), \\
-    k_4 &= F(y^n + \Delta t\,k_3), \\
-    y^{n+1} &= y^n + \tfrac{\Delta t}{6}\bigl(k_1 + 2k_2 + 2k_3 + k_4\bigr),
-  \end{aligned}
-  \label{eq:fd-rk4}
-\end{equation}
-with $y^n \equiv (\Phi^n,\Pi^n)^\top$. The temporal truncation
-error is $\mathcal{O}((\Delta t)^4)$ per step and
-$\mathcal{O}((\Delta t)^4)$ globally over the fixed integration
-window $[0,t_{\max}]$. Combined with
-Eqs.~\eqref{eq:fd-d2-interior}--\eqref{eq:fd-d2-right} the scheme
-is second-order accurate in space and fourth-order accurate in
-time.
-
-\subsection{CFL stability}
-
-For the constant-coefficient wave equation obtained by setting
-$V_\ell \equiv 0$ in Eq.~\eqref{eq:fd-pde}, the maximum
-characteristic speed is $c = 1$. Reducing Eq.~\eqref{eq:fd-pde} to
-the first-order system Eq.~\eqref{eq:fd-system} and applying the
-centred stencil Eq.~\eqref{eq:fd-d2-interior} produces purely
-imaginary spatial eigenvalues
-$\mu_k = \pm i\,2\sin(k\Delta x/2)/\Delta x$ with
-$|\mu_k|\le 2/\Delta x$, so the RK4 stability boundary on the
-imaginary axis $|\mu \Delta t|\le 2\sqrt{2}$ gives the linear
-stability condition
-\begin{equation}
-  \nu \equiv \frac{c\,\Delta t}{\Delta x} \le \sqrt{2}
-  \approx 1.414.
-  \label{eq:fd-cfl}
-\end{equation}
-We use $\nu = 0.5$, well inside the stability region; the
-potential $V_\ell(x) \ge 0$ acts as a non-negative mass term that
-does not increase the maximum characteristic speed and therefore
-does not tighten the bound. With this Courant factor the scheme
-is dissipation-free at leading order and introduces only
-numerical dispersion at $\mathcal{O}((\Delta x)^2)$.
-
-\subsection{Boundary update}
-
-The Sommerfeld conditions of Eq.~\eqref{eq:fd-bc} are imposed
-algebraically on $\Pi$ at every RK4 substage. With
-$(\partial_t - \partial_x)\Phi = 0$ at $x = x_L$ and
-$\Pi = \partial_t \Phi$, the left endpoint update is
-$\Pi_0 = (\partial_x \Phi)_0$. Using the second-order one-sided
-first derivative,
-\begin{equation}
-  (\partial_x \Phi)_0 = \frac{-3\Phi_0 + 4\Phi_1 - \Phi_2}{2\Delta x}
-  + \mathcal{O}\bigl((\Delta x)^2\bigr),
-  \label{eq:fd-dx-left}
-\end{equation}
-and analogously $\Pi_{N_x-1} = -(\partial_x\Phi)_{N_x-1}$ at the
-right endpoint with the mirror stencil. The resulting boundary
-update preserves the second-order spatial accuracy of the
-interior scheme and is applied after each of the four RK4
-substages \eqref{eq:fd-rk4}, so that the intermediate stages
-$y^n + \alpha\,\Delta t\,k_j$ also satisfy the radiative
-condition before being passed to $F$.
-
-\subsection{Causal isolation of the QNM window}
-
-The Sommerfeld update is approximate, since it treats the
-asymptotic problem $V_\ell \to 0$ as exact at finite $|x|$. The
-arrival times of any residual reflections at the observer column
-$\xq = 10\,M$ are bounded below by Eq.~\eqref{eq:bc-arrival},
-which evaluates to at least $108\,M$ from the left boundary and
-$280\,M$ from the right boundary, both well outside
-$t_{\max} = 50\,M$. The QNM extraction window
-$t \in [10,50]\,M$ is therefore causally disconnected from the
-boundaries on the simulated domain, and the FD reference is
-insensitive at machine precision to the quality of the boundary
-update inside the window of interest.
-
-\subsection{Cost and outputs}
-
-The full simulation has $N_x N_t \approx 5\times 10^5$
-space-time grid points and runs in under one minute on a single
-CPU core. The solver writes
-$\Phi_{\mathrm{FD}}(x_i, t_n)$ on the
-$1001\times 501$ grid to disk, which is the
-single source used for all field-accuracy metrics in
-Sec.~\ref{sec:res-fwd} and as the noise-free truth for the
-inverse-PINN observation generator of
-Eq.~\eqref{eq:noisy-obs}.
+This appendix summarises the finite-difference (FD) reference
+solver; the complete specification, including every stencil and
+update formula, is provided in the repository documentation.
+Eq.~\eqref{eq:zerilli} is integrated in first-order-in-time
+form ($\Pi \equiv \partial_t\Phi$) on the grid of
+Sec.~\ref{sec:fwd-problem}: three-point centred
+second-derivative stencil in the interior, second-order
+one-sided closures at the endpoints, classical fourth-order
+Runge--Kutta time stepping, and Sommerfeld conditions imposed
+algebraically on $\Pi$ at every substage. The Courant factor
+$\nu = 0.5$ sits inside the RK4 stability bound
+$\nu \le \sqrt{2}$, and the earliest boundary reflection
+reaches the observer column at $t \ge 108\,M$, far outside
+$t_{\max} = 50\,M$; the full solve completes in under one
+minute on a single CPU core.
 
 % =====================================================================
-\section{Leaver's continued-fraction method}\label{app:leaver}
-
-This appendix records the analytic procedure that produces the
-reference QNM frequencies
-$M\omega_n$ used throughout the paper for benchmarking and
-percentage-error reporting. The derivation follows
-\citet{Leaver1985}; the only Schwarzschild-specific algebra needed
-beyond the ansatz is collected in Table~I of that paper. We
-restate the steps here so the analytic baseline of
-Eq.~\eqref{eq:qnm-ref} is self-contained.
-
-\subsection{Master equation and QNM boundary conditions}
-
-The Regge--Wheeler and Zerilli equations of
-Sec.~\ref{sec:fwd-problem} share the time-harmonic radial form
-\begin{equation}
-  \frac{\mathrm{d}^2 \psi(r)}{\mathrm{d} r_*^2}
-  + \bigl[\omega^2 - V_\ell(r)\bigr]\,\psi(r) = 0,
-  \qquad
-  \psi(x,t) = \psi(r)\,e^{-i\omega t},
-  \label{eq:lv-rw}
-\end{equation}
-with $r_*$ the tortoise coordinate of Eq.~\eqref{eq:tortoise} and
-$V_\ell$ either the Regge--Wheeler or the Zerilli potential. In
-the asymptotic regions $V_\ell \to 0$, so $\psi$ behaves as a
-free wave, and the QNM boundary conditions select the modes that
-are purely ingoing at the horizon and purely outgoing at
-infinity,
-\begin{equation}
-  \psi(r) \sim e^{-i\omega r_*} \;\;\text{as}\;\; r \to 2M^+,
-  \qquad
-  \psi(r) \sim e^{+i\omega r_*} \;\;\text{as}\;\; r \to \infty.
-  \label{eq:lv-bc}
-\end{equation}
-For complex $\omega = \omega_R - i/\tau$ with $\tau > 0$ the
-outgoing solution diverges at infinity in $r$, so QNMs cannot be
-captured by direct numerical shooting; \citet{Leaver1985} replaces
-the shooting problem by a convergence condition on a power
-series, which is the construction below.
-
-\subsection{Frobenius--Jaff\'e ansatz}
-
-We work in Leaver's units $2M = 1$, so $r$ is now dimensionless
-and $f(r) = 1 - 1/r$. Setting $\rho \equiv -i\omega$ and applying
-the standard Jaff\'e construction \citep{Leaver1985,Nollert1993},
-the outgoing solution of Eq.~\eqref{eq:lv-rw} is written as
-\begin{equation}
-  \psi(r) \;=\;
-  r^{1+s}\,(r-1)^{\rho}\,e^{-\rho r}
-  \sum_{n=0}^{\infty} a_{n}\,(2\rho + 1)_{n}\,
-       U\!\bigl(s + 1 + 2\rho + n,\; 2s + 1,\; 2\rho r\bigr),
-  \label{eq:lv-ansatz}
-\end{equation}
-where $(z)_{n} = \Gamma(z+n)/\Gamma(z)$ is the Pochhammer symbol
-and $U(\cdot,\cdot,\cdot)$ is the irregular confluent
-hypergeometric function. The three factors in front of the sum
-encode the QNM asymptotics analytically:
-$(r-1)^{\rho} = (r-1)^{-i\omega}$ reproduces the ingoing
-$e^{-i\omega r_{\!*}}$ behaviour at the horizon
-($r_{\!*} \to -\infty$), and the large-$r$ asymptotics of $U$,
-\begin{equation}
-  U(a, b, z) \;\sim\; z^{-a}
-  \qquad (|z| \to \infty,\; \arg z\;\text{fixed}),
-  \label{eq:lv-U-asymp}
-\end{equation}
-combine with $r^{1+s} e^{-\rho r}$ to yield the outgoing form
-$\psi(r) \sim r^{-1-s+2i\omega} e^{i\omega r}$ at infinity, in
-agreement with the QNM boundary condition
-Eq.~\eqref{eq:lv-bc}. The QNM problem therefore reduces to
-fixing the coefficients $a_{n}$ so that the series in
-Eq.~\eqref{eq:lv-ansatz} is convergent for all $r \ge 1$, in
-particular at $r = \infty$, which by Pincherle's theorem
-\citep{KonoplyaZhidenko2011} is equivalent to the
-continued-fraction equation derived below.
-
-\subsection{Three-term recurrence (explicit Schwarzschild form)}
-
-Substituting Eq.~\eqref{eq:lv-ansatz} into Eq.~\eqref{eq:lv-rw},
-expanding the contiguous-function relations of $U$ and matching
-coefficients of $U(s + 1 + 2\rho + n, 2s + 1, 2\rho r)$ at fixed
-$n$ gives the three-term recurrence
-\begin{equation}
-  \begin{aligned}
-    \alpha_{0}\,a_{1} + \beta_{0}\,a_{0} &= 0,
-      \quad a_{n<0} = 0,\\
-    \alpha_{n}\,a_{n+1}
-    + \beta_{n}\,a_{n}
-    + \gamma_{n}\,a_{n-1} &= 0,
-    \qquad n \ge 1,
-  \end{aligned}
-  \label{eq:lv-rec}
-\end{equation}
-with $a_{0}$ arbitrary and the coefficients given explicitly by
-\citep[Eqs.~(104)--(105)]{Nollert1993}
-\begin{equation}
-  \boxed{\;
-  \begin{aligned}
-    \alpha_{n} &= (n+1)\,(n + 2\rho + 1),\\[2pt]
-    \beta_{n}  &= -\bigl[\,
-                   2 n^{2} + (8\rho + 2)\,n
-                   + 8\rho^{2} + 4\rho
-                   + \ell(\ell+1) + (1 - s^{2})\,\bigr],\\[2pt]
-    \gamma_{n} &= n^{2} + 4\rho\,n + 4\rho^{2} - s^{2}.
-  \end{aligned}
-  \;}
-  \label{eq:lv-coeffs}
-\end{equation}
-Specialising to $s = 2$ and $\ell = 2$, used throughout this paper,
-\begin{equation}
-  \begin{aligned}
-    \alpha_{n} &= (n+1)\,(n + 1 - 2 i\omega),\\
-    \beta_{n}  &= -\bigl[\,
-                   2 n^{2} + (2 - 16 i \omega)\,n
-                   - 8 \omega^{2} - 4 i \omega + 3\,\bigr],\\
-    \gamma_{n} &= n^{2} - 4 i \omega\,n - 4 \omega^{2} - 4,
-  \end{aligned}
-  \label{eq:lv-coeffs-l2}
-\end{equation}
-where we used $\rho = -i\omega$, so $2\rho = -2i\omega$,
-$8\rho = -8i\omega$, $4\rho = -4i\omega$, $8\rho^{2} = -8\omega^{2}$,
-$4\rho^{2} = -4\omega^{2}$, $\ell(\ell+1) = 6$, $s^{2} = 4$, and
-$\ell(\ell+1) + (1 - s^{2}) = 6 + (1 - 4) = 3$.
-The Regge--Wheeler ($s = 2$) and Zerilli potentials produce
-identical $\alpha_{n}, \gamma_{n}$ and identical $\beta_{n}$ at
-fixed $\ell$, hence the same QNM spectrum
-\citep{Chandrasekhar1975,ReggeWheeler1957,Moncrief1974}; the
-two potentials are intertwined by a first-order Darboux
-transformation (Chandrasekhar isospectrality).
-
-\subsection{Asymptotic analysis of the recurrence}
-
-For $n \to \infty$, the leading behaviour of
-Eq.~\eqref{eq:lv-coeffs} is
-\begin{equation}
-  \alpha_{n} \sim n^{2},
-  \qquad
-  \beta_{n} \sim -2 n^{2},
-  \qquad
-  \gamma_{n} \sim n^{2},
-  \label{eq:lv-asy-coef}
-\end{equation}
-so the recurrence Eq.~\eqref{eq:lv-rec} becomes, in this limit,
-$a_{n+1} - 2 a_{n} + a_{n-1} \approx 0$ at leading order, with
-characteristic roots $t = 1$ (a double root). Inserting the
-$O(n^{-1/2})$ subleading terms into the indicial equation gives
-\begin{equation}
-  t_{\pm} \;=\; 1 \pm \sqrt{\frac{-2 i \omega}{n}}
-              + O(n^{-1}),
-  \qquad
-  \frac{a_{n+1}}{a_{n}} \;\sim\; t_{\pm},
-  \label{eq:lv-poincare}
-\end{equation}
-i.e.\ Eq.~\eqref{eq:lv-rec} is a Birkhoff-irregular three-term
-recurrence with two linearly independent asymptotic solutions
-$a_{n}^{(\pm)} \sim n^{-1+2\rho} t_{\pm}^{n}$. Only the
-\emph{minimal} branch $t_{-}$ corresponds to a series
-$\sum a_{n}$ that converges for $r \to \infty$ and therefore to
-a QNM solution of Eq.~\eqref{eq:lv-rec} with the boundary
-condition Eq.~\eqref{eq:lv-bc}. Pincherle's theorem fixes the
-condition that selects this minimal branch, and is the content
-of the next subsection.
-
-\subsection{Continued-fraction equation (Pincherle)}
-
-Define the ratios $r_{n} \equiv a_{n+1}/a_{n}$. Dividing
-Eq.~\eqref{eq:lv-rec} by $a_{n}$ gives
-\begin{equation}
-  \alpha_{n}\,r_{n}
-  + \beta_{n}
-  + \gamma_{n}\,r_{n-1}^{-1}
-  \;=\; 0
-  \quad\Longrightarrow\quad
-  r_{n} \;=\;
-  -\,\frac{\gamma_{n+1}/\alpha_{n}}
-         {\beta_{n+1}/\alpha_{n+1}\bigl/\,\,\;
-          + r_{n+1}}\,,
-  \label{eq:lv-rn-step}
-\end{equation}
-where the second form follows from Eq.~\eqref{eq:lv-rec} shifted
-$n \to n+1$. Iterating Eq.~\eqref{eq:lv-rn-step} downward gives
-\begin{equation}
-  r_{0} \;=\; \frac{a_{1}}{a_{0}}
-  \;=\; -\cfrac{\gamma_{1}}{\beta_{1}
-       - \cfrac{\alpha_{1}\gamma_{2}}{\beta_{2}
-         - \cfrac{\alpha_{2}\gamma_{3}}{\beta_{3}
-           - \cfrac{\alpha_{3}\gamma_{4}}{\beta_{4} - \cdots}}}},
-  \label{eq:lv-cf-rhs}
-\end{equation}
-and the $n=0$ row of Eq.~\eqref{eq:lv-rec} fixes the same ratio
-algebraically as
-\begin{equation}
-  r_{0} \;=\; \frac{a_{1}}{a_{0}}
-        \;=\; -\frac{\beta_{0}}{\alpha_{0}}.
-  \label{eq:lv-cf-lhs}
-\end{equation}
-Pincherle's theorem \citep{KonoplyaZhidenko2011} states that
-Eq.~\eqref{eq:lv-cf-rhs} converges to the ratio of the minimal
-solution of Eq.~\eqref{eq:lv-rec}; equating
-Eqs.~\eqref{eq:lv-cf-lhs} and~\eqref{eq:lv-cf-rhs} therefore
-yields the continued-fraction equation
-\begin{equation}
-  0 \;=\; \beta_{0}
-  - \cfrac{\alpha_{0}\gamma_{1}}{\beta_{1}
-       - \cfrac{\alpha_{1}\gamma_{2}}{\beta_{2}
-         - \cfrac{\alpha_{2}\gamma_{3}}{\beta_{3}
-           - \cfrac{\alpha_{3}\gamma_{4}}{\beta_{4} - \cdots}}}},
-  \label{eq:lv-cf}
-\end{equation}
-whose roots in the complex $\omega$ plane are the QNM frequencies.
-
-\subsection{$n$-th inversion for overtones}
-
-Numerical evaluation of Eq.~\eqref{eq:lv-cf} converges
-geometrically for the fundamental mode but loses precision for
-higher overtones, because the $n$-th overtone is the
-$(n{+}1)$-th-stable root rather than the most stable one of the
-truncated continued fraction. The fix is to invert the recurrence
-$n$ times before truncation. Algebraically, replacing the
-backward iteration in Eq.~\eqref{eq:lv-rn-step} by an explicit
-forward iteration starting from $r_{n-1}$ gives, after $n$
-shifts and equating the result with Eq.~\eqref{eq:lv-cf},
-\begin{equation}
-  \beta_{n} - \cfrac{\alpha_{n-1}\gamma_{n}}{\beta_{n-1}
-    - \cfrac{\alpha_{n-2}\gamma_{n-1}}{\beta_{n-2} - \cdots
-      - \cfrac{\alpha_{0}\gamma_{1}}{\beta_{0}}}}
-  \;=\;
-  \cfrac{\alpha_{n}\gamma_{n+1}}{\beta_{n+1}
-    - \cfrac{\alpha_{n+1}\gamma_{n+2}}{\beta_{n+2} - \cdots}},
-  \label{eq:lv-inv}
-\end{equation}
-which is algebraically equivalent to Eq.~\eqref{eq:lv-cf} but
-numerically isolates the $n$-th overtone as the most stable root
-of the truncated equation, allowing reliable extraction up to
-$n \sim 100$ for Schwarzschild
-\citep{Leaver1985,Nollert1993,KonoplyaZhidenko2011}.
-
-\subsection{Numerical evaluation: modified Lentz and Newton--Raphson}
-
-Denote the truncated left-hand side of Eq.~\eqref{eq:lv-cf} (or
-of its $n$-th inversion Eq.~\eqref{eq:lv-inv}) by
-$F_N(\omega)$, where $N$ is the truncation depth. The continued
-fraction is evaluated by the modified Lentz algorithm. Starting
-from $f_0 = \beta_0$, $C_0 = f_0$, $D_0 = 0$, we iterate, for
-$j = 1, 2, \dots, N$,
-\begin{equation}
-  \begin{aligned}
-    D_j &= \bigl(\beta_j - \alpha_{j-1}\gamma_j\,D_{j-1}\bigr)^{-1}, &
-    C_j &= \beta_j - \frac{\alpha_{j-1}\gamma_j}{C_{j-1}}, \\
-    \Delta_j &= C_j\,D_j, &
-    f_j &= f_{j-1}\,\Delta_j,
-  \end{aligned}
-  \label{eq:lv-lentz}
-\end{equation}
-with the standard guard $D_j \to \varepsilon$ if any denominator
-falls below $|\varepsilon| = 10^{-30}$
-\citep{KonoplyaZhidenko2011}. The iteration is stopped at the
-first $j$ for which $|\Delta_j - 1| < 10^{-14}$, which gives
-$F_N(\omega) = f_N$. The QNM frequency is then a complex root
-of $F_N(\omega) = 0$, located by Newton--Raphson iteration
-\begin{equation}
-  \omega_{(k+1)} = \omega_{(k)} - \frac{F_N(\omega_{(k)})}
-                    {F_N'(\omega_{(k)})},
-  \qquad
-  F_N'(\omega) \approx
-    \frac{F_N(\omega + h) - F_N(\omega - h)}{2 h},
-  \label{eq:lv-newton}
-\end{equation}
-with complex step $h = 10^{-8}$ and convergence tolerance
-$|\omega_{(k+1)} - \omega_{(k)}| < 10^{-12}$. For the
-fundamental mode the seed $\omega_{(0)}$ is taken from the
-sixth-order WKB estimate of \citet{IyerWill1987}; for the first
-overtone the seed is the fundamental shifted by
-$\Delta\omega = -i\,(2 n + 1)/(4 r_{\rm ph})$ along the imaginary
-axis, with $r_{\rm ph} = 3M$ the photon-sphere radius (the
-asymptotic-overtone spacing of
-\citealp{SchutzWill1985,IyerWill1987}). Convergence of
-Eq.~\eqref{eq:lv-newton} is quadratic in the immediate
-neighbourhood of each root and typically requires fewer than ten
-iterations from the WKB seed.
-
-\subsection{Reference frequencies used in this paper}
-
-We solve Eq.~\eqref{eq:lv-cf} for $n = 0$ and Eq.~\eqref{eq:lv-inv}
-for $n = 1$ at $\ell = 2$, $s = 2$, with both continued fractions
-truncated at depth $N = 200$, evaluated by the Lentz recursion of
-Eq.~\eqref{eq:lv-lentz} and bracketed by the Newton--Raphson
-iteration of Eq.~\eqref{eq:lv-newton}. The truncation depth is
-chosen empirically: doubling $N$ from $100$ to $200$ shifts
-$M\omega_0$ by less than $10^{-10}$ and $M\omega_1$ by less than
-$10^{-7}$, well below the four significant figures used in
-benchmarking. The result is cross-checked against the public
-tables of \citet{Berti2009review} and agrees to all quoted
-digits,
-\begin{equation}
-  M\omega_0 = 0.3737 - 0.0890\,i,
-  \qquad
-  M\omega_1 = 0.3467 - 0.2739\,i,
-  \label{eq:lv-values}
-\end{equation}
-giving the damping times $\tau_0/M = 1/|\Im(M\omega_0)| = 11.241$
-and $\tau_1/M = 1/|\Im(M\omega_1)| = 3.651$. These are the
-reference values quoted in Eq.~\eqref{eq:qnm-ref} and used as
-ground truth for every percentage-error figure in
-Sec.~\ref{sec:results}.
+\input{sections/curriculum_appendix}
 
 % =====================================================================
-\section{Derivation of the Regge--Wheeler and Zerilli equations}
-\label{app:zerilli-derivation}
-
-This appendix gives a self-contained derivation of the master
-equation Eq.~\eqref{eq:zerilli} and the Zerilli potential
-Eq.~\eqref{eq:V-zerilli} that the PINN of
-Sec.~\ref{sec:fwd-pinn} solves. The derivation follows the
-standard route of \citet{ReggeWheeler1957} for the axial
-(odd-parity) sector and \citet{Zerilli1970} for the polar
-(even-parity) sector, with the gauge-invariant reformulation of
-\citet{Moncrief1974}; the algebraic conventions match those
-reviewed in \citet{Berti2009review}. We adopt geometric units
-$G = c = 1$ and the metric signature $(-,+,+,+)$.
-
-\subsection{Schwarzschild background and linearised Einstein
-equations}
-\label{sec:rw-background}
-
-The exterior Schwarzschild geometry of mass $M$ is
-\begin{equation}
-  \mathrm{d}s^{2}_{(0)} = -f(r)\,\mathrm{d}t^{2}
-       + f(r)^{-1}\,\mathrm{d}r^{2}
-       + r^{2}\bigl(\mathrm{d}\theta^{2}
-                    + \sin^{2}\!\theta\,\mathrm{d}\phi^{2}\bigr),
-  \qquad
-  f(r) \equiv 1 - \frac{2M}{r},
-  \label{eq:schw-line}
-\end{equation}
-on the manifold $r > 2M$. We write the perturbed metric as
-\begin{equation}
-  g_{\mu\nu}(t,r,\theta,\phi)
-  = g_{\mu\nu}^{(0)}(r,\theta)
-  + h_{\mu\nu}(t,r,\theta,\phi),
-  \qquad |h_{\mu\nu}| \ll |g_{\mu\nu}^{(0)}|,
-  \label{eq:perturbation}
-\end{equation}
-and demand that $g_{\mu\nu}$ satisfy the vacuum Einstein equations
-$R_{\mu\nu}[g] = 0$ to first order in $h$. Since the background is
-already Ricci-flat, the linear perturbation must satisfy
-\begin{equation}
-  \delta R_{\mu\nu}[h]
-  \;=\;
-  -\tfrac{1}{2}\bigl(
-    \nabla^{\alpha}\nabla_{\alpha} h_{\mu\nu}
-    + \nabla_{\mu}\nabla_{\nu} h^{\alpha}{}_{\alpha}
-    - \nabla^{\alpha}\nabla_{\mu} h_{\alpha\nu}
-    - \nabla^{\alpha}\nabla_{\nu} h_{\alpha\mu}\bigr)
-  \;=\; 0,
-  \label{eq:dR-vacuum}
-\end{equation}
-with all covariant derivatives taken with respect to the
-background of Eq.~\eqref{eq:schw-line}. The remainder of this
-appendix solves Eq.~\eqref{eq:dR-vacuum} mode by mode in a
-spherical-harmonic basis.
-
-\subsection{Tensor spherical harmonic decomposition}
-\label{sec:rw-tensor-harmonics}
-
-Spherical symmetry of the background allows a separation of
-variables. Each component of $h_{\mu\nu}$ is expanded in the
-ten tensor spherical harmonics of \citet{ReggeWheeler1957}, which
-split under spatial parity into seven \emph{polar} (even, parity
-$(-1)^{\ell}$) and three \emph{axial} (odd, parity
-$(-1)^{\ell+1}$) basis tensors at each $(\ell,m)$. With
-$Y_{\ell m}(\theta,\phi)$ the standard scalar spherical harmonics,
-the axial perturbation in the original \citet{ReggeWheeler1957}
-parametrisation is
-\begin{equation}
-  h_{\mu\nu}^{\mathrm{axial},\ell m}(t,r,\theta,\phi)
-  = h_{0}(t,r)\,a_{\mu\nu}^{(0),\ell m}(\theta,\phi)
-  + h_{1}(t,r)\,a_{\mu\nu}^{(1),\ell m}(\theta,\phi)
-  + h_{2}(t,r)\,a_{\mu\nu}^{(2),\ell m}(\theta,\phi),
-  \label{eq:axial-h}
-\end{equation}
-with the three angular basis tensors
-$a_{\mu\nu}^{(0),(1),(2)}$ given explicitly by Eq.~(10) of
-\citet{ReggeWheeler1957}; their support is in the
-$(t,\theta), (t,\phi), (r,\theta), (r,\phi)$ blocks for
-$a^{(0)}, a^{(1)}$ and in the
-$(\theta,\theta), (\theta,\phi), (\phi,\phi)$ angular block for
-$a^{(2)}$. The polar perturbation is parametrised analogously by
-seven radial functions $H_{0},H_{1},H_{2},h_{0}^{\mathrm{e}},
-h_{1}^{\mathrm{e}}, K, G$ of $(t,r)$ multiplying the seven polar
-basis tensors; the explicit matrix is given by
-\citet[Eq.~(13)]{ReggeWheeler1957} and reproduced in
-\citet[Sec.~II]{Zerilli1970}. The angular eigenvalue that appears
-throughout is
-\begin{equation}
-  \nabla^{2}_{S^{2}} Y_{\ell m}
-  = -\ell(\ell+1)\,Y_{\ell m},
-  \qquad
-  n \equiv \tfrac{1}{2}(\ell-1)(\ell+2)
-        = \tfrac{1}{2}\bigl(\ell^{2}+\ell-2\bigr),
-  \label{eq:n-def}
-\end{equation}
-so that the angular Laplacian eigenvalue $\ell(\ell+1) = 2(n+1)$.
-The axial and polar sectors decouple at the linearised level
-because Eq.~\eqref{eq:dR-vacuum} preserves parity, and modes of
-different $(\ell,m)$ decouple by orthogonality of the spherical
-harmonics. The two sectors can therefore be treated independently
-at fixed $(\ell,m)$.
-
-\subsection{Regge--Wheeler gauge}
-\label{sec:rw-gauge}
-
-The first-order metric perturbation transforms under
-infinitesimal coordinate changes
-$x^{\mu} \to x^{\mu} + \xi^{\mu}$ as
-\begin{equation}
-  h_{\mu\nu} \;\to\; h_{\mu\nu}
-   - \nabla_{\mu}\xi_{\nu} - \nabla_{\nu}\xi_{\mu},
-  \label{eq:gauge-transf}
-\end{equation}
-and the four components of $\xi_{\mu}$ split into one axial and
-three polar pieces in the harmonic decomposition. For
-$\ell \ge 2$ this gauge freedom can be used to set
-\begin{equation}
-  h_{2} = 0
-  \quad\text{(axial)},
-  \qquad
-  h_{0}^{\mathrm{e}} = h_{1}^{\mathrm{e}} = G = 0
-  \quad\text{(polar)},
-  \label{eq:rw-gauge}
-\end{equation}
-which is the \emph{Regge--Wheeler gauge}
-\citep{ReggeWheeler1957}. The axial sector is then described by
-the two functions $(h_{0}, h_{1})(t,r)$ and the polar sector by
-the four functions $(H_{0}, H_{1}, H_{2}, K)(t,r)$. The
-$\ell = 0,1$ modes carry no dynamical degrees of freedom (they
-correspond to mass and angular-momentum perturbations, gauged
-away to give shifts in the asymptotic mass and Kerr-like
-rotation \citep{Zerilli1970}) and are excluded from what follows.
-
-Equation~\eqref{eq:rw-gauge} is stated here as a result; the
-explicit construction of the gauge generators in each parity
-sector, the action of those generators on the seven scalar
-amplitudes, and the resulting RW-gauge matrix forms of
-$h_{\mu\nu}$ are deferred to the subsections in which they are
-used, namely Sec.~\ref{sec:rw-axial-derivation} for the axial
-sector and Sec.~\ref{sec:rw-polar-derivation} for the polar
-sector. The remainder of the present subsection records only the
-angular harmonic basis on $S^{2}$ that both constructions share,
-and the single divergence identity that fixes the asymmetry
-between the two sectors.
-
-\paragraph{Angular harmonic basis on $S^{2}$.}
-Indices $A,B \in \{\theta,\phi\}$ run over the two-sphere, with
-unit-sphere metric $\hat g_{AB} = \mathrm{diag}(1,\sin^{2}\theta)$,
-covariant derivative $\hat\nabla_{A}$, and Levi--Civita tensor
-$\epsilon_{AB} = \sqrt{\det\hat g}\,[AB] = \sin\theta\,[AB]$ where
-$[AB]$ is the antisymmetric symbol with $[\theta\phi]=1$. Under
-the antipodal parity map $(\theta,\phi)\to(\pi-\theta,\phi+\pi)$
-the scalar harmonics transform as $Y_{\ell m}\to(-1)^{\ell}Y_{\ell m}$
-and the volume form $\epsilon_{AB}$ flips sign because the map
-reverses the orientation of $S^{2}$. A tensor field on $S^{2}$ is
-called \emph{polar} (\emph{even}-parity) if it transforms with the
-same sign as $Y_{\ell m}$, and \emph{axial} (\emph{odd}-parity) if
-it acquires an extra minus sign relative to $Y_{\ell m}$. We now
-classify all the rank-0, rank-1 and rank-2 building blocks needed
-for $h_{\mu\nu}$ by parity.
-
-\subparagraph{Rank 0 (scalar block).}
-At each multipole the only scalar harmonic is $Y_{\ell m}$ itself,
-which has parity $(-1)^{\ell}$ and is therefore polar. There is no
-odd-parity scalar harmonic at fixed $\ell$, hence no axial scalar
-amplitude. This already implies that the entire scalar block
-$\{(t,t),(t,r),(r,r)\}$ of $h_{\mu\nu}$ vanishes in the axial
-sector.
-
-\subparagraph{Rank 1 (vector block, the Hodge--Helmholtz
-decomposition).}
-By the Hodge decomposition theorem, every smooth vector field
-$V_{A}$ on a closed $2$-manifold can be written uniquely as the
-sum of an exact and a co-exact piece (the harmonic piece is absent
-on $S^{2}$ because $H^{1}(S^{2})=0$):
-\begin{equation}
-  V_{A}(\theta,\phi) \;=\; \underbrace{\hat\nabla_{A} f}_{\text{polar}}
-                          \,+\, \underbrace{\epsilon_{A}{}^{B}\hat\nabla_{B} g}_{\text{axial}},
-  \label{eq:helmholtz}
-\end{equation}
-for two scalar potentials $f, g$ on $S^{2}$. Expanding $f, g$ in
-spherical harmonics, the contribution at fixed $(\ell,m)$ uses
-the two vector harmonics
-\begin{equation}
-  \underbrace{\partial_{A}Y_{\ell m}}_{\text{polar (gradient of }Y\text{)}},
-  \qquad
-  \underbrace{X_{A}\equiv\epsilon_{A}{}^{B}\partial_{B}Y_{\ell m}}_{\text{axial (curl of }Y\text{)}},
-  \label{eq:vec-harmonics}
-\end{equation}
-with explicit components on $S^{2}$
-\begin{equation}
-  X_{A} \;=\; \bigl(-\csc\theta\,\partial_{\phi}Y_{\ell m},\;
-                     \sin\theta\,\partial_{\theta}Y_{\ell m}\bigr).
-  \label{eq:X-components}
-\end{equation}
-Their parities are
-\begin{equation}
-  \partial_{A}Y_{\ell m} \;\to\; (-1)^{\ell}\,\partial_{A}Y_{\ell m},
-  \qquad
-  X_{A} \;\to\; (-1)^{\ell+1}\,X_{A},
-  \label{eq:vec-harmonics-parity}
-\end{equation}
-the extra minus on $X_{A}$ coming from $\epsilon_{AB}\to-\epsilon_{AB}$
-under the orientation-reversing antipodal map.
-Eq.~\eqref{eq:helmholtz} is therefore the rank-1 statement that the
-two parity sectors are spanned by these two vector harmonics and
-nothing else. The mixed blocks $h_{tA}, h_{rA}$ of $h_{\mu\nu}$
-are vector fields on $S^{2}$ at each fixed $(t,r)$, so each must
-take the form
-\begin{equation}
-  h_{aA}^{\mathrm{ax}} \;=\; h_{a}(t,r)\,X_{A},
-  \qquad
-  h_{aA}^{\mathrm{pol}} \;=\; h_{a}^{\mathrm{e}}(t,r)\,\partial_{A}Y_{\ell m},
-  \qquad a\in\{t,r\},
-  \label{eq:vec-block-decomp}
-\end{equation}
-which gives the two axial amplitudes $h_{0}\equiv h_{t}, h_{1}\equiv h_{r}$
-and the two polar amplitudes $h_{0}^{\mathrm{e}}, h_{1}^{\mathrm{e}}$
-of the Regge--Wheeler parametrisation directly.
-
-\subparagraph{Rank 2 (symmetric tensor block, traceless plus trace).}
-A symmetric $(0,2)$ tensor on $S^{2}$ at fixed $(\ell,m)$ has
-three independent components, which split as one trace plus a
-two-component traceless symmetric piece. By the same Hodge
-argument applied at rank 2, every symmetric traceless tensor
-$S_{AB}$ on $S^{2}$ decomposes into an exact and a co-exact part:
-\begin{equation}
-  S_{AB} \;=\; \underbrace{T_{AB}}_{\text{polar}}
-              \,+\, \underbrace{\Sigma_{AB}}_{\text{axial}},
-  \label{eq:tensor-helmholtz}
-\end{equation}
-with the basis tensor harmonics
-\begin{equation}
-  T_{AB} \equiv
-   \hat\nabla_{A}\partial_{B}Y_{\ell m}
-   + \tfrac{1}{2}\ell(\ell+1)\hat g_{AB}\,Y_{\ell m},
-  \qquad
-  \Sigma_{AB} \equiv
-   \tfrac{1}{2}\bigl(\epsilon_{A}{}^{C}\hat\nabla_{C}\partial_{B}Y_{\ell m}
-                    +\epsilon_{B}{}^{C}\hat\nabla_{C}\partial_{A}Y_{\ell m}\bigr).
-  \label{eq:ten-harmonics}
-\end{equation}
-$T_{AB}$ is the symmetric traceless gradient of the polar vector
-harmonic $\partial_{A}Y_{\ell m}$ (the additive
-$\tfrac{1}{2}\ell(\ell+1)\hat g_{AB}Y$ piece is what removes the
-trace, using $\hat\nabla^{A}\partial_{A}Y = -\ell(\ell+1)Y$).
-$\Sigma_{AB}$ is the symmetrised gradient of the axial vector
-harmonic $X_{A}$; the dummy index $C$ is needed to contract the
-antisymmetric $\epsilon_{A}{}^{C}$ with the covariant derivative
-so that the construction yields a $(0,2)$ tensor in $A,B$. Their
-parities follow from those of $\partial_{A}Y$ and $X_{A}$:
-$T_{AB}\to(-1)^{\ell}T_{AB}$ (polar),
-$\Sigma_{AB}\to(-1)^{\ell+1}\Sigma_{AB}$ (axial). The trace piece
-is $\hat g_{AB}\,Y_{\ell m}$, which is polar. Putting the trace
-back in, the most general symmetric rank-2 tensor on $S^{2}$ at
-fixed $(\ell,m)$ is therefore spanned by
-\begin{equation}
-  \underbrace{\bigl\{\,\hat g_{AB}\,Y_{\ell m},\; T_{AB}\,\bigr\}}_{\text{polar (2 amplitudes)}},
-  \qquad
-  \underbrace{\bigl\{\,\Sigma_{AB}\,\bigr\}}_{\text{axial (1 amplitude)}}.
-  \label{eq:tensor-basis}
-\end{equation}
-Applied to the angular block $h_{AB}$ of the metric perturbation,
-this gives the polar amplitudes $K(t,r), G(t,r)$ multiplying the
-trace and traceless polar harmonics, and the single axial
-amplitude $h_{2}(t,r)$ multiplying $\Sigma_{AB}$.
-
-\subparagraph{Counting summary.}
-Tabulating the polar/axial decomposition block by block:
-\begin{equation}
-\begin{array}{l|cc}
-\text{block of }h_{\mu\nu} & \text{polar amplitudes} & \text{axial amplitudes}\\\hline
-\{(t,t),(t,r),(r,r)\}\text{ (3 scalars)} & H_{0},H_{1},H_{2} & 0\\
-\{(t,A),(r,A)\}\text{ (2 vectors)}       & h_{0}^{\mathrm{e}},h_{1}^{\mathrm{e}} & h_{0},h_{1}\\
-\{(A,B)\}\text{ (1 sym.\ tensor)}         & K,G & h_{2}\\\hline
-\text{total}                              & 7 & 3
-\end{array}
-\label{eq:hmunu-count}
-\end{equation}
-matching the Regge--Wheeler counts $\{3,2,2\}$ in the polar sector
-$(H_{0},H_{1},H_{2}; h_{0}^{\mathrm{e}},h_{1}^{\mathrm{e}}; K,G)$ and
-$\{0,2,1\}$ in the axial sector $(0; h_{0},h_{1}; h_{2})$, with
-totals $7$ and $3$ respectively. This counting is the explicit
-content of the matrices Eqs.~\eqref{eq:axial-matrix-pre} and
-\eqref{eq:polar-matrix-pre} of the per-sector subsections below.
-
-\subparagraph{Divergence identity used in the gauge fixing.}
-The single fact about Eqs.~\eqref{eq:vec-harmonics} that drives
-the asymmetric gauge count between the two parity sectors is
-\begin{equation}
-  \boxed{\;
-  \hat\nabla^{A}\partial_{A}Y_{\ell m}
-   = -\ell(\ell+1)\,Y_{\ell m} \;\neq\; 0,
-  \qquad
-  \hat\nabla^{A} X_{A}
-   = \epsilon^{AB}\hat\nabla_{A}\partial_{B}Y_{\ell m} \;=\; 0,
-  \;}
-  \label{eq:Xdiv-Ydiv}
-\end{equation}
-where the second equality follows from contracting the symmetric
-tensor $\hat\nabla_{A}\partial_{B}Y$ with the antisymmetric
-$\epsilon^{AB}$. The polar gradient $\partial_{A}Y$ is
-divergence-rich on $S^{2}$, the axial curl $X_{A}$ is
-divergence-free; this single difference is what makes the gauge
-fixing one-condition in the axial sector and three-condition in
-the polar sector, as we now record.
-
-\paragraph{Why one condition in the axial sector and three in the
-polar sector.}
-The gauge-generator $\xi_{\mu}$ has one axial scalar component
-($\Lambda$, multiplying $X_{A}$) and three polar scalar components
-($\xi^{t},\xi^{r}$ multiplying $Y$, and $\xi^{\mathrm{e}}$
-multiplying $\partial_{A}Y$). Combined with
-Eq.~\eqref{eq:Xdiv-Ydiv}, this gives the bookkeeping:
-\begin{itemize}\itemsep1pt
-  \item Axial sector: $1$ gauge generator vs $3$ axial amplitudes
-        $\{h_{0},h_{1},h_{2}\}$, so exactly one gauge condition
-        can be imposed. The single attainable condition is
-        $h_{2}=0$, because the action of $\nabla\xi$ on the axial
-        vector $\Lambda X_{A}$ has zero divergence on $S^{2}$
-        (Eq.~\eqref{eq:Xdiv-Ydiv}, second identity), so $\Lambda$
-        cannot reach $h_{0}$ or $h_{1}$.
-  \item Polar sector: $3$ gauge generators vs $7$ polar amplitudes,
-        so exactly three gauge conditions can be imposed. The
-        choice $G=h_{0}^{\mathrm{e}}=h_{1}^{\mathrm{e}}=0$ is
-        attainable because the action of $\nabla\xi$ on the polar
-        gradient $\xi^{\mathrm{e}}\partial_{A}Y$ has nonzero
-        divergence (Eq.~\eqref{eq:Xdiv-Ydiv}, first identity), so
-        the three polar gauge functions reach all three target
-        components.
-\end{itemize}
-The asymmetry $1$ vs $3$ in the gauge-fixing count is therefore
-not arbitrary: it is dictated by the count of independent
-spherical-harmonic generators in each parity sector and made
-operative by Eq.~\eqref{eq:Xdiv-Ydiv}. The explicit matrix forms
-of $h_{\mu\nu}$ before and after Eq.~\eqref{eq:rw-gauge}, and the
-componentwise action of the gauge generators that achieves the
-fixing in each sector, are recorded in
-Secs.~\ref{sec:rw-axial-derivation} and
-\ref{sec:rw-polar-derivation} where they are used. The further
-reduction from $2$ to $1$ axial degree of freedom and from $4$ to
-$1$ polar degree of freedom is the work of the linearised Einstein
-equations and is carried out there.
-
-\subsection{Axial sector: Regge--Wheeler equation}
-\label{sec:rw-axial-derivation}
-
-\paragraph{Axial perturbation matrix.}
-Writing the three Regge--Wheeler axial scalars as
-$h_{0}, h_{1}, h_{2}$, the most general axial perturbation is
-\begin{equation}
-  h_{\mu\nu}^{\mathrm{ax}} \;=\;
-  \!\left(\begin{array}{cccc}
-    0 & 0
-       & h_{0}\,X_{\theta}
-       & h_{0}\,X_{\phi}\\[2pt]
-    0 & 0
-       & h_{1}\,X_{\theta}
-       & h_{1}\,X_{\phi}\\[2pt]
-    h_{0}\,X_{\theta}
-       & h_{1}\,X_{\theta}
-       & h_{2}\,\Sigma_{\theta\theta}
-       & h_{2}\,\Sigma_{\theta\phi}\\[2pt]
-    h_{0}\,X_{\phi}
-       & h_{1}\,X_{\phi}
-       & h_{2}\,\Sigma_{\theta\phi}
-       & h_{2}\,\Sigma_{\phi\phi}
-  \end{array}\right)\!
-  \label{eq:axial-matrix-pre}
-\end{equation}
-in coordinates $(t,r,\theta,\phi)$. The $(t,t),(t,r),(r,r)$ block
-is identically zero because there are no axial scalar harmonics,
-and there is no axial scalar piece of $\xi^{\mu}$ that could
-populate it.
-
-\emph{Axial gauge generator.}
-The axial part of $\xi_{\mu}$ is a single function $\Lambda(t,r)$
-multiplying $X_{A}$, namely $\xi_{A}^{\mathrm{ax}} = \Lambda\,X_{A}$
-and $\xi_{t} = \xi_{r} = 0$. Substituting into
-Eq.~\eqref{eq:gauge-transf} and projecting onto the axial bases
-gives
-\begin{equation}
-  h_{0}\to h_{0} - \dot\Lambda,
-  \qquad
-  h_{1}\to h_{1} - \Lambda' + \tfrac{2}{r}\Lambda,
-  \qquad
-  h_{2}\to h_{2} - 2\Lambda,
-  \label{eq:axial-gauge-action}
-\end{equation}
-where $\dot{\,} = \partial_{t}$ and $' = \partial_{r}$.
-Choosing $\Lambda = h_{2}/2$ sets $h_{2} = 0$ identically. The
-single axial gauge function is then completely spent: any
-further attempt to use $\Lambda$ would re-introduce a nonzero
-$h_{2}$. The remaining axial functions $h_{0}, h_{1}$ are
-\emph{not} pure gauge and survive into the dynamical equations.
-
-\emph{Axial RW-gauge matrix.}
-Setting $h_{2} = 0$ in Eq.~\eqref{eq:axial-matrix-pre} gives
-\begin{equation}
-  h_{\mu\nu}^{\mathrm{ax,RW}} \;=\;
-  \!\left(\begin{array}{cccc}
-    0 & 0
-       & {-h_{0}\csc\theta\,\partial_{\phi}Y}
-       & h_{0}\sin\theta\,\partial_{\theta}Y\\[2pt]
-    0 & 0
-       & {-h_{1}\csc\theta\,\partial_{\phi}Y}
-       & h_{1}\sin\theta\,\partial_{\theta}Y\\[2pt]
-    {-h_{0}\csc\theta\,\partial_{\phi}Y}
-       & {-h_{1}\csc\theta\,\partial_{\phi}Y}
-       & 0
-       & 0\\[2pt]
-    h_{0}\sin\theta\,\partial_{\theta}Y
-       & h_{1}\sin\theta\,\partial_{\theta}Y
-       & 0
-       & 0
-  \end{array}\right)\!
-  \label{eq:axial-matrix-RW}
-\end{equation}
-which agrees with Eq.~\eqref{eq:axial-components} below. The
-$\csc\theta$ and $\sin\theta$ factors are the components of
-$X_{A}$ from Eq.~\eqref{eq:vec-harmonics}; they are part of the
-definition of the axial vector harmonic and are not removable
-by any further gauge choice. The angular block has been
-emptied; the only nonzero entries are the four mixed
-$h_{aA}$ pieces with $a\in\{t,r\}$, $A\in\{\theta,\phi\}$. The
-same four entries are recorded in component form in
-Eq.~\eqref{eq:axial-components} of the explicit projection that
-follows, where they are used directly in evaluating
-$\delta R_{\mu\nu}$.
-
-\input{sections/axial_projection}
-
-Following the original derivation of \citet{ReggeWheeler1957} and
-adopting the form recorded by
-\citet[App.~A, Eqs.~(A22)--(A24)]{Sago2003} as their Z\,(C6a--c),
-the three independent radial equations derived above read
-\begin{align}
-  &\partial_{r}^{2} h_{0}
-   - \partial_{t}\partial_{r} h_{1}
-   - \frac{2}{r}\,\partial_{t} h_{1}
-   + \!\left[\frac{4M}{r^{2}} - \frac{\ell(\ell+1)}{r}\right]\!
-       \frac{h_{0}}{\,r-2M\,} \;=\; 0,
-  \label{eq:rw-A}\\[2pt]
-  &\partial_{t}^{2} h_{1}
-   - \partial_{t}\partial_{r} h_{0}
-   + \frac{2}{r}\,\partial_{t} h_{0}
-   + \frac{(\ell-1)(\ell+2)\,f(r)}{r^{2}}\, h_{1} \;=\; 0,
-  \label{eq:rw-B}\\[2pt]
-  &\partial_{r}\!\bigl[f(r)\, h_{1}\bigr]
-   - f(r)^{-1}\,\partial_{t} h_{0} \;=\; 0.
-  \label{eq:rw-C}
-\end{align}
-Equation \eqref{eq:rw-C} is the Hamiltonian constraint of the
-axial sector and is preserved by the time evolution generated by
-Eqs.~\eqref{eq:rw-A}--\eqref{eq:rw-B} as a consequence of the
-twice-contracted Bianchi identity. Using the tortoise coordinate
-of Eq.~\eqref{eq:tortoise}, with
-$\partial_{r_{\!*}} = f\,\partial_{r}$, the constraint
-\eqref{eq:rw-C} can be written as
-\begin{equation}
-  \partial_{r_{\!*}}\!\bigl[f(r)\, h_{1}\bigr]
-  \;=\; \partial_{t} h_{0}.
-  \label{eq:rw-C-tortoise}
-\end{equation}
-
-Define the \emph{Regge--Wheeler function}
-\begin{equation}
-  Q(t,r) \;\equiv\; \frac{f(r)}{r}\,h_{1}(t,r),
-  \label{eq:rw-Q}
-\end{equation}
-so that $f h_{1} = r Q$ and $h_{1} = rQ/f$. The constraint
-\eqref{eq:rw-C-tortoise} then reads
-\begin{equation}
-  \partial_{t} h_{0} \;=\; \partial_{r_{\!*}}(rQ)
-                   \;=\; f\,Q + r\,\partial_{r_{\!*}} Q,
-  \label{eq:rw-Q-constraint}
-\end{equation}
-where the second equality uses
-$\partial_{r_{\!*}} r = f$. Apply $\partial_{r_{\!*}}$ to
-Eq.~\eqref{eq:rw-Q-constraint} and commute it with $\partial_{t}$
-on the right:
-\begin{equation}
-  \partial_{r_{\!*}}^{2}(rQ)
-  \;=\; \partial_{r_{\!*}} \partial_{t} h_{0}
-  \;=\; f\,\partial_{t} \partial_{r} h_{0}.
-  \label{eq:rw-step1}
-\end{equation}
-Now use Eq.~\eqref{eq:rw-B}, solved for $\partial_{t}\partial_{r}h_{0}$,
-to eliminate the cross derivative on the right of
-Eq.~\eqref{eq:rw-step1}:
-\begin{equation}
-  \partial_{r_{\!*}}^{2}(rQ)
-  \;=\; f\,\partial_{t}^{2} h_{1}
-      + \frac{2f}{r}\,\partial_{t} h_{0}
-      + \frac{(\ell-1)(\ell+2)\,f^{2}}{r^{2}}\, h_{1}.
-  \label{eq:rw-step2}
-\end{equation}
-Substitute $h_{1} = rQ/f$ and
-$\partial_{t} h_{0} = fQ + r\partial_{r_{\!*}} Q$ from
-Eq.~\eqref{eq:rw-Q-constraint}; the three terms on the right of
-Eq.~\eqref{eq:rw-step2} become
-\begin{align}
-  f\,\partial_{t}^{2} h_{1}
-    &= r\,\partial_{t}^{2} Q,
-  \label{eq:rw-piece1}\\
-  \frac{2f}{r}\,\partial_{t} h_{0}
-    &= \frac{2f^{2}}{r}\,Q + 2f\,\partial_{r_{\!*}} Q,
-  \label{eq:rw-piece2}\\
-  \frac{(\ell-1)(\ell+2)\,f^{2}}{r^{2}}\, h_{1}
-    &= \frac{(\ell-1)(\ell+2)\,f}{r}\,Q.
-  \label{eq:rw-piece3}
-\end{align}
-The left-hand side of Eq.~\eqref{eq:rw-step2} expands as
-\begin{align}
-  \partial_{r_{\!*}}^{2}(rQ)
-    &= \partial_{r_{\!*}}\!\bigl[f Q + r\,\partial_{r_{\!*}} Q\bigr]
-  \nonumber\\
-    &= (\partial_{r_{\!*}} f)\,Q
-       + 2 f\,\partial_{r_{\!*}} Q
-       + r\,\partial_{r_{\!*}}^{2} Q,
-  \label{eq:rw-lhs-expand}
-\end{align}
-where $\partial_{r_{\!*}} f = f f' = f \cdot (2M/r^{2})
-                              = 2Mf/r^{2}$.
-Inserting Eq.~\eqref{eq:rw-lhs-expand} and
-Eqs.~\eqref{eq:rw-piece1}--\eqref{eq:rw-piece3} into
-Eq.~\eqref{eq:rw-step2} gives
-\begin{equation}
-  \frac{2Mf}{r^{2}}\,Q
-  + 2f\,\partial_{r_{\!*}} Q
-  + r\,\partial_{r_{\!*}}^{2} Q
-  =
-  r\,\partial_{t}^{2} Q
-  + \frac{2 f^{2}}{r}\,Q
-  + 2f\,\partial_{r_{\!*}} Q
-  + \frac{(\ell-1)(\ell+2)\,f}{r}\,Q.
-  \label{eq:rw-master-raw}
-\end{equation}
-The two $2f\,\partial_{r_{\!*}} Q$ terms cancel. Dividing through
-by $r$ and rearranging yields
-\begin{equation}
-  \partial_{t}^{2} Q - \partial_{r_{\!*}}^{2} Q
-  + \!\left[\frac{(\ell-1)(\ell+2)\,f}{r^{2}}
-            + \frac{2 f^{2}}{r^{2}}
-            - \frac{2Mf}{r^{3}}\right]\! Q
-  \;=\; 0.
-  \label{eq:rw-master-raw2}
-\end{equation}
-The bracketed potential simplifies algebraically. Using
-$2f = 2 - 4M/r$, the leading terms inside the bracket combine as
-\begin{equation}
-  (\ell-1)(\ell+2) + 2f
-  = (\ell^{2}+\ell-2) + 2 - \tfrac{4M}{r}
-  = \ell(\ell+1) - \tfrac{4M}{r},
-  \label{eq:rw-bracket}
-\end{equation}
-so that
-\begin{equation}
-  \frac{(\ell-1)(\ell+2)\,f}{r^{2}}
-  + \frac{2 f^{2}}{r^{2}}
-  - \frac{2Mf}{r^{3}}
-  = f\,\frac{\ell(\ell+1)}{r^{2}}
-   - f\,\frac{4M}{r^{3}}
-   - \frac{2Mf}{r^{3}}
-  = f\!\left[\frac{\ell(\ell+1)}{r^{2}} - \frac{6M}{r^{3}}\right].
-  \label{eq:rw-V-collapse}
-\end{equation}
-Substituting Eq.~\eqref{eq:rw-V-collapse} into
-Eq.~\eqref{eq:rw-master-raw2} gives the Regge--Wheeler equation
-\begin{equation}
-  \boxed{\;
-  \partial_{t}^{2} Q - \partial_{r_{\!*}}^{2} Q
-  + V_{\ell}^{\mathrm{RW}}(r)\,Q \;=\; 0,
-  \qquad
-  V_{\ell}^{\mathrm{RW}}(r)
-  = f(r)\!\left[\frac{\ell(\ell+1)}{r^{2}} - \frac{6M}{r^{3}}\right],
-  \;}
-  \label{eq:rw-eqn}
-\end{equation}
-which agrees with Eq.~(7) of \citet{ReggeWheeler1957}. We have not
-yet used Eq.~\eqref{eq:rw-A}; it is the
-Bianchi-implied consequence of Eqs.~\eqref{eq:rw-B}
-and~\eqref{eq:rw-C} and serves as an algebraic identity once
-Eq.~\eqref{eq:rw-eqn} is satisfied, which provides an internal
-consistency check on the reduction.
-
-\subsection{Polar sector: Zerilli equation}
-\label{sec:rw-polar-derivation}
-
-\paragraph{Polar perturbation matrix.}
-Writing the seven polar scalars as
-$H_{0},H_{1},H_{2},h_{0}^{\mathrm{e}},h_{1}^{\mathrm{e}},K,G$, the
-most general polar metric perturbation in coordinates
-$(t,r,\theta,\phi)$ reads
-\begin{equation}
-  h_{\mu\nu}^{\mathrm{pol}} \;=\;
-  \!\left(\begin{array}{cccc}
-    H_{0}\,Y & H_{1}\,Y
-       & h_{0}^{\mathrm{e}}\,\partial_{\theta}Y
-       & h_{0}^{\mathrm{e}}\,\partial_{\phi}Y\\[2pt]
-    H_{1}\,Y & H_{2}\,Y
-       & h_{1}^{\mathrm{e}}\,\partial_{\theta}Y
-       & h_{1}^{\mathrm{e}}\,\partial_{\phi}Y\\[2pt]
-    h_{0}^{\mathrm{e}}\,\partial_{\theta}Y
-       & h_{1}^{\mathrm{e}}\,\partial_{\theta}Y
-       & r^{2}\!\bigl(KY + G\,T_{\theta\theta}\bigr)
-       & r^{2} G\,T_{\theta\phi}\\[2pt]
-    h_{0}^{\mathrm{e}}\,\partial_{\phi}Y
-       & h_{1}^{\mathrm{e}}\,\partial_{\phi}Y
-       & r^{2} G\,T_{\theta\phi}
-       & r^{2}\!\bigl(K\sin^{2}\!\theta\,Y + G\,T_{\phi\phi}\bigr)
-  \end{array}\right)\!,
-  \label{eq:polar-matrix-pre}
-\end{equation}
-with three independent angular tensor pieces in the
-bottom-right block: $K$ multiplies the trace part $\hat g_{AB}Y$
-and $G$ multiplies the traceless part $T_{AB}$ of
-Eq.~\eqref{eq:ten-harmonics}.
-
-\paragraph{Polar gauge generators and the choice
-$G=h_{0}^{\mathrm{e}}=h_{1}^{\mathrm{e}}=0$.}
-The polar part of $\xi_{\mu}$ has three scalar functions
-$\xi^{t}(t,r),\xi^{r}(t,r),\xi^{\mathrm{e}}(t,r)$, namely
-$\xi_{t}=\xi^{t}Y$, $\xi_{r}=\xi^{r}Y$,
-$\xi_{A}=\xi^{\mathrm{e}}\partial_{A}Y$. Substituting into
-Eq.~\eqref{eq:gauge-transf}, projecting onto the polar bases and
-using Eq.~\eqref{eq:Xdiv-Ydiv}, the seven polar functions
-transform as
-\begin{equation}
-\begin{aligned}
-  H_{0} &\to H_{0} - 2\dot\xi^{t} + \tfrac{Mf}{r^{2}}\xi^{r},
-   \quad &
-  H_{1} &\to H_{1} - \dot\xi^{r} - {\xi^{t}}',
-   \quad &
-  H_{2} &\to H_{2} - 2{\xi^{r}}'
-              - \tfrac{2M}{r^{2}f}\xi^{r},\\
-  h_{0}^{\mathrm{e}} &\to h_{0}^{\mathrm{e}} - \xi^{t}
-                         - \dot\xi^{\mathrm{e}},
-   \quad &
-  h_{1}^{\mathrm{e}} &\to h_{1}^{\mathrm{e}} - \xi^{r}
-                         - {\xi^{\mathrm{e}}}'
-                         + \tfrac{2}{r}\xi^{\mathrm{e}},
-   \quad &
-  G &\to G - \tfrac{2}{r^{2}}\xi^{\mathrm{e}},\\
-  K &\to K - \tfrac{2f}{r}\xi^{r}
-            - \tfrac{2}{r^{2}}\ell(\ell+1)\xi^{\mathrm{e}}.
-   \quad & & & &
-\end{aligned}
-\label{eq:polar-gauge-action}
-\end{equation}
-The expressions for these polar transformations agree with
-\citet[Eqs.~(II.7)--(II.8)]{Zerilli1970} and the review of
-\citet{Berti2009review}. The crucial appearance is the
-$\ell(\ell+1)\xi^{\mathrm{e}}$ contribution to $K$, which comes
-from $\hat\nabla^{A}\partial_{A}Y\neq 0$ (the polar half of
-Eq.~\eqref{eq:Xdiv-Ydiv}); the $\xi^{t},\xi^{r}$ contributions to
-$h_{0}^{\mathrm{e}},h_{1}^{\mathrm{e}}$ likewise require a polar
-harmonic with nonzero divergence on $S^{2}$. Setting
-\begin{equation}
-  \xi^{\mathrm{e}} = \tfrac{r^{2}}{2}G,
-  \qquad
-  \xi^{t} = h_{0}^{\mathrm{e}} - \dot\xi^{\mathrm{e}},
-  \qquad
-  \xi^{r} = h_{1}^{\mathrm{e}} - {\xi^{\mathrm{e}}}'
-            + \tfrac{2}{r}\xi^{\mathrm{e}},
-  \label{eq:polar-gauge-choice}
-\end{equation}
-in that order, kills $G$ first, then $h_{0}^{\mathrm{e}}$ and
-$h_{1}^{\mathrm{e}}$. The three polar gauge functions
-$\{\xi^{t},\xi^{r},\xi^{\mathrm{e}}\}$ are now completely spent;
-no freedom remains to touch $H_{0},H_{1},H_{2},K$.
-
-\paragraph{Polar RW-gauge matrix.}
-Substituting $G=h_{0}^{\mathrm{e}}=h_{1}^{\mathrm{e}}=0$ into
-Eq.~\eqref{eq:polar-matrix-pre} gives the diagonal-block form
-\begin{equation}
-  h_{\mu\nu}^{\mathrm{pol,RW}} \;=\;
-  \!\left(\begin{array}{cccc}
-    H_{0}\,Y & H_{1}\,Y & 0 & 0\\[2pt]
-    H_{1}\,Y & H_{2}\,Y & 0 & 0\\[2pt]
-    0 & 0 & r^{2} K\,Y & 0\\[2pt]
-    0 & 0 & 0 & r^{2}\sin^{2}\!\theta\,K\,Y
-  \end{array}\right)\!,
-  \label{eq:polar-matrix-RW}
-\end{equation}
-in which the entire mixed block is zero, the angular block is
-diagonal, and only the four scalar amplitudes
-$H_{0},H_{1},H_{2},K$ remain.
-
-\paragraph{Reduction to the Zerilli master function.}
-The polar sector is algebraically heavier than the axial one
-because the four surviving RW-gauge functions
-$(H_{0},H_{1},H_{2},K)$ are subject to seven nontrivial components
-of $\delta R_{\mu\nu}=0$, organised by \citet{Zerilli1970}. After
-algebraic elimination using the constraint components
-$\delta R_{tr}=\delta R_{tt}=0$, the system reduces to two coupled
-first-order partial differential equations in $r$ and $t$ for two
-independent linear combinations of $K$ and $H_{1}$. The full
-componentwise projection parallel to the axial calculation in
-Sec.~\ref{sec:rw-axial-derivation} above is straightforward in
-principle but algebraically lengthy; rather than reproduce it, we
-record the gauge-invariant master function and its master
-equation, both of which are independent of the intermediate
-constraint elimination. \citet{Moncrief1974} introduced the
-gauge-invariant combination
-\begin{equation}
-  \psi_{\mathrm{Z}}(t,r) \;\equiv\;
-  \frac{r}{n+1}\!\left[
-    K(t,r)
-    + \frac{f(r)}{n + 3M/r}
-      \bigl(H_{2}(t,r) - r\,\partial_{r} K(t,r)\bigr)
-  \right],
-  \label{eq:moncrief-psi}
-\end{equation}
-with $n = (\ell-1)(\ell+2)/2$ as in Eq.~\eqref{eq:n-def}.
-Eq.~\eqref{eq:moncrief-psi} is gauge-invariant in the sense that
-its value is unchanged under the polar piece of the residual
-gauge freedom of Eq.~\eqref{eq:gauge-transf} that survives
-Eq.~\eqref{eq:rw-gauge}, so the same $\psi_{\mathrm{Z}}$ is
-extracted in any gauge \citep{Moncrief1974}. Substituting
-Eq.~\eqref{eq:moncrief-psi} into the polar reduction of
-Eq.~\eqref{eq:dR-vacuum} and using the constraint components to
-eliminate the remaining metric functions yields the
-\emph{Zerilli equation}
-\begin{equation}
-  \partial_{t}^{2} \psi_{\mathrm{Z}}
-  - \partial_{r_{\!*}}^{2} \psi_{\mathrm{Z}}
-  + V_{\ell}^{\mathrm{Z}}(r)\,\psi_{\mathrm{Z}} \;=\; 0,
-  \label{eq:zerilli-eqn-app}
-\end{equation}
-with the Zerilli potential
-\begin{equation}
-  V_{\ell}^{\mathrm{Z}}(r) \;=\;
-  \frac{2 f(r)}{r^{3}}\,
-  \frac{n^{2}(n+1)\,r^{3} + 3 n^{2} M r^{2}
-        + 9 n M^{2} r + 9 M^{3}}{(n r + 3M)^{2}}.
-  \label{eq:V-zerilli-app}
-\end{equation}
-Eq.~\eqref{eq:V-zerilli-app} agrees identically with
-Eq.~\eqref{eq:V-zerilli} of the main text. The intermediate
-elimination from the polar system to
-Eq.~\eqref{eq:zerilli-eqn-app} is algebraically lengthy and is
-performed in full in \citet[Eqs.~(II.10)--(II.18)]{Zerilli1970}
-and \citet[Sec.~II]{Moncrief1974}; we do not reproduce it here.
-The two derivations agree on
-Eq.~\eqref{eq:V-zerilli-app}, and a third independent check is
-provided by the Chandrasekhar--Detweiler intertwining relation,
-under which $V_{\ell}^{\mathrm{RW}}$ and $V_{\ell}^{\mathrm{Z}}$
-are related by a first-order operator \citep{Berti2009review} and
-share the same QNM spectrum.
-
-\subsection{Verification of the Zerilli potential}
-\label{sec:rw-verify}
-
-A non-trivial sanity check on Eq.~\eqref{eq:V-zerilli-app} comes
-from its asymptotic behaviour at the horizon and at infinity, and
-from its $\ell = 2$ specialisation used throughout the paper. The
-parallel asymptotic check on the Regge--Wheeler potential
-$V_{\ell}^{\mathrm{RW}}$ of Eq.~\eqref{eq:rw-eqn} is immediate
-from inspection: the bracket
-$\ell(\ell+1)/r^{2}-6M/r^{3}$ is bounded and analytic for
-$r\ge 2M$, the prefactor $f(r)$ vanishes linearly at the horizon
-and tends to $1$ at infinity, so $V_{\ell}^{\mathrm{RW}}\to 0$ at
-the horizon and $V_{\ell}^{\mathrm{RW}}\to \ell(\ell+1)/r^{2}$ at
-infinity, in agreement with Eq.~\eqref{eq:V-asymptotic}. The
-remainder of this subsection is dedicated to the analogous,
-slightly less trivial check for the polar potential.
-
-At the horizon, $f(r) \to 0$ as $r \to 2M$, and the rational
-factor in Eq.~\eqref{eq:V-zerilli-app} is regular at $r = 2M$
-because $n r + 3M = 2nM + 3M > 0$ for $\ell \ge 2$. Therefore
-$V_{\ell}^{\mathrm{Z}}(r) \to 0$ as $r \to 2M$, that is, as
-$x \to -\infty$ in the tortoise coordinate of
-Eq.~\eqref{eq:tortoise}. The decay is exponential in $x$ because
-$f \sim e^{x/(2M)}$ near the horizon, recovering the
-$V \propto e^{x/(2M)}$ behaviour quoted in
-Eq.~\eqref{eq:V-asymptotic}.
-
-At infinity, $f \to 1$ and the leading behaviour of the rational
-factor is
-\begin{equation}
-  \frac{n^{2}(n+1)\,r^{3} + 3 n^{2} M r^{2} + 9 n M^{2} r + 9 M^{3}}
-       {(n r + 3 M)^{2}}
-  \;=\;
-  (n+1)\,r + O(1)
-  \quad \text{as } r \to \infty,
-  \label{eq:V-asym-r}
-\end{equation}
-so that
-\begin{equation}
-  V_{\ell}^{\mathrm{Z}}(r)
-  \;\xrightarrow[r\to\infty]{}\;
-  \frac{2(n+1)}{r^{2}}
-  \;=\; \frac{\ell(\ell+1)}{r^{2}},
-  \label{eq:V-asym-l}
-\end{equation}
-which is the centrifugal barrier of a free wave on a flat
-$3{+}1$ background, as expected from the spherical decomposition
-of Sec.~\ref{sec:rw-tensor-harmonics}. This matches the
-$x \to +\infty$ limit recorded in Eq.~\eqref{eq:V-asymptotic}.
-
-For the dipole multipole $\ell = 2$ used in this paper, the
-parameter is $n = (1)(4)/2 = 2$, and
-Eq.~\eqref{eq:V-zerilli-app} reduces to
-\begin{equation}
-  V_{2}^{\mathrm{Z}}(r)
-  = \frac{2 f(r)}{r^{3}}\,
-    \frac{12\,r^{3} + 12 M r^{2} + 18 M^{2} r + 9 M^{3}}
-         {(2r + 3M)^{2}}.
-  \label{eq:V2-explicit}
-\end{equation}
-Setting $M = 1$ and evaluating at the photon-sphere radius
-$r = 3M = 3$ gives $f(3) = 1/3$, $2 r + 3 M = 9$, and
-\begin{equation}
-  V_{2}^{\mathrm{Z}}(3)
-  = \frac{2/3}{27}\,
-    \frac{12{\cdot}27 + 12{\cdot}9 + 18{\cdot}3 + 9}
-         {81}
-  = \frac{2}{81}\cdot \frac{324+108+54+9}{81}
-  = \frac{2 \cdot 495}{81 \cdot 81}
-  = \frac{990}{6561}
-  \approx 0.151,
-  \label{eq:V2-photon}
-\end{equation}
-which is finite, positive, and of the same order of magnitude as
-the peak of $V_{2}^{\mathrm{Z}}$ near the photon sphere quoted by
-\citet{Berti2009review}; the exact peak of the polar potential
-lies slightly outside $r = 3M$ and is found by setting
-$\mathrm{d}V_{2}^{\mathrm{Z}}/\mathrm{d}r = 0$. Combining
-Eq.~\eqref{eq:zerilli-eqn-app} with Eq.~\eqref{eq:V-zerilli-app}
-and the identification $\Phi(t,x) \equiv \psi_{\mathrm{Z}}(t,r(x))$
-recovers exactly the form
-$\partial_{t}^{2} \Phi - \partial_{x}^{2} \Phi
-  + V_{\ell}^{\mathrm{Z}}\,\Phi = 0$
-of Eq.~\eqref{eq:zerilli} in the main text, closing the
-derivation.
+\input{sections/supplementary_appendix}
 
 % =====================================================================
 \section{Hyperparameter tables}\label{app:hyper}
@@ -2464,8 +733,8 @@ variants of Sec.~\ref{sec:inv-pinn}.
 forward PINN
 and all six inverse PINN variants. The two pipelines differ only
 in the number of L-BFGS iterations ($30\,000$ forward, $15\,000$
-inverse) and in the additional inverse-specific blocks of
-Table~\ref{tab:inv-hyper}.}
+inverse) and in the inverse-specific settings listed below the
+table.}
 \label{tab:fwd-hyper}
 \small
 \begin{tabular}{lll}
@@ -2508,70 +777,27 @@ QNM window
 \end{tabular}
 \end{table}
 
-\begin{table}[h!]
-\centering
-\caption{Inverse-PINN-specific hyperparameters for the six variants
-of Sec.~\ref{sec:inv-pinn}. The mass guess
-$M_{\mathrm{init}} = 0.8$ ($20\%$ below truth) and the
-ringdown initial guesses
-$(\omega_{\mathrm{init}},\tau_{\mathrm{init}},
-A_{\mathrm{ring,init}},\phi_{0,\mathrm{init}}) =
-(0.30,\,8.0,\,0.5,\,0.0)$
-are common to all variants. The data weight $\lambda_{\mathrm{data}}=10$
-and the noisy-data setup
-$(N_{\mathrm{obs}},\sigma_{\mathrm{noise}})=(500,\,0.01)$ are also
-common. The three columns that vary across variants are the
-ringdown loss weight $\lambda_{\mathrm{ring}}$, the ringdown lower
-bound $t_{\mathrm{ring,min}}/M$, and the number of template
-evaluation points $N_{\mathrm{ring}}$.}
-\label{tab:inv-hyper}
-\small
-\begin{tabular}{lcccc}
-\hline
-Variant & Config name &
-$\lambda_{\mathrm{ring}}$ & $t_{\mathrm{ring,min}}/M$ & $N_{\mathrm{ring}}$ \\
-\hline
-Baseline & \texttt{inverse\_qnm}          & $1$    & $10$ & $200$  \\
-A        & \texttt{inverse\_qnm\_tring18} & $1$    & $18$ & $200$  \\
-B        & \texttt{inverse\_qnm\_lring100} & $100$ & $10$ & $200$  \\
-C        & \texttt{inverse\_qnm\_nring1000} & $1$  & $10$ & $1000$ \\
-D        & \texttt{inverse\_qnm\_combo}   & $100$  & $18$ & $1000$ \\
-E        & \texttt{inverse\_qnm\_2mode}   & $100$  & $18$ & $1000$ \\
-\hline
-\end{tabular}
-\end{table}
-
-Variant E differs from D in the template, since E uses a two-mode
-ringdown ($n=0$ and $n=1$) and D uses a single-mode template
-($n=0$ only). All other inverse-PINN settings are identical
-between D and E.
+The inverse variants add the template hyperparameters
+$(\tring, \lambda_{\mathrm{ring}}, \Nring)$ of
+Table~\ref{tab:variants}, with common initial guesses
+$M_{\mathrm{init}} = 0.8$,
+$(\omega, \tau, A_{\mathrm{ring}}, \phi)_{\mathrm{init}} =
+(0.30,\,8.0,\,0.5,\,0.0)$, data weight
+$\lambda_{\mathrm{data}} = 10$, and noisy-data setup
+$(N_{\mathrm{obs}}, \sigma_{\mathrm{noise}}) = (500,\,0.01)$.
 
 \section{ESPRIT (M3) results}\label{app:esprit}
 
-The ESPRIT subspace decomposition of Sec.~\ref{sec:qnm-methods},
-applied to the forward PINN field
-$\Phi_\theta(x_{\mathrm{obs}},t)$ on the QNM window
-$t \in [10,\,50]\,M$ with model order $K = 6$, returns the six
-complex exponential components listed in Table~\ref{tab:esprit-fwd}.
-Our M3 estimator selects the component of largest amplitude, which
-is $k=6$ at $\omega = 0.4829$ ($29.2\%$ above the Leaver value
-$0.3737$) and $\tau = 7.84\,M$ ($30.3\%$ below $11.241\,M$); this is
-the M3 entry of Table~\ref{tab:fwd-qnm}. Inspection of the
-full decomposition, however, shows that the closest match to the
-analytic fundamental is in fact $k=5$, at $\omega = 0.376$ and
-$\tau = 11.10\,M$ (within $0.6\%$ and $1.3\%$ of Leaver). This
-component is not selected because its amplitude
-($|A_5| = 2.3\times 10^{-41}$) is below the spurious $k=6$ pole
-($|A_6| = 9.2\times 10^{-41}$). Both candidate amplitudes lie more than forty orders of magnitude below the
-signal scale ($\Phi \sim 10^{-1}$), so the entire spectrum is in
-the numerical-noise floor of the Hankel decomposition and any
-amplitude-based selection is unstable. Two further components
-($k=2,4$) sit at the origin with $\tau \to \infty$; component $k=1$
-is a degenerate machine-zero pole at $\tau = 0.025\,M$ with $|A_1|=0$,
-and $k=3$ has negative $\omega$ with sub-Planckian amplitude. All
-four are unphysical numerical artefacts. ESPRIT is
-therefore reported only here, in the appendix, and is not used in
-any primary number of Sec.~\ref{sec:results}.
+Applied to the forward-PINN observer series ($t\in[10,50]\,M$,
+model order $K = 6$), ESPRIT returns the decomposition of
+Table~\ref{tab:esprit-fwd}: the amplitude-selected component
+($k = 6$) lies roughly $30\%$ from the Leaver values while the
+component closest to the fundamental ($k = 5$, within $0.6\%$
+and $1.3\%$) is not selected, and all candidate amplitudes lie
+at least twenty orders of magnitude below the signal scale. On
+a field that is by construction a nearly clean damped sinusoid
+the subspace problem is ill-conditioned, and M3 is reported as
+a diagnostic only.
 
 \begin{table}[h!]
 \centering
@@ -2600,123 +826,6 @@ $5^{\dagger}$ & $0.376$    & $11.098$           & $2.3\times 10^{-41}$ \\
 \hline
 \end{tabular}
 \end{table}
-
-ESPRIT is not run on the six inverse-PINN variants. The
-mode-spectrum diagnostic is most useful when many comparable-amplitude
-components are present, which is the case for the unfiltered FD
-reference but not for $\Phi_\theta$, where the QNM-dominated
-spectrum is precisely what the network has been trained to reproduce.
-On a clean damped sinusoid the conditioning of the underlying Hankel
-matrix degrades and ESPRIT returns spurious modes at machine
-precision, as is visible in Table~\ref{tab:esprit-fwd}. The
-amplitude-ranked first pole disagrees with the
-$(\omega,\tau)$-closest pole by tens of percent even though both
-sit deep in the numerical-noise floor.
-
-\section{Per-window extraction tables}\label{app:per-window}
-
-Tables~\ref{tab:m1m2-all}--\ref{tab:m4m5-all} report the
-per-extractor results of M1, M2, M4 and M5 across the forward
-PINN and the six inverse variants of Sec.~\ref{sec:inv-pinn}.
-Bold entries are the primary values quoted in
-Sec.~\ref{sec:res-fwd} (forward) and Sec.~\ref{sec:res-inv}
-(inverse). Reference values are
-$M\omega_0 = 0.3737$, $\tau_0/M = 11.241$.
-
-\begin{table}[h!]
-\centering
-\caption{M1 (FFT plus log-line of local maxima) and M2 (NLS on
-the wide window $t\in[10,50]\,M$) extractions of $(\omega,\tau)$
-from the converged $\Phi_\theta(x_{\mathrm{obs}},t)$. Percentage
-errors are quoted with respect to the Leaver references.}
-\label{tab:m1m2-all}
-\small
-\begin{tabular}{l rrrr rrrr}
-\hline
-& \multicolumn{4}{c}{M1 (FFT + log-line)}
-& \multicolumn{4}{c}{M2 (wide-window NLS)} \\
-Run & $\omega$ & $\Delta\omega$ & $\tau/M$ & $\Delta\tau$
-    & $\omega$ & $\Delta\omega$ & $\tau/M$ & $\Delta\tau$ \\
-\hline
-Forward
- & $0.3712$ & $0.68\%$ & $10.92$ & $2.83\%$
- & $0.3794$ & $1.54\%$ & $\mathbf{11.464}$ & $\mathbf{1.99\%}$ \\
-Baseline
- & $0.3775$ & $1.02\%$ & $11.41$ & $1.52\%$
- & $0.3819$ & $2.18\%$ & $11.83$ & $5.27\%$ \\
-A
- & $0.3705$ & $0.86\%$ & $10.44$ & $7.10\%$
- & $0.3800$ & $1.67\%$ & $11.29$ & $0.43\%$ \\
-B
- & $0.4024$ & $7.69\%$ & $8.79$  & $21.85\%$
- & $0.4050$ & $8.37\%$ & $8.62$  & $23.27\%$ \\
-C
- & $0.3778$ & $1.09\%$ & $11.43$ & $1.66\%$
- & $0.3822$ & $2.27\%$ & $11.82$ & $5.14\%$ \\
-D
- & $0.3726$ & $0.29\%$ & $9.91$  & $11.86\%$
- & $0.3798$ & $1.63\%$ & $\mathbf{11.06}$ & $\mathbf{1.59\%}$ \\
-E
- & $0.3683$ & $1.44\%$ & $9.79$  & $12.95\%$
- & $0.3777$ & $1.08\%$ & $11.10$ & $1.30\%$ \\
-\hline
-\end{tabular}
-\end{table}
-
-\begin{table}[h!]
-\centering
-\caption{M4 (1-D plateau scan over $t_0$) and M5 (2-D plateau
-scan over $(t_0,\tend)$) extractions of $(\omega,\tau)$
-from $\Phi_\theta(x_{\mathrm{obs}},t)$. The plateau standard
-deviation $\sigma_\omega$ is reported alongside $\omega$ and serves
-as the fit-window systematic uncertainty discussed in
-Sec.~\ref{sec:plateau}. Variant B does not produce a valid plateau
-(NaN entries) and is excluded from the summary.}
-\label{tab:m4m5-all}
-\small
-\begin{tabular}{l rrrr rrrr}
-\hline
-& \multicolumn{4}{c}{M4 (1-D plateau)}
-& \multicolumn{4}{c}{M5 (2-D plateau)} \\
-Run & $\omega$ & $\sigma_\omega$ & $\Delta\omega$ & $\Delta\tau$
-    & $\omega$ & $\sigma_\omega$ & $\Delta\omega$ & $\Delta\tau$ \\
-\hline
-Forward
- & $0.3736$ & $\mathbf{2.0{\times}10^{-4}}$ & $\mathbf{0.029\%}$ & $2.65\%$
- & $0.3728$ & $8.4{\times}10^{-4}$ & $0.23\%$ & $3.91\%$ \\
-Baseline
- & $0.3792$ & $1.7{\times}10^{-1}$ & $1.46\%$ & $42.6\%$
- & $0.4062$ & $7.2{\times}10^{-2}$ & $8.70\%$ & $34.4\%$ \\
-A
- & $0.3704$ & $2.3{\times}10^{-4}$ & $0.89\%$ & $8.21\%$
- & $0.3703$ & $3.8{\times}10^{-4}$ & $0.90\%$ & $7.83\%$ \\
-B
- & NaN      & NaN                 & ---     & ---
- & NaN      & NaN                 & ---     & ---     \\
-C
- & $0.5615$ & $1.9{\times}10^{-1}$ & $50.3\%$ & $74.9\%$
- & $0.3654$ & $8.9{\times}10^{-2}$ & $2.23\%$ & $37.9\%$ \\
-D
- & $\mathbf{0.3748}$ & $\mathbf{4.4{\times}10^{-5}}$
- & $\mathbf{0.31\%}$ & $15.66\%$
- & $0.3748$ & $3.4{\times}10^{-5}$ & $0.31\%$ & $15.62\%$ \\
-E
- & $0.3639$ & $4.1{\times}10^{-3}$ & $2.63\%$ & $18.95\%$
- & $0.3625$ & $1.4{\times}10^{-2}$ & $3.01\%$ & $18.74\%$ \\
-\hline
-\end{tabular}
-\end{table}
-
-The reporting convention of Sec.~\ref{sec:reporting} combines
-the M4 plateau estimate of $\omega$ on a given run with the M2
-wide-window estimate of $\tau$ from the same run, since the wide
-window is the largest sample size on which the field's own decay
-rate dominates the fit. Reading the primary values for variant D
-from the bold entries of Tables~\ref{tab:m1m2-all}--\ref{tab:m4m5-all}
-gives $\omega = 0.3748\pm 4.4\times 10^{-5}$ ($0.31\%$ of the
-Leaver value, plateau-certified) and $\tau/M = 11.06$ ($1.59\%$),
-which are the values quoted in Table~\ref{tab:inv-summary}.
-
 \section{Plateau plots and 2-D heatmaps}\label{app:plots}
 
 Figures~\ref{fig:m4-grid} and \ref{fig:m5-grid} show the M4 1-D
@@ -2739,14 +848,10 @@ B & C \\[0.6em]
 D & E \\
 \end{tabular}
 \caption{M4 (1-D plateau scan over the start time $t_0$) for the
-six inverse-PINN variants. Variant D shows the tightest plateau
-($\sigma_\omega = 4.4\times 10^{-5}$) and supplies the primary
-$\omega$ estimate. Baseline, B and C show no usable plateau and
-are excluded from the summary; A and E show partial
-plateaux that recover $\omega$ to within a few percent. Each panel
-is the per-variant version of Fig.~\ref{fig:fwd-plateau-m4}; the
-left subplot of each panel is $\omega(t_0)$ for $\tend=50\,M$ and
-the right subplot is the residual standard deviation in the rolling
+six inverse-PINN variants. Each panel
+is the per-variant version of Fig.~\ref{fig:fwd-plateau-m4}: the
+left subplot is $\omega(t_0)$ at $\tend=50\,M$ and
+the right subplot the residual standard deviation in the rolling
 window used to detect the plateau.}
 \label{fig:m4-grid}
 \end{figure}
@@ -2765,9 +870,7 @@ E continued in Fig.~\ref{fig:m5-grid} cont.). Each panel reports
 $\omega(t_0,\tend)$ (left) and
 $\tau(t_0,\tend)$ (right) on a shared colour scale
 matching Fig.~\ref{fig:fwd-plateau-m5}; the red rectangle marks
-the auto-detected plateau. The plateau region of variant D (next
-page) is the largest and tightest of the six panels and matches
-the M4 estimate of Fig.~\ref{fig:m4-grid}.}
+the auto-detected plateau.}
 \label{fig:m5-grid}
 \end{figure}
 
@@ -2780,92 +883,43 @@ the M4 estimate of Fig.~\ref{fig:m4-grid}.}
 \includegraphics[width=0.95\textwidth,keepaspectratio]{../outputs/qnm/zerilli_l2_inverse_qnm_2mode/pinn_method5_2d_heatmap.png}\\[0.4em]
 \textbf{E}
 \caption{(continued) M5 2-D plateau scans for inverse variants
-C, D, E. Variant D shows the largest, tightest plateau region
-across both $\omega$ and $\tau$.}
+C, D, E.}
 \end{figure}
 
 % =====================================================================
 \section{Principled choice of the gradient-gate scale}\label{app:gate-scale}
 
-The hybrid surrogate of Sec.~\ref{sec:hyb-method} has a single
-free hyperparameter that is not fixed by the architecture: the
-scale $s$ of the gradient gate Eq.~\eqref{eq:hyb-gate}. This
-appendix shows that $s$ is fixed by a label-free criterion that
-uses only the coarse prior, and that the deployed value
-$s = 10^{-3}$ lies within $2\%$ of the field-RMSD optimum
-without any retraining sweep.
-
-\subsection{The gate scale as a regime separator}
-
-The gate
-\begin{equation}
-  g(\gamma; s) = \frac{\gamma}{\gamma + s},
-  \qquad
-  \gamma \equiv |\nabla\mathcal{U}\Phi^{\mathrm{c}}|,
-  \label{eq:gate-scale-def}
-\end{equation}
-is a soft indicator of the prior gradient $\gamma$ with crossover
-$g = \tfrac{1}{2}$ at $\gamma = s$: it saturates to $g \to 1$ for
-$\gamma \gg s$ and rolls off linearly, $g \approx \gamma/s$, for
-$\gamma \ll s$. The scale $s$ therefore sets the gradient
-threshold that separates the two regimes the diagnostic of
-Fig.~\ref{fig:hyb-grad} and Table~\ref{tab:hyb-gate-decile}
-expose:
-\begin{itemize}
-  \item the \emph{wavefront} regime ($\gamma$ large), where the
-  coarse prior carries its $\mathcal{O}(\Delta x^{2})$
-  dispersion error and the residual operator
-  $\mathcal{H}_{\theta}$ reduces the error by up to a factor of
-  $12$ (Table~\ref{tab:hyb-gate-decile}); here the gate should
-  pass the correction, $g \to 1$;
-  \item the \emph{smooth} regime ($\gamma$ small), comprising the
-  smooth interior and the causal exterior, where the prior is
-  already at the field floor ($\sim\!10^{-12}$) and the network
-  can only add speckle, so the hybrid error exceeds the baseline;
-  here the gate should suppress the correction, $g \to 0$.
-\end{itemize}
-The break-even gradient, at which the baseline and hybrid errors
-are equal, falls between the $50$--$60\%$ and $60$--$70\%$
-deciles of $\gamma$. A scale placed too low admits speckle into
-the smooth regime; a scale placed too high suppresses the
-correction on genuine wavefronts. The principled value is the
-one that resolves this trade-off.
-
-\subsection{Label-free re-gating from a single trained model}
-
-The trade-off can be quantified \emph{exactly}, for any $s$, from
-the single trained model, because the gate is an inference-time
-multiplier and the learned operator $\mathcal{H}_{\theta}$ is
-fixed. Writing the deployed correction at the training scale
-$s_{0} = 10^{-3}$ as $D \equiv g(\gamma; s_{0})\,\mathcal{H}_{\theta}$,
-the hybrid field at any other scale $s$ follows by re-weighting
-the same correction,
-\begin{equation}
-  \Phi^{\mathrm{hyb}}(x,t; s)
-  = \mathcal{U}\Phi^{\mathrm{c}}
-  + \frac{g(\gamma; s)}{g(\gamma; s_{0})}\,D
-  = \mathcal{U}\Phi^{\mathrm{c}}
-  + \frac{\gamma + s_{0}}{\gamma + s}\,D,
-  \label{eq:gate-rescale}
-\end{equation}
-with no retraining. Splitting the canonical-BH field error
-$|\Phi^{\mathrm{hyb}}(s) - \Phi^{\mathrm{f}}|$ into the wavefront
-cells (top $40\%$ of $\gamma$) and the smooth cells (bottom
-$60\%$) gives the two terms of Table~\ref{tab:gate-scale-sweep}.
+The gate $g = \gamma/(\gamma + s)$, with
+$\gamma \equiv |\nabla\,\mathcal{U}\Phi^{\mathrm{c}}|$, has one
+free hyperparameter, the scale $s$. Because the gate is an
+inference-time multiplier, the field error at any $s$ follows
+from the single trained model by re-weighting the deployed
+correction, without retraining
+(Table~\ref{tab:gate-scale-sweep}): the smooth-cell and
+wavefront-cell criteria bracket a flat basin in which the
+global RMSD varies by less than $2\%$, and the deployed
+$s = 10^{-3}$ lies inside it, coinciding with the $68$th
+percentile of the prior-gradient distribution. This yields the
+label-free deployment rule
+$s \simeq Q_{0.68}(|\nabla\,\mathcal{U}\Phi^{\mathrm{c}}|)$ ---
+a function of the coarse prior alone, requiring neither the
+fine reference nor a retraining sweep. The re-gating identity,
+its derivation and its caveats are given in the repository
+documentation.
 
 \begin{table}[!htbp]
 \centering
 \caption{Field error of the canonical-BH hybrid as a function of
-the gate scale $s$, obtained by the label-free re-gating
-Eq.~\eqref{eq:gate-rescale} of the single trained model. Columns
+the gate scale $s$, obtained by label-free re-gating of the
+single trained model. Columns
 are the RMS error on the smooth cells (bottom $60\%$ of the prior
 gradient), the RMS error on the wavefront cells (top $40\%$), and
 the global field RMSD. The smooth term saturates at the
-irreducible speckle floor for $s \gtrsim 7\times 10^{-4}$; the
+irreducible noise floor for $s \gtrsim 7\times 10^{-4}$; the
 wavefront term and the global RMSD are minimized near
 $s \approx 1.4\times 10^{-3}$. The deployed value $s = 10^{-3}$
 (boldface) lies in the resulting flat basin, within $2\%$ of the
-RMSD minimum, and its global-RMSD entry reproduces the headline
+RMSD minimum, and its global-RMSD entry reproduces the
 canonical RMSD of Sec.~\ref{sec:res-hyb}.}
 \label{tab:gate-scale-sweep}
 \small
@@ -2886,68 +940,6 @@ $5\times 10^{-3}$        & $3.03\times 10^{-6}$ & $1.682\times 10^{-3}$ & $1.064
 \bottomrule
 \end{tabular}
 \end{table}
-
-The two terms behave oppositely in $s$. The smooth-cell error
-decreases monotonically as $s$ rises --- a larger scale
-suppresses more speckle --- and saturates at the irreducible
-floor $\approx 3.0\times 10^{-6}$ once $s \gtrsim 7\times 10^{-4}$,
-beyond which no further speckle can be removed. The
-wavefront-cell error is U-shaped: lowering $s$ over-weights
-marginal cells while raising it suppresses the correction on
-genuine wavefronts, and the minimum sits at
-$s \approx 1.5\times 10^{-3}$. Because the wavefront term exceeds
-the smooth term by more than two orders of magnitude, the global
-RMSD tracks the wavefront term and is minimized at
-$s^{\star} \approx 1.4\times 10^{-3}$; consistently, the global
-RMSD satisfies
-$\mathrm{RMSD}^{2} = 0.4\,E_{\mathrm{wf}}^{2}
-+ 0.6\,E_{\mathrm{sm}}^{2}$ row by row.
-
-\subsection{The principled value}
-
-The two criteria --- speckle saturation in the smooth regime
-($s \gtrsim 7\times 10^{-4}$) and the wavefront/global-RMSD
-minimum ($s \approx 1.4\times 10^{-3}$) --- bracket a flat basin
-in which the field RMSD varies by less than $2\%$ over
-$s \in [7\times 10^{-4}, 1.5\times 10^{-3}]$ and by less than
-$10\%$ over $[5\times 10^{-4}, 2\times 10^{-3}]$. Equivalently,
-$s = 10^{-3}$ falls at the $68$th percentile of the prior
-gradient magnitude $\gamma$ on the canonical BH, with the flat
-basin spanning roughly its $67$th to $70$th percentiles: the gate
-is then fully open on the wavefront-bearing cells and rolled off
-through the transition zone into the machine-accurate smooth
-bulk.
-
-This last form is the deployable, \emph{label-free} rule, since
-the distribution of $\gamma = |\nabla\mathcal{U}\Phi^{\mathrm{c}}|$
-is a function of the coarse prior alone and needs neither the
-fine-FD reference nor a retraining sweep:
-\begin{equation}
-  s \;\simeq\; Q_{0.68}\!\left(|\nabla\mathcal{U}\Phi^{\mathrm{c}}|\right),
-  \label{eq:gate-scale-rule}
-\end{equation}
-where $Q_{p}$ denotes the $p$-quantile over the domain. The
-post-hoc analysis above, which does use the fine reference,
-confirms that this prior-only choice lands within $2\%$ of the
-field-RMSD optimum; we therefore retain $s = 10^{-3}$ rather than
-retuning to the canonical-BH optimum $1.4\times 10^{-3}$, which
-would consume the labels and over-fit a single black hole. The
-rule Eq.~\eqref{eq:gate-scale-rule} transfers unchanged to the
-Kerr extension of Sec.~\ref{sec:conclusion}, where the fine solve
-is the dominant cost and a label-free, sweep-free scale is
-essential.
-
-Two caveats apply. First, the re-gating
-Eq.~\eqref{eq:gate-rescale} re-weights a correction
-$\mathcal{H}_{\theta}$ trained at $s_{0} = 10^{-3}$, so
-Table~\ref{tab:gate-scale-sweep} measures the inference-time
-sensitivity of a fixed model rather than a full
-retrain-at-each-$s$ optimum; the coincidence of the analytic
-minimum with the training value, together with the agreement of
-the two independent criteria, makes the choice robust. Second,
-the analysis is carried out on the canonical BH, whose field is
-the only one cached at full resolution; the population statistics
-of Sec.~\ref{sec:res-hyb} use the same scale.
 
 % =====================================================================
 \bibliography{refs}

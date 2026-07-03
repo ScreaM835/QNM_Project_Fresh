@@ -1,0 +1,75 @@
+% =====================================================================
+\section{Curriculum-learning study}
+\label{sec:res-cur}
+
+This appendix summarises the curriculum-learning extension of
+the forward PINN; complete tables, figures and per-variant
+extraction results are provided in the repository
+documentation.
+
+\subsection{Method}
+\label{sec:cur-pinn}
+
+The temporal domain is partitioned into $K$ windows trained
+sequentially: each window is an independent network with the
+forward baseline's architecture, loss weights and optimiser
+schedule, and the trained $k$-th network supplies the initial
+condition of the $(k{+}1)$-th window by evaluation at the split
+time. The three configurations (Cur-2w, Cur-3w, Cur-soft;
+Table~\ref{tab:cur-summary}) are motivated by the
+single-window forward PINN concentrating $\sim\!41\%$ of its
+RMSD in the late-time band $t \in [37.5,50]\,M$.
+
+\subsection{Results}
+
+Table~\ref{tab:cur-summary} reports full-domain and per-window
+field accuracy against the FD reference.
+
+\begin{table}[!htbp]
+\centering
+\caption{Curriculum PINN variants versus the single-window
+forward baseline: field accuracy. Cur-2w is a hard two-window
+partition at $t = 25\,M$; Cur-3w a hard three-window partition
+at $t = 17, 34\,M$; Cur-soft a variant with a $10\,M$ overlap,
+continuity-anchor loss and smoothstep blending. Columns:
+full-domain RMSD against the FD reference and the per-window
+RMSDs on each sub-domain (``---'' if the variant does not use
+that window); for Cur-soft the third ``$W$'' column reports the
+RMSD on the soft-blend overlap region $[20,30]\,M$ rather than
+a third disjoint window.}
+\label{tab:cur-summary}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.05}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Variant & Full-domain RMSD & $W_{1}$ RMSD & $W_{2}$ RMSD & $W_{3}$ / overlap RMSD \\
+        & ($\times 10^{-3}$) & ($\times 10^{-3}$) & ($\times 10^{-3}$) & ($\times 10^{-3}$) \\
+\midrule
+Baseline (single window) & $\mathbf{0.817}$ & $-\!\!-\!\!-$ & $-\!\!-\!\!-$ & $-\!\!-\!\!-$ \\
+\midrule
+Cur-2w   & $0.845$ & $\mathbf{0.516}$ & $1.077$ & $-\!\!-\!\!-$ \\
+Cur-3w   & $0.976$ & $0.554$          & $0.920$ & $1.322$ \\
+Cur-soft & $3.155$ & $1.739$          & $3.932$ & $2.394$ (overlap) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The two-window curriculum delivers the intended local gain: its
+first window reaches RMSD $5.16\times 10^{-4}$, a $37\%$
+improvement over the baseline restricted to the same
+sub-domain. The gain does not survive stitching: the second
+window inherits the first's residual error through the
+numerical IC transfer and must additionally resolve the
+late-time decay, ending at $1.08\times 10^{-3}$, so the
+full-domain RMSD closes $3\%$ above the baseline; Cur-3w
+compounds one interpolation error per splice
+($0.55 \to 0.92 \to 1.32$, units of $10^{-3}$) and ends $19\%$
+above; Cur-soft performs worst, at roughly four times the
+baseline, with no M4 plateau at all. Extraction is insensitive
+to the curriculum at the wide-window M2 level but degrades at
+plateau level (Cur-2w: $\sigma_\omega = 2\times 10^{-4} \to
+9\times 10^{-4}$, plateau-mean error $0.029\% \to 0.79\%$). The
+curriculum therefore meets its narrow design objective without
+improving the full-domain field or the extraction
+(Sec.~\ref{sec:discussion}).

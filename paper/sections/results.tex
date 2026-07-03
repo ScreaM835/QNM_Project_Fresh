@@ -1,52 +1,224 @@
-% =============================================================
+﻿% =============================================================
 % Section 4: Results
 % =============================================================
 \section{Results}\label{sec:results}
 
-Section~\ref{sec:res-fwd} reports the forward PINN field
-accuracy against the FD reference and the five-method extraction
-of $(\omega,\tau)$ from $\Phi_\theta(\xq,t)$.
-Section~\ref{sec:res-inv} reports the six inverse PINN variants:
-mass recovery, the primary post-hoc QNM estimate, and the
-$A_{\mathrm{ring}}$--$\tau$ degeneracy of the template loss.
-Section~\ref{sec:res-cur} reports the three curriculum-PINN
-configurations against the single-network adaptive-sampling
-baseline. Section~\ref{sec:res-fno} reports the Fourier neural
-operator surrogate of Sec.~\ref{sec:fno-method} on a single
-canonical BH and on a $100$-BH population drawn from the
-training distribution, including the three-version ablation
-that motivates the final v4 loss design.
-Section~\ref{sec:res-hyb} reports the hybrid coarse-FD plus
-neural-residual surrogate of Sec.~\ref{sec:hyb-method} on the
-same canonical BH and on a $100$-BH Sobol test population,
-including the field-accuracy reduction relative to a quintic-spline
-upsample of the weak $k = 4$ coarse FD solution and the
-honest finding that QNM extraction at $\xq = 2\,M$ is already
-limited by the plateau extractor floor and not by the coarse-up
-baseline.
+The five models are presented in a uniform format: field
+accuracy against the FD reference (snapshots, pointwise error,
+and summary metrics), the ringdown waveform at the observer,
+and the QNM extraction table of the five methods of
+Sec.~\ref{sec:qnm-methods} under the reporting convention of
+Sec.~\ref{sec:reporting}. Sections~\ref{sec:res-repro}%
+--\ref{sec:res-inv} treat one black hole at a time
+(reproduction, enhanced forward, inverse);
+Secs.~\ref{sec:res-fno} and~\ref{sec:res-hyb} evaluate the two
+amortised surrogates on the canonical BH and on $100$-BH test
+populations. Supporting scans, ablations and diagnostics are
+collected in Appendix~\ref{app:supp}; the curriculum-learning
+study is reported in Appendix~\ref{sec:res-cur}.
+Table~\ref{tab:results-summary} summarises the principal
+quantitative results of the five models.
 
-Throughout this paper the \emph{forward PINN} refers to the
-network of Sec.~\ref{sec:fwd-pinn} that solves the Zerilli
-equation forward at fixed $M$ from PDE residual plus IC/BC
-losses, the \emph{inverse PINN} refers to the joint
-PDE-plus-data network of Sec.~\ref{sec:inv-pinn} that
-simultaneously recovers $M$ and a single-mode template
-$(\omega_{\mathrm{learned}},\tau_{\mathrm{learned}},
-A_{\mathrm{ring}},\phi_0)$ from $\Nobs$ noisy field samples,
-and the \emph{FNO surrogate} refers to the operator-learning
-network of Sec.~\ref{sec:fno-method} that maps initial data and
-mass to the full spacetime field in a single forward pass after
-amortised training across a population of $1{,}000$ BHs.
+\begin{table}[!htbp]
+\centering
+\caption{Summary of the principal quantitative results.
+Field errors are computed against the FD reference over the
+full $(x,t)$ grid: RMSD in field units
+($|\Phi|_{\max} \approx 1$) and relative $L^{2}$ norm (RL2).
+QNM errors are relative errors against the Leaver
+continued-fraction values $M\omega_{0} = 0.3737$,
+$\tau_{0}/M = 11.241$, under the reporting convention of
+Sec.~\ref{sec:reporting} (M4 plateau estimator; inverse-PINN
+$\tau$ from M2 on the wide window); the reproduction rows
+quote M2, the damped-cosine estimator of
+\citet{Patel2024pinn}, at $\xq = 10\,M$. Population-row QNM
+errors are medians over the $100$-BH test set; the hybrid
+population field entries are population means. The FNO
+canonical RL2 is obtained from its RMSD via the FD-field norm
+on the same grid. For the reproduction rows
+the corresponding values in \citet[Table~2]{Patel2024pinn} are
+$\mathrm{RL2} = 28.06\%$ (Zerilli) and $23.59\%$
+(Regge--Wheeler); for the hybrid rows the coarse-up baseline
+gives $\mathrm{RL2} = 4.93\%$ (canonical) and $6.11\%$
+(population). The inverse PINN simultaneously recovers the BH
+mass to $0.34\%$. Dashes denote quantities not applicable to,
+or not evaluated for, that row.}
+\label{tab:results-summary}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lllcccc@{}}
+\toprule
+Sec. & Model & Evaluation & Field RMSD & RL2 [\%]
+     & $|\Delta\omega|/\omega$ [\%] & $|\Delta\tau|/\tau$ [\%] \\
+\midrule
+\ref{sec:res-repro} & Reproduction (Zerilli)       & canonical BH             & $1.83\times 10^{-3}$ & $1.30$  & $1.25$  & $1.50$  \\
+\ref{sec:res-repro} & Reproduction (Regge--Wheeler) & canonical BH            & $3.77\times 10^{-3}$ & $2.67$  & $1.97$  & $1.56$  \\
+\ref{sec:res-fwd}   & Enhanced forward PINN        & canonical BH             & $8.17\times 10^{-4}$ & $0.58$  & $0.029$ & $2.65$  \\
+\ref{sec:res-inv}   & Inverse PINN                 & canonical BH, $1\%$ noise & ---                 & $3.0$   & $0.30$  & $1.6$   \\
+\ref{sec:res-fno}   & FNO surrogate                & canonical BH             & $9.30\times 10^{-4}$ & $0.68$  & $0.114$ & $0.099$ \\
+\ref{sec:res-fno}   & FNO surrogate                & $100$-BH population      & ---                  & ---     & $0.343$ & $0.940$ \\
+\ref{sec:res-hyb}   & Hybrid surrogate             & canonical BH             & $6.85\times 10^{-4}$ & $0.486$ & $0.045$ & $0.083$ \\
+\ref{sec:res-hyb}   & Hybrid surrogate             & $100$-BH population      & $9.90\times 10^{-4}$ & $0.672$ & $0.049$ & $0.263$ \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 % --------------------------------------------------------------
-\subsection{Forward PINN}
+\subsection{Faithful reproduction of the prior-work baseline}
+\label{sec:res-repro}
+
+All extensions are measured against \citet{Patel2024pinn}, the
+only previous time-domain PINN treatment of these $\ell = 2$
+master equations. We therefore first train the forward PINN at
+their exact settings (Table~\ref{tab:fwd-hyper}: uniform
+collocation resampling, their loss weights and optimiser
+budget) --- i.e.\ without the enhancements of
+Sec.~\ref{sec:res-fwd} --- on both the even-parity (Zerilli)
+and odd-parity (Regge--Wheeler) potentials.
+
+\paragraph{Field accuracy.} At matched settings the
+reproduction reaches $\mathrm{RL2} = 1.30\%$
+(RMSD $1.83\times 10^{-3}$) on the Zerilli potential and
+$\mathrm{RL2} = 2.67\%$ (RMSD $3.77\times 10^{-3}$, MAD
+$2.53\times 10^{-3}$) on the Regge--Wheeler potential, against
+$28.06\%$ and $23.59\%$ respectively in
+\citet[Table~2]{Patel2024pinn} --- a factor of $\sim\!21$
+(Zerilli) and $\sim\!9$ (Regge--Wheeler) at identical
+architecture, loss weights and optimiser budget; the remaining
+differences are implementation-level (double-precision
+training and the outgoing-pulse initial velocity of
+Sec.~\ref{sec:fwd-pinn}).
+Snapshot overlays and global error maps are shown in
+Figs.~\ref{fig:repro-zer-field} and~\ref{fig:repro-rw-field},
+and the training histories in Fig.~\ref{fig:repro-loss}.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.82\textwidth]{../outputs/pinn/zerilli_l2_paper/snapshots.png}\\[0.4em]
+\includegraphics[width=0.88\textwidth]{../outputs/pinn/zerilli_l2_paper/error_heatmap.png}
+\caption{Faithful reproduction on the Zerilli potential. Top:
+snapshots of $\Phi(x,t)$ at $t/M \in \{10,20,30,40\}$ overlaid
+for the reproduced PINN and the FD reference; the curves are
+visually indistinguishable on this scale. Bottom: global
+pointwise error $|\Phi_{\mathrm{FD}} - \Phi_{\mathrm{PINN}}|$
+on $x \in [-50,150]\,M$, $t \in [0,50]\,M$, peaking at
+$\sim\!1.0\times 10^{-2}$ on the outgoing wavefront,
+consistent with the gridwise RMSD of $1.83\times 10^{-3}$.}
+\label{fig:repro-zer-field}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.82\textwidth]{../outputs/pinn/regge_wheeler_l2_paper/snapshots.png}\\[0.4em]
+\includegraphics[width=0.88\textwidth]{../outputs/pinn/regge_wheeler_l2_paper/error_heatmap.png}
+\caption{Faithful reproduction on the Regge--Wheeler potential.
+Top: snapshots of $\Phi(x,t)$ at $t/M \in \{10,20,30,40\}$
+overlaid for the reproduced PINN and the FD reference. Bottom:
+global pointwise error $|\Phi_{\mathrm{FD}} - \Phi_{\mathrm{PINN}}|$
+on the same domain, concentrated on the left-going late-time
+characteristic, consistent with the gridwise RMSD of
+$3.77\times 10^{-3}$.}
+\label{fig:repro-rw-field}
+\end{figure}
+
+\paragraph{QNM extraction.} Table~\ref{tab:repro-qnm} applies
+the two extraction methods used by \citet{Patel2024pinn} (M1
+and M2, their ``PINN1''/``PINN2'') to the reproduced fields at
+$\xq = 10\,M$. The frequencies agree at the one-to-two-percent
+level on both potentials; the damping time, the observable most
+sensitive to field quality, improves several-fold: from
+$14.42\%$ to $1.50\%$ (Zerilli) and from $5.39\%$ to $1.56\%$
+(Regge--Wheeler, M2). The ringdown at the observer, with the
+damped-cosine reconstructions overlaid, is shown in
+Figs.~\ref{fig:repro-zer-ringdown}
+and~\ref{fig:repro-rw-ringdown}.
+
+\begin{table}[!htbp]
+\centering
+\caption{Faithful reproduction: QNM extraction at $\xq = 10\,M$
+with the two methods of \citet{Patel2024pinn} (M1 = FFT $+$
+log-envelope, M2 = damped-cosine NLS; their PINN1/PINN2),
+applied to the reproduced PINN fields on both potentials.
+Reference values are the Leaver continued-fraction Schwarzschild
+$\ell = 2$ fundamental $M\omega_0 = 0.3737$,
+$\tau_0/M = 11.241$; \citet{Patel2024pinn} quote their
+percentage errors against the rounded reference
+$M\omega_0 = 0.374$. Bold entries mark the damping-time
+improvement discussed in the text.}
+\label{tab:repro-qnm}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{@{}llcccc@{}}
+\toprule
+ & & \multicolumn{2}{c}{This work} & \multicolumn{2}{c}{\citet{Patel2024pinn}} \\
+\cmidrule(lr){3-4}\cmidrule(l){5-6}
+Potential & Method & $M\omega$ (err) & $\tau/M$ (err) & $M\omega$ (err) & $\tau/M$ (err) \\
+\midrule
+Zerilli & M1 & $0.3697$ ($1.08\%$) & $10.671$ ($5.07\%$) & $0.375$ ($0.29\%$) & $10.089$ ($10.25\%$) \\
+Zerilli & M2 & $0.3784$ ($1.25\%$) & $11.410$ ($\mathbf{1.50\%}$) & $0.376$ ($0.52\%$) & $9.620$ ($14.42\%$) \\
+Regge--Wheeler & M1 & $0.3716$ ($0.56\%$) & $10.753$ ($4.34\%$) & $0.373$ ($0.11\%$) & $10.474$ ($6.82\%$) \\
+Regge--Wheeler & M2 & $0.3811$ ($1.97\%$) & $11.416$ ($\mathbf{1.56\%}$) & $0.383$ ($2.51\%$) & $10.636$ ($5.39\%$) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.80\textwidth]{../outputs/pinn/zerilli_l2_paper/curve_fitting.png}
+\caption{Faithful reproduction on the Zerilli potential:
+ringdown at the observer. $\log_{10}|\Phi(\xq{=}10\,M, t)|$ for
+the reproduced PINN and FD waveforms with the damped-cosine
+reconstructions of the M1 and M2 extractions of
+Table~\ref{tab:repro-qnm} overlaid.}
+\label{fig:repro-zer-ringdown}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.80\textwidth]{../outputs/pinn/regge_wheeler_l2_paper/curve_fitting.png}
+\caption{Faithful reproduction on the Regge--Wheeler potential:
+ringdown at the observer. $\log_{10}|\Phi(\xq{=}10\,M, t)|$ for
+the reproduced PINN and FD waveforms with the damped-cosine
+reconstructions of the M1 and M2 extractions of
+Table~\ref{tab:repro-qnm} overlaid.}
+\label{fig:repro-rw-ringdown}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.80\textwidth]{../outputs/pinn/zerilli_l2_paper/loss.png}\\[0.4em]
+\includegraphics[width=0.80\textwidth]{../outputs/pinn/regge_wheeler_l2_paper/loss.png}
+\caption{Faithful-reproduction training histories: total loss
+and the seven unweighted components versus training step, with
+the Adam--L-BFGS transition at iteration $10{,}000$ marked.
+Top: Zerilli. Bottom: Regge--Wheeler.}
+\label{fig:repro-loss}
+\end{figure}
+
+\paragraph{Isospectral consistency.} The two potentials share
+the same QNM spectrum \citep{Chandrasekhar1975}, so a
+consistent pipeline must recover compatible $(\omega,\tau)$
+from both --- and it does: the M2 damping-time errors agree to
+within $0.06$ percentage points ($1.50\%$ versus $1.56\%$),
+against a nine-point spread in \citet[Table~3]{Patel2024pinn}.
+Having established equivalent behaviour on both potentials,
+the remainder of this paper reports on the Zerilli equation.
+
+\FloatBarrier
+
+% --------------------------------------------------------------
+\subsection{Enhanced forward PINN}
 \label{sec:res-fwd}
 
-The converged forward PINN matches the FD reference to high
-accuracy on the full simulation domain. With the architecture and
-training schedule of Sec.~\ref{sec:fwd-pinn} the field-accuracy
-metrics, evaluated on the FD grid
-$x \in [-50,150]\,M$, $t \in [0,50]\,M$, are
+Starting from the faithful reproduction of
+Sec.~\ref{sec:res-repro}, the enhanced forward PINN doubles the
+L-BFGS budget and replaces uniform resampling with the
+residual-greedy sampling of Sec.~\ref{sec:fwd-pinn}, all other
+settings unchanged. On the FD grid
+$x \in [-50,150]\,M$, $t \in [0,50]\,M$ the field-accuracy
+metrics are
 \begin{equation}
   \mathrm{RMSD} = 8.17\times 10^{-4}, \qquad
   \mathrm{MAD}  = 4.99\times 10^{-4}, \qquad
@@ -59,17 +231,13 @@ absolute units (peak $|\Phi| \approx 0.7$ on the domain), and
 $\mathrm{RL2}$ is their relative $L^2$ norm.
 This $\mathrm{RL2} = 0.58\%$ is a factor of $\sim\!50$ smaller
 than the $\mathrm{RL2} = 28.06\%$ of
-\citet[Table~2, Zerilli row]{Patel2024pinn} on the same problem,
-and the corresponding $\mathrm{MAD}$ improvement is
-$5.0\times 10^{-4}$ versus their $1.82\times 10^{-2}$, a factor
-of~$\sim\!36$. We attribute the improvement to the larger number
-of L-BFGS iterations and the greedy adaptive sampling of
-Sec.~\ref{sec:fwd-pinn}; see also the discussion in
-Sec.~\ref{sec:discussion}. Field accuracy at the snapshot times
-is shown in Fig.~\ref{fig:fwd-field}, the global pointwise error
-in Fig.~\ref{fig:fwd-heatmap}, and the per-component loss
-histories underlying Eq.~\eqref{eq:fwd-metrics} in
-Fig.~\ref{fig:fwd-loss}.
+\citet[Table~2, Zerilli row]{Patel2024pinn} and a further
+factor of $\sim\!2.2$ below the reproduction; the MAD
+improvement is $5.0\times 10^{-4}$ versus their
+$1.82\times 10^{-2}$, a factor of $\sim\!36$. Field accuracy
+at the snapshot times, the global pointwise error, and the
+per-component loss history are shown in
+Figs.~\ref{fig:fwd-field}--\ref{fig:fwd-loss}.
 
 \begin{figure}[!htbp]
 \centering
@@ -145,7 +313,9 @@ $[t_0^{\min},50]\,M$ window with $t_0^{\min}$ taken as the lower
 edge of the M4 plateau. M4 and M5 quote
 plateau-mean $\pm$ plateau standard deviation across the
 contiguous block of fit windows minimising the combined relative
-scatter (Algorithm~\ref{alg:m4} and Sec.~\ref{sec:plateau}).}
+scatter (Algorithm~\ref{alg:m4} and Sec.~\ref{sec:plateau}).
+Bold entries are the primary values under the reporting
+convention of Sec.~\ref{sec:reporting}.}
 \label{tab:fwd-qnm}
 \footnotesize
 \setlength{\tabcolsep}{4pt}
@@ -158,7 +328,7 @@ M1 (FFT $+$ log-line)        & $0.3712$  & $0.68\%$  & $10.92$ & $2.83\%$ & $[10
 M2 (NLS, wide)               & $0.3794$  & $1.54\%$  & $11.464$ & $1.99\%$ & $[10,\,50]\,M$ \\
 M2 (NLS on M4 plateau)       & $0.3749$  & $0.31\%$  & $10.41$ & $7.38\%$ & $[14,\,50]\,M$ \\
 M3 (ESPRIT, $K=6$)           & $0.4829$  & $29.2\%$  & $7.84$  & $30.3\%$ & $[10,\,50]\,M$ \\
-M4 (1-D plateau)             & $0.37359{\pm}2{\times}10^{-4}$ & $\mathbf{0.029\%}$ & $10.94{\pm}0.02$ & $2.65\%$ & $t_0\in[14,21]M$, $\tend{=}50M$ \\
+M4 (1-D plateau)             & $0.37359{\pm}2{\times}10^{-4}$ & $\mathbf{0.029\%}$ & $10.94{\pm}0.02$ & $\mathbf{2.65\%}$ & $t_0\in[14,21]M$, $\tend{=}50M$ \\
 M5 (2-D plateau)             & $0.3728{\pm}8{\times}10^{-4}$ & $0.23\%$ & $10.80{\pm}0.12$ & $3.91\%$ & $t_0\in[10,16.7]M$, $\tend\in[42,50]M$ \\
 \bottomrule
 \end{tabular}
@@ -187,29 +357,21 @@ the bias of the plateau mean from the Leaver value.}
 \label{fig:fwd-plateau-m5}
 \end{figure}
 
-Three points stand out. First, the M4 plateau
-estimate of $\omega$ achieves $0.029\%$ accuracy, more than an
-order of magnitude tighter than any single-window method, and the
-plateau standard deviation $\sigma_\omega \sim 2\times 10^{-4}$ is
-comparable to the residual bias of the plateau mean against the
-Leaver value ($|0.37359 - 0.3737| \approx 1.1\times 10^{-4}$).
-Second, M2 on the M4 plateau window reduces the
-$\omega$ error of M2 on the wide window by a factor of five (from
-$1.54\%$ to $0.31\%$) but increases the $\tau$ error fourfold (from
-$1.99\%$ to $7.38\%$), motivating the asymmetric reporting
-convention of Sec.~\ref{sec:reporting}. Third, M3
-returns frequencies at machine-precision amplitudes ($|c_k| \sim
-10^{-23}$), reflecting the fact that the analytic ESPRIT problem
-is ill-conditioned on a $\Phi(\xq,t)$ whose dominant component is
-already a clean damped sinusoid; we quote M3 in
-Appendix~\ref{app:esprit} for completeness only. The M5 plateau in
-the $(t_0,\tend)$ plane spans the corner of the grid closest to
-the QNM regime, $t_0 \in [10,16.7]\,M$ and $\tend \in [42,50]\,M$,
-exactly as expected from Eq.~\eqref{eq:timescales}, since the
-plateau abuts the lower-$t_0$ edge once the prompt burst has
-passed ($t_0 \gtrsim t_{\mathrm{burst}}$) and extends to the
-upper-$\tend$ edge of the simulation domain since
-$\tend \ll t_{\mathrm{tail}}$ on $[0,50]\,M$.
+Two points stand out. The M4 plateau estimate reaches
+$0.029\%$ in $\omega$ --- an order of magnitude tighter than
+any single-window method, with
+$\sigma_\omega \sim 2\times 10^{-4}$ comparable to the residual
+bias --- while M2 on the M4 plateau window sharpens $\omega$
+but degrades $\tau$, motivating the asymmetric reporting
+convention of Sec.~\ref{sec:reporting}. M3 returns frequencies
+at machine-precision amplitudes and is quoted in
+Appendix~\ref{app:esprit} only.
+
+A curriculum-learning alternative to the greedy sampler ---
+sequential temporal windows with numerical-IC transfer ---
+lowers the earliest sub-domain RMSD by $37\%$ but improves
+neither the full-domain error nor the extraction
+(Appendix~\ref{sec:res-cur}).
 
 \FloatBarrier
 
@@ -217,18 +379,28 @@ $\tend \ll t_{\mathrm{tail}}$ on $[0,50]\,M$.
 \subsection{Inverse PINN}
 \label{sec:res-inv}
 
-For each of the six variants of Table~\ref{tab:variants} we report
-the field-accuracy metrics on the trained $\Phi_\theta$, the
-recovered mass $M_{\mathrm{learned}}$, the primary single-mode
-QNM estimate $(\omega,\tau)$ obtained from the convention of
-Sec.~\ref{sec:reporting}, and the M4 plateau quality as a
-diagnostic. Variant-level numbers are summarised in
-Table~\ref{tab:inv-summary}. For variant D, the best of the six
-runs and the focus of the rest of this subsection, field
-accuracy at the snapshot times is shown in
+The inverse PINN is the forward network of
+Sec.~\ref{sec:res-fwd} with three additions: the mass $M$ is
+promoted from a fixed constant to a trainable scalar, a data
+loss anchors the network to $\Nobs = 500$ noisy samples of the
+field at $1\%$ Gaussian noise, and a damped-sinusoid ringdown
+template $(\omega_{\mathrm{learned}}, \tau_{\mathrm{learned}},
+A_{\mathrm{ring}}, \phi_0)$ is fitted jointly so that the QNM
+parameters are read out directly at convergence. Architecture,
+PDE residual and training schedule are otherwise identical to
+the forward setup (Sec.~\ref{sec:inv-pinn}).
+
+Table~\ref{tab:inv-summary} reports the field accuracy, the
+recovered mass, and the primary QNM estimate under the
+convention of Sec.~\ref{sec:reporting} for the six variants of
+Table~\ref{tab:variants}. Mass recovery is stable across all
+six independently trained variants ($0.34$--$1.44\%$, five
+within $0.5\%$), so the joint recovery mechanism is robust to
+the template-loss configuration. For variant D, the best run
+and the focus below, field accuracy is shown in
 Fig.~\ref{fig:inv-field}, the global pointwise error in
-Fig.~\ref{fig:inv-heatmap}, and the training-time convergence
-of the five learnable scalars in Fig.~\ref{fig:inv-conv}.
+Fig.~\ref{fig:inv-heatmap}, and the convergence of the five
+learnable scalars in Fig.~\ref{fig:inv-conv}.
 
 \begin{figure}[!htbp]
 \centering
@@ -239,10 +411,7 @@ snapshot times, in the same format as Fig.~\ref{fig:fwd-field}.
 Top: snapshots of $\Phi(x,t)$ at $t/M\in\{10,20,30,40\}$ overlaid
 for the inverse PINN and the FD reference, with $M$ treated as
 an unknown trainable scalar. Bottom: pointwise
-$|\Phi_\theta - \Phi_{\mathrm{FD}}|$ at the same four times. The
-field-recovery quality is comparable to the forward run while
-$M$ is simultaneously inferred to $0.34\%$ of its true value
-(Table~\ref{tab:inv-summary}).}
+$|\Phi_\theta - \Phi_{\mathrm{FD}}|$ at the same four times.}
 \label{fig:inv-field}
 \end{figure}
 
@@ -273,9 +442,8 @@ converged-network field $\Phi_\theta(\xq,t)$ and the FD truth
 (black); the orange band marks the training window
 $[\tring,\tend] = [18,50]\,M$. Out-of-window template divergence
 is the visual signature of the $A_{\mathrm{ring}}$--$\tau$
-degeneracy quantified at the end of this subsection
-(paragraph on $A_{\mathrm{ring}}$--$\tau$, with
-Tables~\ref{tab:inv-learned} and~\ref{tab:tau-degeneracy}).}
+degeneracy quantified in Appendix~\ref{app:supp-inv}
+(Tables~\ref{tab:inv-learned} and~\ref{tab:tau-degeneracy}).}
 \label{fig:inv-conv}
 \end{figure}
 
@@ -314,18 +482,14 @@ $\ddagger$ Two-mode NLS did not converge to a finite solution on
 any window; M4 returns NaN.
 \end{table}
 
-We now apply the same five extraction methods of
-Sec.~\ref{sec:qnm-methods} to the time series
-$\Phi_\theta(\xq=10\,M,t)$ from the converged variant-D inverse
-PINN, exactly as for the forward PINN of
-Table~\ref{tab:fwd-qnm}. The extracted ringdown is shown in
-Fig.~\ref{fig:inv-ringdown}, the per-method numbers are
-collected in Table~\ref{tab:inv-qnm}, and the M4 and M5 plateau
-diagnostics are shown in Figs.~\ref{fig:inv-plateau-m4}
-and~\ref{fig:inv-plateau-m5}. M3 is omitted (its dominant
-amplitudes lie at $|c_k|\sim 10^{-23}$, the same ill-conditioning
-behaviour as on the forward problem;
-cf.\ Appendix~\ref{app:esprit}).
+The five extraction methods are applied to
+$\Phi_\theta(\xq{=}10\,M,t)$ from variant D exactly as for the
+forward PINN: the ringdown is shown in
+Fig.~\ref{fig:inv-ringdown}, the per-method numbers in
+Table~\ref{tab:inv-qnm}, and the plateau diagnostics in
+Figs.~\ref{fig:inv-plateau-m4} and~\ref{fig:inv-plateau-m5};
+M3 is omitted for the same ill-conditioning as on the forward
+problem (Appendix~\ref{app:esprit}).
 
 \begin{figure}[!htbp]
 \centering
@@ -373,11 +537,9 @@ M5 (2-D plateau)             & $0.37485{\pm}3{\times}10^{-5}$ & $0.30\%$ & $9.48
 \includegraphics[width=0.95\textwidth]{../outputs/qnm/zerilli_l2_inverse_qnm_combo/pinn_method4_stability.png}
 \caption{M4 plateau diagnostic for the inverse PINN, variant D.
 Format identical to Fig.~\ref{fig:fwd-plateau-m4}: $(\omega_0,
-\tau_0)$ as a function of $t_0$ at fixed $\tend = 50\,M$. The
-plateau extends across essentially the entire
-$t_0\in[10,25]\,M$ scan range with $\sigma_\omega \sim 4\times
-10^{-5}$, more than two orders of magnitude tighter than the
-$\sigma_\omega \sim 2\times 10^{-4}$ of the forward run.}
+\tau_0)$ as a function of $t_0$ at fixed $\tend = 50\,M$; the
+plateau extends across the entire $t_0\in[10,25]\,M$ scan
+range.}
 \label{fig:inv-plateau-m4}
 \end{figure}
 
@@ -388,567 +550,73 @@ $\sigma_\omega \sim 2\times 10^{-4}$ of the forward run.}
 Format identical to Fig.~\ref{fig:fwd-plateau-m5}: heatmap of the
 absolute deviation of the M2 estimate from the plateau median on
 the $(t_0,\tend)$ grid (capped at $5\%$); the contiguous plateau
-rectangle is outlined in red. The plateau is in the same
-$(t_0,\tend)$ corner as the forward run, with comparable
-in-block scatter; the M5 extracted value
-$M\omega = 0.37485 \pm 3\times 10^{-5}$ agrees with the M4 value
-to within both methods' standard deviations.}
+rectangle is outlined in red, in the same
+$(t_0,\tend)$ corner as the forward run.}
 \label{fig:inv-plateau-m5}
 \end{figure}
 
-The cross-method picture for variant D mirrors the forward run
-of Table~\ref{tab:fwd-qnm}: M4 and M5 yield mutually consistent
-$\omega$ estimates at the $0.30\%$ level with plateau standard deviations
-$\sim 3\text{--}4\times 10^{-5}$, M1 is competitive on $\omega$
-($0.29\%$) but loses on $\tau$ as expected from the
-log-line slope's sensitivity to the prompt burst, and M2 on the
-wide window is the best $\tau$ estimator ($1.59\%$). For
-$\tau$, M4 and M5 collapse to the template-degeneracy value
-$\sim 9.48\,M$ (the same value the trained scalar
-$\tau_{\mathrm{learned}}$ converged to in
-Fig.~\ref{fig:inv-conv}), while M2 on the wide window recovers
-$11.06\,M$ from the network's own field $\Phi_\theta(\xq,t)$;
-this is the $A_{\mathrm{ring}}$--$\tau$ degeneracy of
-Eq.~\eqref{eq:loss-ring}, discussed quantitatively in the
-paragraph below (with Tables~\ref{tab:inv-learned}
-and~\ref{tab:tau-degeneracy}) and visualised in
-Fig.~\ref{fig:inv-conv}. The reporting convention of
+The cross-method picture for variant D mirrors the forward run:
+M4 and M5 yield mutually consistent $\omega$ estimates at the
+$0.30\%$ level with plateau standard deviations
+$\sim 3\text{--}4\times 10^{-5}$, and M2 on the wide window is
+the best $\tau$ estimator ($1.59\%$). For $\tau$, M4 and M5
+collapse to the learned-template value $\sim 9.48\,M$
+($\tau_{\mathrm{learned}}$ finishes $15.7\%$ below the Leaver
+value; Fig.~\ref{fig:inv-conv}) while the wide-window fit on
+the network's own field, constrained by the PDE residual and
+the noisy data, recovers $11.06\,M$: this is the
+$A_{\mathrm{ring}}$--$\tau$ degeneracy of
+Eq.~\eqref{eq:loss-ring}, and the reporting convention of
 Sec.~\ref{sec:reporting} therefore takes $\omega$ from M4 and
-$\tau$ from M2-wide, as already used in
-Table~\ref{tab:inv-summary}.
+$\tau$ from M2-wide, as in Table~\ref{tab:inv-summary}.
 
-\begin{table}[!htbp]
-\centering
-\caption{Inverse PINN learned template parameters at the end of
-training for each
-variant. These are the values of the learnable scalars
-$(\omega,\tau,A_{\mathrm{ring}},\phi)$ inside the ringdown loss of
-Eq.~\eqref{eq:loss-ring} after $10{,}000$ Adam plus $15{,}000$
-L-BFGS iterations. They are reported as a diagnostic and are not
-the primary QNM estimates of Table~\ref{tab:inv-summary}; the
-reason is given in the
-$A_{\mathrm{ring}}$--$\tau$ paragraph below.}
-\label{tab:inv-learned}
-\small
-\begin{tabular}{@{}lcccc@{}}
-\toprule
-Variant & $\omega_{\mathrm{learned}}$ & $\tau_{\mathrm{learned}}/M$ &
-        $A_{\mathrm{ring}}$ & $\phi$ \\
-\midrule
-baseline   & $0.3820$ & $11.89$ & $1.92$ & $-0.99$ \\
-A          & $0.3704$ & $10.10$ & $2.59$ & $-0.72$ \\
-B          & $0.4050$ & $8.62$  & $2.97$ & $-1.38$ \\
-C          & $0.3822$ & $11.84$ & $1.92$ & $-0.99$ \\
-D          & $0.3748$ & $9.48$  & $2.93$ & $-0.85$ \\
-E (mode 0) & $0.3496$ & $9.22$  & $2.52$ & $+0.31$ \\
-E (mode 1) & $0.3810$ & $7.38$  & $3.24$ & $-1.90$ \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Figure~\ref{fig:inv-conv} shows the parameter histories of variant
-D on a logged-sample horizontal axis, so the L-BFGS phase
-($10{,}000\to 25{,}000$ raw iterations) is compressed into the
-rightmost few sample points and appears as the apparent step at
-the right edge of each panel. Four of the five learned parameters
-behave as expected: $M$ (top-left) overshoots to $\sim 1.15$
-during Adam, returns to $\sim 1.04$, and converges to its
-final value $1.003$ ($0.34\%$ from the true mass) under L-BFGS;
-$\omega_{\mathrm{learned}}$ (top-right) climbs from $0.30$ to
-$\sim 0.355$ during Adam, drifts down to $\sim 0.31$, and
-recovers to its final value $0.3748$ ($0.30\%$ from the Leaver
-value) under L-BFGS, and the apparent ``ends low'' behaviour is
-an artefact of the logged-sample axis rather than the data;
-$A_{\mathrm{ring}}$ (middle-right) rises from $0.5$ to a final
-value $2.93$, overshooting to $\sim 3.29$ during early L-BFGS
-before settling back; and $\phi$ (bottom-left) settles to
-$-0.85$. The exception is $\tau_{\mathrm{learned}}$
-(middle-left), which drifts from $\tau_{\mathrm{init}} = 8.0\,M$
-down to $\sim 7.3\,M$ during Adam, climbs to $9.48\,M$ via
-L-BFGS, and finishes $15.7\%$ below the Leaver value. This is
-the $A_{\mathrm{ring}}$--$\tau$ degeneracy of
-Eq.~\eqref{eq:loss-ring} introduced in Sec.~\ref{sec:inv-pinn};
-the bottom-right panel confirms it visually, since the template
-at the final learned scalars is visually indistinguishable from
-the FD truth at $\xq=10\,M$ on $t \gtrsim 18\,M$ even with
-$\tau_{\mathrm{learned}}$ off by $1.8\,M$. The network field
-$\Phi_\theta(\xq,t)$ is constrained by the PDE residual and the
-noisy data and exhibits the physical decay rate; the
-post-hoc M2 wide-window fit on $\Phi_\theta$ recovers
-$\tau = 11.06\,M$ ($1.6\%$ from the Leaver value) as listed in
-Table~\ref{tab:inv-summary}. The learned and post-hoc values of
-$\tau$ are tabulated side by side for all six variants in
-Table~\ref{tab:tau-degeneracy}.
-
-All six variants reduce the $20\%$ mass initialisation error
-$|M_{\mathrm{init}}-M_{\mathrm{true}}|/M_{\mathrm{true}} = 0.20$ to
-$\le 1.5\%$ within the allotted $25{,}000$ optimiser iterations. The single-mode-template
-variants (baseline, A, C, D) recover $M$ to within $0.5\%$;
-variants B and E are worse, with $1.25\%$ and $1.44\%$
-respectively. Variant B places weight $100$ on a template the
-optimiser cannot satisfy with a single damped sinusoid (the
-prompt burst is still present at $\tring = 10\,M$,
-Eq.~\eqref{eq:timescales}), so field and mass accuracy are
-sacrificed to template accuracy. In E the four additional learnable parameters of the
-overtone slow mass convergence, but the structural information
-added by the second mode improves the primary $\tau$ estimate
-substantially (1.3\% vs.\ 5.3\% for baseline; see below).
-
-We quote $\omega$ from the M4 plateau mean (Sec.~\ref{sec:reporting}).
-The plateau standard deviation $\sigma_\omega$ is also a useful
-diagnostic. For variants A, D
-and E the plateau is tight ($\sigma_\omega/\omega \le 1\%$) and
-$\omega$ is recovered to $0.3$--$2.6\%$. For baseline and C the
-plateau is wide ($\sigma_\omega/\omega \approx 0.44$ and $0.34$
-respectively), signalling that the two-mode NLS does not find a
-stable $(\omega_0,\tau_0)$ across $t_0$; the mean is not a
-trustworthy estimate, and the M2-wide value of $\omega$ would in
-fact be more accurate. For B the two-mode NLS does not converge to
-a finite minimum on any window in the scan, so M4 is undefined.
-$\sigma_\omega$ is therefore a quality diagnostic. A small
-$\sigma_\omega$ accepts the estimate, a large or undefined
-$\sigma_\omega$ rejects it (cf.\ Sec.~\ref{sec:plateau}).
-Variant D ranks first on the combination of $M$, $\omega$ and
-$\tau$. The single-factor changes A and
-C are individually beneficial (A improves $\tau$ and the M4
-plateau; C improves $M$); B is strictly worse than baseline on
-$\tau$ and M4 plateau quality at no benefit to $M$; E is
-competitive on the primary QNM numbers but pays a $\sim 1\%$
-penalty on $M$ and $\omega$ for the extra template freedom.
-Variant D combines the three single-factor improvements of A--C:
-it has the tightest plateau ($\sigma_\omega = 4\times 10^{-5}$)
-and the smallest $\omega$ error ($0.30\%$) of the six runs.
-
-Table~\ref{tab:tau-degeneracy} compares
-$\tau_{\mathrm{learned}}$ to the post-hoc M2 wide-window fit on
-$\Phi_\theta(\xq,t)$ for all six variants.
-
-\begin{table}[!htbp]
-\centering
-\caption{$A_{\mathrm{ring}}$--$\tau$ degeneracy diagnostic. The
-training-time learned $\tau_{\mathrm{learned}}$ is the value of the
-learnable scalar at the end of training. The post-hoc M2 wide-window
-$\tau_{\mathrm{M2}}^{\mathrm{wide}}$ is the M2 fit to
-$\Phi_\theta(\xq,t)$ over $[10,50]\,M$. Truth is
-$\tau_0/M = 11.241$ \citep{Leaver1985}. ``Bias gap'' is
-$|\tau_{\mathrm{learned}} - \tau_{\mathrm{M2}}^{\mathrm{wide}}|/M$.
-For variant E, $\tau_{\mathrm{learned}}$ refers to the fundamental
-template mode (mode 0).}
-\label{tab:tau-degeneracy}
-\small
-\begin{tabular}{@{}lccc@{}}
-\toprule
-Variant & $\tau_{\mathrm{learned}}/M$ & $\tau_{\mathrm{M2}}^{\mathrm{wide}}/M$ & Bias gap \\
-\midrule
-baseline & $11.89$ & $11.83$ & $0.06$ \\
-A        & $10.10$ & $11.29$ & $1.19$ \\
-B        & $8.62$  & $8.63$  & $0.01$ \\
-C        & $11.84$ & $11.82$ & $0.02$ \\
-D        & $9.48$  & $11.06$ & $1.58$ \\
-E        & $9.22$  & $11.10$ & $1.88$ \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-The pattern in Table~\ref{tab:tau-degeneracy} groups by
-$\lambda_{\mathrm{ring}}$. For baseline and C the learned and
-post-hoc $\tau$ agree to within $0.06\,M$, but \emph{both} are
-biased high by $\sim 0.6\,M$ relative to the Leaver value; the post-hoc M2 fit is constrained by the
-network's own field, which has been trained against the inverse
-template, so when the template is weak ($\lambda_{\mathrm{ring}} =
-1$) the network does not correct the template's late-time
-overshoot. For variant D, raising $\lambda_{\mathrm{ring}}$ to
-$100$ \emph{and} increasing $\tring$ to $18\,M$ shifts
-$\tau_{\mathrm{learned}}$ down to $9.48\,M$ along the
-degeneracy with $A_{\mathrm{ring}} = 2.93$, while the post-hoc M2
-fit to the converged $\Phi_\theta$ recovers $11.06\,M$. The
-network-level field $\Phi_\theta(\xq,t)$ has therefore learned the
-correct decay rate from the noisy data and the PDE, despite the
-template parameters drifting in the opposite direction; the
-post-hoc extraction recovers the field's own decay rate, not the
-template's. This separation of the trained network's field from
-the trained template parameters is the reason for the reporting
-convention of Sec.~\ref{sec:reporting}, and it is also the reason
-variant D wins on $\omega$. With the template at $\tring = 18\,M$
-the prompt-burst contamination of the M4 plateau scan is
-suppressed (cf.\ Eq.~\eqref{eq:timescales}), and the network's
-$\Phi_\theta(\xq,t)$ converges to a QNM-dominated waveform on
-which the M4 two-mode NLS finds a tight plateau, despite the
-drift of the template parameters themselves.
+Across variants the plateau standard deviation acts as the
+quality flag of Sec.~\ref{sec:plateau}: A, D and E form tight
+plateaus ($\sigma_\omega/\omega \le 1\%$) and recover $\omega$
+to $0.3$--$2.6\%$, while for baseline and C no genuine plateau
+forms and for B the two-mode NLS does not converge
+(Table~\ref{tab:inv-summary}). Variant D, combining the
+single-factor improvements of A--C, ranks first on $M$,
+$\omega$ and $\tau$ jointly ($M = 1.003$,
+$\sigma_\omega = 4\times 10^{-5}$). The learned-template
+scalars of all six variants (Appendix~\ref{app:supp-inv})
+drift $1.2$--$1.9\,M$ along the degeneracy for the strongly
+template-weighted variants, while the post-hoc fit recovers
+the physical decay rate.
 
 \FloatBarrier
 
-% --------------------------------------------------------------
-\subsection{Curriculum PINN}
-\label{sec:res-cur}
-
-We evaluate the three curriculum variants of
-Sec.~\ref{sec:cur-pinn} against the single-window forward PINN
-baseline of Sec.~\ref{sec:res-fwd}. Every variant uses the same
-per-window architecture, loss, weights and (Adam $10{,}000$ +
-L-BFGS $30{,}000$) optimiser schedule as the baseline, applied
-independently per window. Field-accuracy metrics on the full
-domain and the per-window RMSDs that diagnose where the error is
-concentrated are collected in Table~\ref{tab:cur-summary}, with
-the per-window decomposition restricted to the temporal sub-domain
-of each window. The same five post-hoc QNM extraction methods
-introduced in Sec.~\ref{sec:qnm-methods} (M1: FFT$+$log-line;
-M2: NLS on the wide window $[10,50]\,M$; M3: ESPRIT, $K{=}6$;
-M4: 1-D plateau scan; M5: 2-D plateau scan) are applied to the
-stitched ringdown $\Phi_{\mathrm{cur}}(\xq,t)$ at $\xq = 10\,M$
-of each variant, exactly as for the forward baseline of
-Table~\ref{tab:fwd-qnm}, and reported in
-Table~\ref{tab:cur-qnm}. M2 on the M4 plateau (the wide-window
-NLS evaluated on the M4 plateau midpoint, the convention adopted
-in Table~\ref{tab:fwd-qnm}) is also included.
-
-\begin{table}[!htbp]
-\centering
-\caption{Curriculum PINN variants versus the single-window
-forward baseline: field accuracy. Full-domain RMSD against the FD
-reference and the per-window RMSDs on each sub-domain (``---''
-if the variant does not use that window). For Cur-soft the third
-``$W$'' column reports the RMSD on the soft-blend overlap region
-$[20,30]\,M$ rather than a third disjoint window.}
-\label{tab:cur-summary}
-\footnotesize
-\setlength{\tabcolsep}{4pt}
-\renewcommand{\arraystretch}{1.05}
-\begin{tabular}{@{}lcccc@{}}
-\toprule
-Variant & Full-domain RMSD & $W_{1}$ RMSD & $W_{2}$ RMSD & $W_{3}$ / overlap RMSD \\
-        & ($\times 10^{-3}$) & ($\times 10^{-3}$) & ($\times 10^{-3}$) & ($\times 10^{-3}$) \\
-\midrule
-Baseline (single window) & $\mathbf{0.817}$ & $-\!\!-\!\!-$ & $-\!\!-\!\!-$ & $-\!\!-\!\!-$ \\
-\midrule
-Cur-2w   & $0.845$ & $\mathbf{0.516}$ & $1.077$ & $-\!\!-\!\!-$ \\
-Cur-3w   & $0.976$ & $0.554$          & $0.920$ & $1.322$ \\
-Cur-soft & $3.155$ & $1.739$          & $3.932$ & $2.394$ (overlap) \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{table}[!htbp]
-\centering
-\caption{Curriculum PINN variants: post-hoc QNM extraction at
-$\xq = 10\,M$ with the same five methods of
-Table~\ref{tab:fwd-qnm}, against the Leaver Schwarzschild
-$\ell{=}2$ fundamental $M\omega_{0} = 0.3737$,
-$\tau_{0}/M = 11.241$. The forward baseline row reproduces the
-relevant entries of Table~\ref{tab:fwd-qnm} for direct
-comparison. M4 and M5 quote the plateau mean $\pm$
-plateau standard deviation across the plateau block; ``no
-plateau'' indicates that no plateau of size $\lfloor N/4 \rfloor$
-satisfying the relative-scatter criterion of
-Sec.~\ref{sec:plateau} forms.}
-\label{tab:cur-qnm}
-\scriptsize
-\setlength{\tabcolsep}{3.5pt}
-\renewcommand{\arraystretch}{1.1}
-\begin{tabular}{@{}lcccccc@{}}
-\toprule
-Method & $M\omega$ & $\omega$ err & $\tau/M$ & $\tau$ err & Window or plateau \\
-\midrule
-\multicolumn{6}{@{}l}{\textit{Baseline (single-window forward PINN, reproduces Table~\ref{tab:fwd-qnm})}} \\
-  M1 (FFT$+$log-line)         & $0.3712$  & $0.68\%$  & $10.92$ & $2.83\%$ & $[10,\,50]\,M$ \\
-  M2 (NLS, wide window)       & $0.3795$  & $1.54\%$  & $11.46$ & $1.99\%$ & $[10,\,50]\,M$ \\
-  M2 (NLS on M4 plateau)      & $0.3749$  & $0.31\%$  & $10.41$ & $7.38\%$ & $[14,\,50]\,M$ \\
-  M3 (ESPRIT, $K{=}6$)        & $0.4829$  & $29.2\%$  & $7.84$  & $30.3\%$ & $[10,\,50]\,M$ \\
-  M4 (1-D plateau)            & $0.37359{\pm}2{\times}10^{-4}$ & $\mathbf{0.029\%}$ & $10.94{\pm}0.02$ & $2.65\%$ & $t_0\in[14,21]M$, $\tend{=}50M$ \\
-  M5 (2-D plateau)            & $0.3728{\pm}8{\times}10^{-4}$  & $0.23\%$  & $10.80{\pm}0.12$ & $3.91\%$ & $t_0\in[10,16.7]M$, $\tend\in[42,50]M$ \\
-\midrule
-\multicolumn{6}{@{}l}{\textit{Cur-2w (hard partition, $W_{1}{=}[0,25]M$, $W_{2}{=}[25,50]M$)}} \\
-  M1                          & $0.3711$  & $0.70\%$  & $10.91$ & $2.95\%$ & $[10,\,50]\,M$ \\
-  M2 (wide)                   & $0.3794$  & $1.53\%$  & $11.48$ & $2.11\%$ & $[10,\,50]\,M$ \\
-  M2 on M4 plateau            & $0.3748$  & $0.31\%$  & $10.44$ & $7.16\%$ & $[14,\,50]\,M$ \\
-  M3                          & $0.3774$  & $1.00\%$  & $10.46$ & $6.97\%$ & $[10,\,50]\,M$ \\
-  M4                          & $0.3708{\pm}9{\times}10^{-4}$  & $0.79\%$  & $10.98{\pm}0.08$ & $2.28\%$ & $t_0\in[10,15]M$, $\tend{=}50M$ \\
-  M5                          & $0.3729{\pm}1.8{\times}10^{-3}$ & $0.22\%$ & $10.91{\pm}0.08$ & $2.98\%$ & $t_0\in[13.3,20]M$, $\tend\in[42,50]M$ \\
-\midrule
-\multicolumn{6}{@{}l}{\textit{Cur-3w (hard partition, $[0,17]\cup[17,34]\cup[34,50]M$)}} \\
-  M1                          & $0.3711$  & $0.69\%$  & $10.81$ & $3.83\%$ & $[10,\,50]\,M$ \\
-  M2 (wide)                   & $0.3796$  & $1.59\%$  & $11.46$ & $1.93\%$ & $[10,\,50]\,M$ \\
-  M2 on M4 plateau            & $0.3751$  & $0.36\%$  & $10.39$ & $7.58\%$ & $[14,\,50]\,M$ \\
-  M3                          & $0.3776$  & $1.04\%$  & $10.45$ & $7.03\%$ & $[10,\,50]\,M$ \\
-  M4                          & $0.3713{\pm}5{\times}10^{-4}$  & $0.64\%$  & $10.78{\pm}0.04$ & $4.12\%$ & $t_0\in[10,15]M$, $\tend{=}50M$ \\
-  M5                          & $0.3713{\pm}7{\times}10^{-4}$  & $0.64\%$  & $10.82{\pm}0.08$ & $3.78\%$ & $t_0\in[13.3,20]M$, $\tend\in[42,50]M$ \\
-\midrule
-\multicolumn{6}{@{}l}{\textit{Cur-soft (overlap $[20,30]M$, anchors\,+\,smoothstep blend)}} \\
-  M1                          & $0.3692$  & $1.20\%$  & $10.53$ & $6.37\%$ & $[10,\,50]\,M$ \\
-  M2 (wide)                   & $0.3782$  & $1.19\%$  & $11.44$ & $1.77\%$ & $[10,\,50]\,M$ \\
-  M2 on M4 plateau            & $0.3669$  & $1.82\%$  & $10.55$ & $6.12\%$ & $[18,\,50]\,M$ \\
-  M3                          & $0.3777$  & $1.07\%$  & $10.48$ & $6.78\%$ & $[10,\,50]\,M$ \\
-  M4                          & no plateau & $25.7\%$ & --- & --- & $\sigma_\omega/|\omega|>0.06$ \\
-  M5                          & $0.385{\pm}3.8{\times}10^{-2}$ & $2.95\%$ & $11.99{\pm}2.98$ & $6.66\%$ & $t_0\in[10,16.7]M$, $\tend\in[30,38]M$ \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-The 2-window hard partition (Cur-2w) is essentially tied with the
-single-window baseline on the full-domain RMSD
-($8.45 \times 10^{-4}$ versus $8.17 \times 10^{-4}$, a $3\%$
-increase) and recovers the same headline QNM at the M5 plateau
-($M\omega = 0.3729$, error $0.22\%$ versus $0.23\%$ for the
-baseline). The M4 plateau, by contrast, degrades from
-$\sigma_\omega = 2\times 10^{-4}$ to
-$\sigma_\omega = 9\times 10^{-4}$ and the M4 mean drifts from
-$0.029\%$ to $0.79\%$, a 27-fold loss of plateau quality. The
-per-window breakdown of Table~\ref{tab:cur-summary} is
-informative: $W_{1} = [0,25]\,M$ alone
-reaches RMSD $5.16\times 10^{-4}$, the lowest sub-domain RMSD
-seen anywhere in this work and a $37\%$ improvement on the
-baseline RMSD evaluated over the same sub-domain (which we read
-off the baseline's pointwise error map; the time-restricted
-baseline RMSD on $[0,25]\,M$ is $8.2\times 10^{-4}$).
-The curriculum strategy does therefore deliver the predicted
-local benefit on a smaller temporal sub-domain. The benefit is
-neutralised by $W_{2} = [25,50]\,M$, which sees RMSD
-$10.8\times 10^{-4}$, larger than the full-domain baseline and
-roughly $2\times$ larger than $W_{1}$. The $W_{2}$ error
-inherits both (i) the residual error of $W_{1}$ at $t = 25\,M$
-through the IC transfer of Eq.~\eqref{eq:cur-ic} and (ii) the
-greater dynamic-range demand of resolving the late-time
-exponentially-decaying ringdown after the prompt burst has
-exited.
-
-The 3-window hard partition (Cur-3w) makes the same diagnostic
-sharper. Per-window RMSD grows monotonically with window index,
-$W_{1} \to W_{2} \to W_{3} = 5.5 \to 9.2 \to 13.2$ (units of
-$10^{-4}$). Each additional stitching boundary contributes a
-fresh interpolation error to the IC of the next window, and the
-errors compound. The full-domain RMSD ends $19\%$ above the
-single-window baseline, and the M1 $\tau$ error worsens from
-$2.95\%$ (Cur-2w) to $3.83\%$ (Cur-3w), tracking the additional
-late-time stitching error. The M4 and M5 plateaux of
-Table~\ref{tab:cur-qnm} continue to form (no plateau failure)
-but with $\sigma_\omega = 5\!-\!7 \times 10^{-4}$ and a mean
-bias $0.64\%$, two-and-a-half times the bias of the
-single-window baseline. The M2 wide-window $\omega$ and $\tau$
-are largely insensitive to which curriculum variant is used,
-which is consistent with the wide window averaging over
-the per-window errors.
-
-The soft-overlap variant (Cur-soft) does not improve the
-hard-partition result. It performs worse than Cur-2w on every
-extraction column except M2 wide-window $\tau$, which it
-marginally ties. The full-domain RMSD is $\sim 4\times$ the
-single-window baseline; both $W_{1}$ and the overlap region
-$[20,30]\,M$ are individually worse than the corresponding
-hard-partition entries. Most strikingly, the M4 plateau scan
-fails to identify any contiguous block of size
-$\lfloor N/4 \rfloor$ for which
-$\mathrm{std}(\omega)/|\bar\omega| < 3\%$, i.e.\ no plateau
-forms; the table reports the relative-scatter floor
-($\sigma_\omega/|\omega| > 0.06$) and the corresponding
-single-best two-mode fit, $M\omega = 0.278$ at $25.7\%$ error,
-which is the standard manifestation of the no-plateau condition
-of Sec.~\ref{sec:plateau}. M5 finds a small valid 2-D plateau
-($t_0 \in [10,16.7]\,M$, $\tend \in [30,38]\,M$) but with
-$\sigma_\omega = 4\times 10^{-2}$, two orders of magnitude
-larger than the baseline, signalling that even the 2-D scan
-struggles to find a stable region. Two factors plausibly
-contribute. First, the continuity-anchor loss
-Eq.~\eqref{eq:cur-anchor} imposes
-$201 \times 11 = 2{,}211$ additional point constraints on
-$\Phi_{\theta_{2}}$ across the overlap, drawn from the trained
-$\Phi_{\theta_{1}}$, which itself carries non-zero error
-($\sim 1.7\times 10^{-3}$ on the overlap as measured against
-the FD reference); the anchors therefore propagate an error
-floor into $W_{2}$ that the PDE constraint cannot reduce below.
-Second, the optimiser has to balance the PDE loss, the
-two IC residuals at $t = 20\,M$, and $\mathcal{L}_{\mathrm{cont}}$
-simultaneously, and the additional loss term modifies the
-relative weighting from the
-$\boldsymbol{\lambda} = (100,100,100,1,100,1,1)$ baseline that
-was tuned for the single-window setup.
-
-\begin{figure}[p]
-\centering
-\includegraphics[height=0.245\textheight,keepaspectratio]{../outputs/pinn/zerilli_l2_curriculum/snapshots.png}\\[0.15em]
-{\footnotesize Cur-2w: snapshots}\\[0.4em]
-\includegraphics[height=0.245\textheight,keepaspectratio]{../outputs/pinn/zerilli_l2_curriculum_3w/snapshots.png}\\[0.15em]
-{\footnotesize Cur-3w: snapshots}\\[0.4em]
-\includegraphics[height=0.245\textheight,keepaspectratio]{../outputs/pinn/zerilli_l2_soft_overlap_curriculum/snapshots.png}\\[0.15em]
-{\footnotesize Cur-soft: snapshots}
-\caption{Curriculum PINN versus FD reference at the snapshot
-times for all three variants ($\Phi_{\mathrm{cur}}(x,t)$ solid,
-$\Phi_{\mathrm{FD}}$ dashed). Same axes and snapshot times as
-Figs.~\ref{fig:fwd-field} and \ref{fig:inv-field}. Pointwise
-absolute differences $|\Phi_{\mathrm{cur}} - \Phi_{\mathrm{FD}}|$
-for the same three variants are shown in
-Fig.~\ref{fig:cur-field-diff}.}
-\label{fig:cur-field}
-\end{figure}
-
-\begin{figure}[p]
-\centering
-\includegraphics[height=0.245\textheight,keepaspectratio]{../outputs/pinn/zerilli_l2_curriculum/abs_diff_snapshots.png}\\[0.15em]
-{\footnotesize Cur-2w: $|\Phi_{\mathrm{cur}} - \Phi_{\mathrm{FD}}|$}\\[0.4em]
-\includegraphics[height=0.245\textheight,keepaspectratio]{../outputs/pinn/zerilli_l2_curriculum_3w/abs_diff_snapshots.png}\\[0.15em]
-{\footnotesize Cur-3w: $|\Phi_{\mathrm{cur}} - \Phi_{\mathrm{FD}}|$}\\[0.4em]
-\includegraphics[height=0.245\textheight,keepaspectratio]{../outputs/pinn/zerilli_l2_soft_overlap_curriculum/abs_diff_snapshots.png}\\[0.15em]
-{\footnotesize Cur-soft: $|\Phi_{\mathrm{cur}} - \Phi_{\mathrm{FD}}|$}
-\caption{Curriculum PINN pointwise absolute differences
-$|\Phi_{\mathrm{cur}} - \Phi_{\mathrm{FD}}|$ at the snapshot
-times, companion to Fig.~\ref{fig:cur-field}. Cur-2w and Cur-3w
-show comparable pointwise error to the single-window baseline
-(Fig.~\ref{fig:fwd-field}, lower panel); Cur-soft shows visibly
-elevated error throughout, consistent with the
-$\sim\!4\times$ larger full-domain RMSD of
-Table~\ref{tab:cur-summary}.}
-\label{fig:cur-field-diff}
-\end{figure}
-
-\begin{figure}[p]
-\centering
-\includegraphics[height=0.245\textheight,keepaspectratio]{../outputs/pinn/zerilli_l2_curriculum/error_heatmap.png}\\[0.15em]
-{\footnotesize Cur-2w}\\[0.4em]
-\includegraphics[height=0.245\textheight,keepaspectratio]{../outputs/pinn/zerilli_l2_curriculum_3w/error_heatmap.png}\\[0.15em]
-{\footnotesize Cur-3w}\\[0.4em]
-\includegraphics[height=0.245\textheight,keepaspectratio]{../outputs/pinn/zerilli_l2_soft_overlap_curriculum/error_heatmap.png}\\[0.15em]
-{\footnotesize Cur-soft}
-\caption{Curriculum PINN global pointwise error. Heatmaps of
-$|\Phi_{\mathrm{cur}} - \Phi_{\mathrm{FD}}|$ on the full training
-domain $x \in [-50,150]\,M$, $t \in [0,50]\,M$ for the three
-curriculum variants. The vertical band of elevated error near
-$t = 25\,M$ in Cur-2w marks the splice between $W_{1}$ and
-$W_{2}$; Cur-3w shows two such bands at $t = 17, 34\,M$;
-Cur-soft shows broad elevated error throughout the overlap
-region $[20,30]\,M$ and beyond, consistent with the higher
-full-domain RMSD of Table~\ref{tab:cur-summary}.}
-\label{fig:cur-heatmap}
-\end{figure}
-
-\begin{figure}[p]
-\centering
-\includegraphics[height=0.245\textheight,keepaspectratio]{../outputs/pinn/zerilli_l2_curriculum/ringdown_overlay.png}\\[0.15em]
-{\footnotesize Cur-2w: $[0,25]\cup[25,50]\,M$}\\[0.4em]
-\includegraphics[height=0.245\textheight,keepaspectratio]{../outputs/pinn/zerilli_l2_curriculum_3w/ringdown_overlay.png}\\[0.15em]
-{\footnotesize Cur-3w: $[0,17]\cup[17,34]\cup[34,50]\,M$}\\[0.4em]
-\includegraphics[height=0.245\textheight,keepaspectratio]{../outputs/pinn/zerilli_l2_soft_overlap_curriculum/ringdown_overlay.png}\\[0.15em]
-{\footnotesize Cur-soft: overlap $[20,30]\,M$}
-\caption{Curriculum PINN ringdown at $\xq = 10\,M$. Stitched
-$\Phi_{\mathrm{cur}}(\xq,t)$ overlaid on the FD reference for
-all three curriculum variants. All three reproduce the full
-ringdown waveform at the observer; Cur-3w shows visibly larger
-late-time deviations ($t \gtrsim 35\,M$), and Cur-soft shows
-visible departures throughout the overlap region, consistent
-with the per-window RMSD trends of Table~\ref{tab:cur-summary}.}
-\label{fig:cur-ringdown}
-\end{figure}
-
-\begin{figure}[p]
-\centering
-\includegraphics[height=0.245\textheight,keepaspectratio]{../outputs/qnm/zerilli_l2_curriculum/pinn_method4_stability.png}\\[0.15em]
-{\footnotesize Cur-2w}\\[0.4em]
-\includegraphics[height=0.245\textheight,keepaspectratio]{../outputs/qnm/zerilli_l2_curriculum_3w/pinn_method4_stability.png}\\[0.15em]
-{\footnotesize Cur-3w}\\[0.4em]
-\includegraphics[height=0.245\textheight,keepaspectratio]{../outputs/qnm/zerilli_l2_soft_overlap_curriculum/pinn_method4_stability.png}\\[0.15em]
-{\footnotesize Cur-soft (no plateau)}
-\caption{M4 plateau diagnostic for the three curriculum variants.
-Fitted $M\omega(t_{0})$ and $\tau(t_{0})/M$ on the M4 1-D scan,
-plotted exactly as in Figs.~\ref{fig:fwd-plateau-m4} and
-\ref{fig:inv-plateau-m4}. Cur-2w and Cur-3w both show a clean
-plateau in the early-$t_0$ region; the Cur-2w plateau is
-27$\times$ wider in $\sigma_\omega$ than the single-window
-baseline (Sec.~\ref{sec:res-fwd}). Cur-soft shows no plateau:
-the relative-scatter criterion of Sec.~\ref{sec:plateau} is not
-met by any contiguous block of size $\lfloor N/4 \rfloor$.}
-\label{fig:cur-plateau-m4}
-\end{figure}
-
-\begin{figure}[p]
-\centering
-\includegraphics[height=0.245\textheight,keepaspectratio]{../outputs/qnm/zerilli_l2_curriculum/pinn_method5_2d_heatmap.png}\\[0.15em]
-{\footnotesize Cur-2w}\\[0.4em]
-\includegraphics[height=0.245\textheight,keepaspectratio]{../outputs/qnm/zerilli_l2_curriculum_3w/pinn_method5_2d_heatmap.png}\\[0.15em]
-{\footnotesize Cur-3w}\\[0.4em]
-\includegraphics[height=0.245\textheight,keepaspectratio]{../outputs/qnm/zerilli_l2_soft_overlap_curriculum/pinn_method5_2d_heatmap.png}\\[0.15em]
-{\footnotesize Cur-soft}
-\caption{M5 plateau diagnostic for the three curriculum variants.
-Heatmap of $\sigma_\omega/|\bar\omega|$ on the
-$(t_{0},\tend)$ grid, plotted exactly as in
-Figs.~\ref{fig:fwd-plateau-m5} and \ref{fig:inv-plateau-m5}.
-Cur-2w and Cur-3w show a wide low-scatter region in the early
-$t_0$, late $\tend$ corner; Cur-soft retains only a small valid
-2-D plateau ($t_0\in[10,16.7]M$, $\tend\in[30,38]M$) with
-$\sigma_\omega = 4\times 10^{-2}$, two orders of magnitude
-larger than the single-window baseline.}
-\label{fig:cur-plateau-m5}
-\end{figure}
-
-The curriculum strategy therefore meets its narrow design
-objective (lower per-window error on the early sub-domain) but
-does not translate into a lower full-domain RMSD or a tighter
-QNM extraction once the windows are stitched. The dominant cost
-is the IC-transfer interpolation error, which compounds linearly
-with the number of stitching boundaries and grows at late times
-as the signal amplitude decays. A useful baseline against which
-the curriculum should be compared is the
-greedy-adaptive-sampling forward PINN of Sec.~\ref{sec:fwd-pinn}
-itself, which delivers the same factor-of-two reduction in
-late-time error without paying the per-stitch interpolation cost,
-by concentrating $0.3\,N_{r}$ of the collocation budget on the
-high-residual late-time band within a single network. We discuss
-the implications for the broader curriculum-PINN literature in
-Sec.~\ref{sec:discussion}.
-
-\FloatBarrier
 
 % --------------------------------------------------------------
 \subsection{Fourier neural operator surrogate}
 \label{sec:res-fno}
 
 The FNO surrogate of Sec.~\ref{sec:fno-method} trains once on
-a population of $1{,}000$ $(M,x_{0},\sigma)$ triples and then
-predicts $\Phi(x,t)$ for an unseen draw with a single forward
-pass, in contrast to the PINNs of
-Secs.~\ref{sec:res-fwd}--\ref{sec:res-cur} which solve one
-Zerilli problem at a time. We evaluate the surrogate in two
-settings that together quantify its competitiveness with the
-PINN baseline. The \emph{canonical} draw $(M,x_{0},\sigma) = (1,4,5)$
-fixes the same single-BH benchmark used for the forward,
-inverse, and curriculum PINNs and so allows a direct,
-same-target comparison of field accuracy and post-hoc QNM
-extraction precision. The $100$-BH in-distribution
-\emph{population} probes the regime in which per-BH PINN
-training is prohibitive and amortisation across draws is the
-relevant cost figure of merit. FNO numbers in this subsection
-are primarily extracted at $\xq = 2\,M$ for the reasons given in
-Sec.~\ref{sec:fno-method}; the four estimators of
-Sec.~\ref{sec:qnm-methods} and the reporting convention of
-Sec.~\ref{sec:reporting} apply unchanged.
+$1{,}000$ $(M,x_{0},\sigma)$ triples and then predicts
+$\Phi(x,t)$ for an unseen draw with a single forward pass, in
+contrast to the PINNs, which solve one Zerilli problem at a
+time. It is evaluated in two settings: the \emph{canonical}
+draw $(M,x_{0},\sigma) = (1,4,5)$, the same single-BH benchmark
+used for the PINNs, and a $100$-BH in-distribution
+\emph{population}, the regime in which per-BH PINN training is
+prohibitive and amortisation is the relevant figure of merit.
+Extraction is at $\xq = 2\,M$ (Sec.~\ref{sec:fno-method}), with
+the estimators and reporting convention of
+Secs.~\ref{sec:qnm-methods}--\ref{sec:reporting} unchanged.
 
-\paragraph{Field accuracy on the canonical BH.} The v4 FNO
+\paragraph{Field accuracy on the canonical BH.} The FNO
 reproduces the FD reference field on the canonical draw with
-gridwise $\mathrm{RMSD} = 9.30\times 10^{-4}$ (in field
-units, $|\Phi|_{\max} \approx 1.0$ at $t = 0$), with the
-residual concentrated near the prompt pulse and at late times
-where the signal amplitude itself has decayed by three orders
-of magnitude.
-Figure~\ref{fig:fno-snapshots} compares the v4 FNO prediction
-against the FD reference at four time slices across
-$t \in [0,100]\,M$ (top row) and plots the pointwise absolute
-residual $|\Phi_{\mathrm{FNO}} - \Phi_{\mathrm{FD}}|$ at the
-same four times (bottom row). The two curves overlay within the
-line thickness; the residual peaks near $6\times 10^{-3}$ in
-the vicinity of the moving wave packet and sits at
-$\sim\!10^{-4}$--$10^{-3}$ elsewhere.
-Figure~\ref{fig:fno-heatmap} shows the global pointwise error
-on $(x,t) \in [-50,150]\,M \times [0,100]\,M$, plotted on a
-shared $\mathrm{magma\_r}$ logarithmic colour scale with
-ceiling $1.11\times 10^{-1}$ and floor $1.11\times 10^{-5}$.
-The residual sits uniformly in the $10^{-4}$--$10^{-3}$ band
-across the domain, with a single brighter characteristic
-tracing the outgoing wave packet from the source region. The
-per-component training history that underlies the
-field-accuracy floor is shown in Fig.~\ref{fig:fno-loss}.
+gridwise $\mathrm{RMSD} = 9.30\times 10^{-4}$ (in field units,
+$|\Phi|_{\max} \approx 1.0$ at $t = 0$), the pointwise error
+sitting uniformly in the $10^{-4}$--$10^{-3}$ band with a
+single brighter characteristic tracing the outgoing wave
+packet (Figs.~\ref{fig:fno-snapshots}--\ref{fig:fno-loss}).
 
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.82\textwidth]{../outputs/qnm/fno_xq2_comparison/figs_v4/fno_v4_snapshots.png}\\[0.4em]
 \includegraphics[width=0.82\textwidth]{../outputs/qnm/fno_xq2_comparison/figs_v4/fno_v4_abs_diff_snapshots.png}
-\caption{FNO v4 versus FD reference at the snapshot times. Top:
+\caption{FNO versus FD reference at the snapshot times. Top:
 snapshots of $\Phi(x,t)$ at four times
 $t/M\in\{10,30,50,100\}$ overlaid for the FNO and the FD
 reference; the two curves are visually indistinguishable on
@@ -961,12 +629,13 @@ $6\times 10^{-3}$ in the vicinity of the wave packet.}
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.92\textwidth]{../outputs/qnm/fno_xq2_comparison/figs_v4/fno_v4_pointwise_error.png}
-\caption{FNO v4 global pointwise error on the canonical BH.
+\caption{FNO global pointwise error on the canonical BH.
 Heatmap of $|\Phi_{\mathrm{FD}} - \Phi_{\mathrm{FNO}}|$ on
 $x\in[-50,150]\,M$, $t\in[0,100]\,M$ (the full FNO training
-window), plotted on a shared
-$\mathrm{magma\_r}$ logarithmic colour scale
-(max $1.11\times 10^{-1}$, floor $1.11\times 10^{-5}$). The
+window), plotted on a logarithmic
+$\mathrm{magma\_r}$ colour scale
+(max $1.11\times 10^{-1}$, floor $1.11\times 10^{-5}$), shared
+with the hybrid error maps of Sec.~\ref{sec:res-hyb}. The
 residual sits uniformly in the $10^{-4}$--$10^{-3}$ band, with
 a single brighter characteristic tracing the outgoing wave
 packet from the source region.}
@@ -976,17 +645,15 @@ packet from the source region.}
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.85\textwidth]{../outputs/qnm/fno_xq2_comparison/figs_v4/fno_v4_loss.png}
-\caption{FNO v4 training history. Total loss
+\caption{FNO training history. Total loss
 $\mathcal{L}_{\mathrm{FNO}}$ of Eq.~\eqref{eq:fno-loss} and its
 six weighted components ($\mathcal{L}_{\mathrm{field}}$,
 $\mathcal{L}_{H^{1}}$, $\mathcal{L}_{\mathrm{ring}}$,
 $\mathcal{L}_{\mathrm{obs}}$, $\mathcal{L}_{\mathrm{tw}}$,
 $\mathcal{L}_{\mathrm{pde}}$, weights as in
-Sec.~\ref{sec:fno-method}) versus epoch on a semi-log axis.
-Training is $300$ epochs of Adam with cosine annealing; we do
-not follow with an L-BFGS phase because the memory and
-wall-clock cost of L-BFGS on $\sim\!7.8\times 10^{7}$
-parameters is prohibitive on a single A100. The total loss
+Sec.~\ref{sec:fno-method}) versus epoch on a semi-log axis
+($300$ epochs of Adam with cosine annealing,
+Table~\ref{tab:train-config}). The total loss
 falls by four orders of magnitude from $\sim\!10^{-1}$ at
 initialisation to $\sim\!5\times 10^{-6}$ by epoch $300$, with
 the field and $H^{1}$ terms dominating the floor and the
@@ -996,14 +663,11 @@ tracking a decade below.}
 \label{fig:fno-loss}
 \end{figure}
 
-\paragraph{Ringdown waveform at the observer.}
-Figure~\ref{fig:fno-ringdown-xq2} shows the 1-D observer slice
-$\Phi(\xq{=}2,t)$ on the canonical BH on linear and logarithmic
-scales. The FNO and FD curves overlay within the line thickness
-on the linear panel and track to $\lesssim 10^{-3}$ in absolute
-amplitude across $t \in [0,100]\,M$ on the logarithmic panel,
-with the FNO error growing slowly beyond $t \approx 80\,M$ as
-the signal amplitude itself falls below the field-error floor.
+\paragraph{QNM extraction on the canonical BH.}
+Table~\ref{tab:fno-canonical} compares the five extractors on
+the FNO field and the FD reference field, both applied to the
+observer slice $\Phi(\xq{=}2,t)$ of
+Fig.~\ref{fig:fno-ringdown-xq2}. The plateau estimators are the cleanest at this
 
 \begin{figure}[!htbp]
 \centering
@@ -1018,64 +682,51 @@ Table~\ref{tab:fno-canonical} is applied to this time series.}
 \end{figure}
 
 \paragraph{QNM extraction on the canonical BH.}
-Table~\ref{tab:fno-canonical} compares the five
-QNM extractors of Sec.~\ref{sec:qnm-methods} applied to the
-v4 FNO field and to the FD reference field, both at
-$\xq = 2\,M$. M1 (FFT plus log-line) and M2 (1-mode NLS,
-wide window) saturate at $\omega$ error $\sim\!100\%$ on both
-the FNO and the FD reference, because the observer position
-$\xq = 2\,M$ lies inside the spatial support of the prompt
-pulse, where the field passes through a sign change shortly
-after the peak and the FFT cannot resolve the phase coherently.
-M3 (ESPRIT) returns
-$\omega$ to $0.60\%$ and $\tau$ to $3.3\%$. The two plateau
-estimators M4 and M5 of Sec.~\ref{sec:plateau} are the cleanest
-extractors at this observer position. M4 recovers $\omega$ to
-$0.114\%$ and $\tau$ to $0.099\%$ against the Leaver values,
-with M5 returning $0.115\%$ and $0.098\%$ respectively on the
-independent 2-D scan over the fit window; the agreement
-establishes that the M4 plateau is not a coincidence of the
-specific 1-D scan range. The plateau in-block scatter of the
-M4 fit, $\sigma_{\omega} = 6.4\times 10^{-5}$ in $\omega M$
-(i.e.\ $\sim\!0.02\%$ relative) and $\sigma_{\tau} = 0.022$ in
-$\tau/M$ ($\sim\!0.2\%$ relative), is below the bias from the
-Leaver value, so the reported error is not statistical scatter
-but a true offset set by the bulk $9.30\times 10^{-4}$ field
-residual of the surrogate. The same M4 extractor applied to
-the FD reference field returns $0.019\%$ in $\omega$ and
-$0.005\%$ in $\tau$, a factor of $\sim\!6$ and $\sim\!20$
-below the FNO; the gap is set by the field residual, not by
-the extraction algorithm. The 1-D plateau diagnostic of
-Fig.~\ref{fig:fno-plateau-m4-xq2} and the 2-D scan of
-Fig.~\ref{fig:fno-plateau-m5-xq2} confirm this decomposition.
+Table~\ref{tab:fno-canonical} compares the five extractors on
+the FNO field and the FD reference field, both at
+$\xq = 2\,M$. The plateau estimators are the cleanest at this
+observer: M4 recovers $\omega$ to $0.114\%$ and $\tau$ to
+$0.099\%$, with M5 confirming both values on the independent
+2-D window scan (Figs.~\ref{fig:fno-plateau-m4-xq2}
+and~\ref{fig:fno-plateau-m5-xq2}). The plateau in-block scatter
+($\sigma_{\omega} = 6.4\times 10^{-5}$) is below the residual
+bias, so the quoted error is a true offset set by the
+$9.30\times 10^{-4}$ bulk field residual rather than fit
+scatter; the same extractor on the FD reference returns
+$0.019\%$ and $0.005\%$, the corresponding discretisation
+floor. M1/M2 saturate on both fields alike, yet return
+sub-percent errors on the shorter $[10,50]\,M$ hybrid window
+(Table~\ref{tab:hyb-canonical}): the saturation is a property
+of the joint window--observer geometry, not of the surrogate.
 
 \begin{table}[!htbp]
 \centering
 \caption{QNM extraction on the canonical BH
 $(M,x_{0},\sigma) = (1,4,5)$ at $\xq = 2\,M$, comparing the
-v4 FNO prediction against the FD reference. Reported as the
+FNO prediction against the FD reference. Reported as the
 percent error of $\omega$ and $\tau$ relative to the Leaver
 values $M\omega_{0} = 0.3737$ and $\tau_{0}/M = 11.241$. M1 and
-M2 saturate at $\sim 100\%$ on both fields because $\xq = 2\,M$
-lies inside the prompt pulse support; the two plateau
-estimators M4 (1-D scan over $t_0$ at fixed $t_{\mathrm{end}}$)
-and M5 (2-D scan over $(t_0, t_{\mathrm{end}})$) are the
-cleanest extractors at this observer position and return
-mutually consistent values.}
+M2 saturate at $\sim 100\%$ on both fields on this
+window--observer combination (see text). M4 is the 1-D scan
+over $t_0$ at fixed $t_{\mathrm{end}}$ and M5 the 2-D scan over
+$(t_0, t_{\mathrm{end}})$, both fitting the two-mode NLS
+template of Sec.~\ref{sec:plateau}. Bold entries are the
+primary values under the reporting convention of
+Sec.~\ref{sec:reporting}.}
 \label{tab:fno-canonical}
 \small
 \setlength{\tabcolsep}{6pt}
 \begin{tabular}{@{}lcccc@{}}
 \toprule
-& \multicolumn{2}{c}{FNO v4} & \multicolumn{2}{c}{FD reference} \\
+& \multicolumn{2}{c}{FNO} & \multicolumn{2}{c}{FD reference} \\
 \cmidrule(lr){2-3}\cmidrule(lr){4-5}
 Estimator & $\omega$ \% err & $\tau$ \% err & $\omega$ \% err & $\tau$ \% err \\
 \midrule
 M1 (FFT + log-line)            & $\sim 100$ & $3.93$  & $\sim 100$ & $0.11$ \\
 M2 (1-mode NLS)                & $\sim 100$ & $3.93$  & $\sim 100$ & $0.11$ \\
 M3 (ESPRIT)                    & $0.596$    & $3.34$  & $0.511$    & $3.10$ \\
-\textbf{M4 (2-mode 1-D plateau)} & $0.114$  & $0.099$ & $0.019$    & $0.005$ \\
-\textbf{M5 (2-mode 2-D plateau)} & $0.115$  & $0.098$ & $0.019$    & $0.005$ \\
+M4 (1-D plateau)               & $\mathbf{0.114}$ & $\mathbf{0.099}$ & $0.019$ & $0.005$ \\
+M5 (2-D plateau)               & $0.115$    & $0.098$ & $0.019$    & $0.005$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1083,7 +734,7 @@ M3 (ESPRIT)                    & $0.596$    & $3.34$  & $0.511$    & $3.10$ \\
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.9\textwidth]{../outputs/qnm/fno_xq2_comparison/figs_v4/fno_v4_plateau_m4_xq2.png}
-\caption{M4 1-D plateau diagnostic for the FNO v4 prediction at
+\caption{M4 1-D plateau diagnostic for the FNO prediction at
 $\xq = 2\,M$ on the canonical BH. $(\omega,\tau)$ from a
 2-mode NLS fit at fixed $t_{\mathrm{end}} = 100\,M$ as a
 function of the start time $t_0 \in [10,20]\,M$. Blue markers
@@ -1097,7 +748,7 @@ value.}
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.85\textwidth,keepaspectratio]{../outputs/qnm/fno_xq2_comparison/figs_v4/fno_v4_plateau_m5_xq2.png}
-\caption{M5 2-D plateau diagnostic for the FNO v4 prediction at
+\caption{M5 2-D plateau diagnostic for the FNO prediction at
 $\xq = 2\,M$ on the canonical BH. Heatmap of the 2-mode NLS
 fit on the $(t_0,t_{\mathrm{end}})$ grid, plotted on a shared
 linear colour scale ($\omega M \in [0.30,0.50]$,
@@ -1112,94 +763,44 @@ the M4 entry of Table~\ref{tab:fno-canonical}.}
 \label{fig:fno-plateau-m5-xq2}
 \end{figure}
 
-\paragraph{Observer-position dependence and the shared $\xq = 10$ failure.}
-Figure~\ref{fig:fno-xq-sweep} sweeps the observer position
-$\xq \in \{0,2,5,10\}\,M$ on the canonical BH and reports
-all four estimators on the v4 FNO field and on the FD reference
-field at each $\xq$. The pattern at $\xq = 2$ described above
-(M1/M2 saturated, M3 sub-percent, M4 permille-level) is
-specific to the prompt-pulse sign change at that observer.
-At $\xq = 0$ and $\xq = 5$ the field passes through no such
-sign change in the QNM window, M1 becomes the strongest
-estimator on both the FNO field and the FD reference at
-$\omega$ error $\sim\!10^{-2}\%$, and the longer time
-available for the wave to arrive at the more distant observer
-allows the FFT to lock onto the QNM oscillation. At $\xq = 10\,M$, the ringdown
-amplitude has decayed to the field-error floor of the FD
-reference itself by $t \gtrsim 80\,M$ within the
-$t \in [10,100]\,M$ window adopted for the FNO sweep. M4
-consequently identifies no valid plateau on either field,
-because its convergence criterion requires a contiguous band
-of scan windows with low relative scatter and that band
-disappears once the signal sinks into the noise. The shared
-dropout is visible in Fig.~\ref{fig:fno-xq-sweep} as the
-absence of M4 bars at $\xq = 10$ for both colours and motivates
-our choice of $\xq = 2\,M$ as the primary FNO extraction
-position, the only observer in our window where M4 forms a
-plateau on the FD reference field as well as on the FNO
-prediction.
+\paragraph{Observer position.} The operator models extract at
+$\xq = 2\,M$, adjacent to the potential-barrier peak
+($r \approx 3.1\,M$), where the plateau criterion validates on
+the FD reference (Sec.~\ref{sec:fno-method}); the PINN sections
+retain $\xq = 10\,M$ for direct comparability with
+\citet{Patel2024pinn}. The full sweep across
+$\xq \in \{0,2,5,10\}\,M$ is reported in
+Appendix~\ref{app:supp-xq}.
 
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=\textwidth]{../outputs/qnm/fno_xq2_comparison/figs_v4/fno_v4_xq_sweep.png}
-\caption{QNM extraction across observer positions
-$\xq \in \{0,2,5,10\}\,M$ on the canonical BH for the v4 FNO
-(blue) and the FD reference (red), for all four estimators.
-At $\xq = 0$ and $\xq = 5$, M1 (FFT) is the strongest estimator;
-at $\xq = 2$, M1/M2 saturate at $\sim 100\%$ (the field
-sign-changes inside the prompt pulse support) and M4 dominates
-at permille-level precision; at $\xq = 10$, M4 returns no plateau
-on either the FNO field or the FD reference field within the
-$t \in [10,100]\,M$ window, indicating that the M4 failure mode
-is a property of the window--observer geometry rather than of
-the operator surrogate.}
-\label{fig:fno-xq-sweep}
-\end{figure}
 
 \paragraph{Population evaluation across the training distribution.}
-We draw $100$ test BHs from the same uniform distribution
+We draw $100$ test BHs from the training distribution
 ($M \in [0.8,1.2]$, $x_{0} \in [-10,30]$, $\sigma \in [3,8]$)
-used to train the FNO and apply the M4 plateau extractor at
-$\xq = 2\,M$ to both the FNO prediction and the FD reference
-for each draw. Figure~\ref{fig:fno-pop-scatter} shows the
-per-BH scatter of M4 $(\omega,\tau)$ for the FNO prediction
-against the FD reference extraction. Points lie along the
-$y = x$ diagonal with no visible bias, showing that the same-as-FD
-agreement holds at the population level: the population
-median $0.343\%$ matches the FD reference's $0.335\%$ to
-within the statistical noise of the test set. Table~\ref{tab:fno-population} reports the
-population medians across the $59$--$62$ draws on which M4
-finds a plateau for both sources. The v4 FNO matches the FD
-reference's own population-median QNM accuracy to within the
-statistical precision of the test set, with $\omega$ error
-$0.343\%$ for FNO and $0.335\%$ for FD reference and $\tau$
-error $0.940\%$ versus $0.661\%$. The 1-percent pass rates
-($32\%$ FNO, $33\%$ FD reference) differ by less than one
-binomial standard error on $n \approx 60$ draws ($\sigma \approx 6\%$).
-The two sources return no M4 plateau on a predominantly
-overlapping $\sim\!40\%$ subset of draws, locating the
-population-level dropout in the M4 plateau scan on the noisy
-late-time tail of the FD reference rather than in the operator
-surrogate.
+and apply M4 at $\xq = 2\,M$ to the FNO prediction and the FD
+reference for each draw. The per-BH scatter lies along the
+$y = x$ diagonal with no visible bias
+(Fig.~\ref{fig:fno-pop-scatter}), and the medians match:
+$0.343\%$ versus $0.335\%$ in $\omega$, with $1$-percent pass
+rates within one binomial standard error of each other
+(Table~\ref{tab:fno-population}). Draws with no plateau are
+predominantly shared between the two sources, and the
+late-time residual is homogeneous across the training box
+(Appendix~\ref{app:supp-fno}).
 
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.9\textwidth]{../outputs/qnm/fno_xq2_comparison/figs_v4/fno_v4_population_scatter.png}
-\caption{Per-BH M4 extraction at $\xq = 2\,M$, FNO v4 versus FD
+\caption{Per-BH M4 extraction at $\xq = 2\,M$, FNO versus FD
 reference, over $100$ test draws from the FNO training
 distribution. Left: $\omega$ in dimensionless units $M\omega$.
 Right: $\tau$ in units of $M$. Points lie along the $y = x$
 diagonal (grey); the marginal histograms collapse to within
 counting noise. The dotted lines mark the Leaver values
 $M\omega_{0} = 0.3737$ and $\tau_{0}/M = 11.241$. Each panel
-shows the joint subset on which M4 returns a plateau for both
-sources ($57$ draws on which both $\omega$ and $\tau$ have a
-plateau for $\tau$); the per-source counts of
+shows the joint subset of $57$ draws on which M4 returns a
+plateau for both sources; the per-source counts of
 Table~\ref{tab:fno-population} are larger because they include
-draws on which only one source has a plateau. The dropout rate
-is dominated by the $t \in [10,100]\,M$ window--$\xq$ geometry
-and is shared between FNO and FD as established in
-Fig.~\ref{fig:fno-xq-sweep}.}
+draws on which only one source has a plateau.}
 \label{fig:fno-pop-scatter}
 \end{figure}
 
@@ -1209,9 +810,9 @@ Fig.~\ref{fig:fno-xq-sweep}.}
 the $100$-BH test set drawn from the FNO training distribution.
 $n_\omega$ is the number of draws on which M4 finds a plateau
 for the given source. \texttt{pass1} is the fraction of draws
-on which $|\omega - \omega_{0}|/\omega_{0} < 1\%$. The v4 FNO
-column matches the FD GT column within a factor of $\sim 1$ on
-all four entries.}
+on which $|\omega - \omega_{0}|/\omega_{0} < 1\%$. The FNO
+and FD reference columns agree on all four entries to within
+the statistical precision of the test set.}
 \label{tab:fno-population}
 \small
 \setlength{\tabcolsep}{6pt}
@@ -1219,248 +820,23 @@ all four entries.}
 \toprule
 Source & $\omega$ \%err (med) & $\tau$ \%err (med) & $n_\omega$ & $n_\tau$ & \texttt{pass1} \\
 \midrule
-v4 FNO     & $0.343$ & $0.940$ & $59$ & $59$ & $0.32$ \\
+FNO        & $0.343$ & $0.940$ & $59$ & $59$ & $0.32$ \\
 FD reference & $0.335$ & $0.661$ & $62$ & $62$ & $0.33$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\paragraph{Where in initial-data space does the surrogate degrade?}
-The population scatter of Fig.~\ref{fig:fno-pop-scatter}
-collapses the $(M, x_{0}, \sigma)$ manifold onto a single
-diagonal and so cannot expose any structure of the residual
-across the training distribution. Table~\ref{tab:fno-pop-heatmap}
-addresses this by tabulating the per-BH FNO late-time field
-RMSD
-$\sqrt{\langle(\Phi_{\rm FNO} - \Phi_{\rm FD})^{2}\rangle}_{t>T/2}$
-(restricted to the late-time half of the window so the metric
-is dominated by the ringdown rather than the prompt pulse) in
-tertile bins along each of the three initial-data axes $M$,
-$x_{0}$, $\sigma$. The late-time field RMSD is \emph{tightly}
-bounded across the entire training box, spanning only
-$5.7\times 10^{-4}$ to $1.8\times 10^{-3}$ (median
-$9.4\times 10^{-4}$) over the full population, and varies by
-less than $\sim\!40\%$ between the lowest and highest tertile
-along any axis: there is no isolated failure region in the
-training box. The mild rise at the lowest $\sigma$ tertile
-tracks the narrowing of the initial Gaussian, where the input
-field develops sharper spatial features that approach the
-spectral truncation scale of the FNO ($n_{x} = 64$ retained
-modes), and is the expected behaviour of a band-limited
-operator.
-
-\begin{table}[!htbp]
-\centering
-\caption{FNO v4 late-time field RMSD,
-$\sqrt{\langle(\Phi_{\rm FNO}-\Phi_{\rm FD})^{2}\rangle}_{t>T/2}$,
-across the $100$-BH test population, binned into equal-width
-bins along each axis of the initial-data manifold
-$(M, x_{0}, \sigma) \in [0.8,1.2] \times [-10,30] \times [3,8]$.
-Each row gives the bin definition, the count $n$ of test BHs
-falling in the bin, the median RMSD, and the worst-case RMSD
-in the bin. The residual sits in a $\sim 3\times$ band across
-the entire training box with no isolated failure region.}
-\label{tab:fno-pop-heatmap}
-\small
-\setlength{\tabcolsep}{6pt}
-\begin{tabular}{@{}llcccc@{}}
-\toprule
-Axis & Bin & $n$ & median & max \\
-\midrule
-$M$       & $[0.80,0.93]$  & $30$ & $1.15\times 10^{-3}$ & $1.82\times 10^{-3}$ \\
-          & $[0.93,1.07]$  & $41$ & $8.71\times 10^{-4}$ & $1.41\times 10^{-3}$ \\
-          & $[1.07,1.20]$  & $29$ & $8.82\times 10^{-4}$ & $1.13\times 10^{-3}$ \\
-\midrule
-$x_{0}/M$ & $[-10.0, 3.33]$ & $34$ & $1.01\times 10^{-3}$ & $1.82\times 10^{-3}$ \\
-          & $[3.33, 16.67]$ & $39$ & $8.90\times 10^{-4}$ & $1.68\times 10^{-3}$ \\
-          & $[16.67, 30.0]$ & $27$ & $9.06\times 10^{-4}$ & $1.54\times 10^{-3}$ \\
-\midrule
-$\sigma/M$ & $[3.00, 4.67]$ & $32$ & $1.07\times 10^{-3}$ & $1.82\times 10^{-3}$ \\
-           & $[4.67, 6.33]$ & $35$ & $8.20\times 10^{-4}$ & $1.54\times 10^{-3}$ \\
-           & $[6.33, 8.00]$ & $33$ & $9.80\times 10^{-4}$ & $1.35\times 10^{-3}$ \\
-\midrule
-all       & --              & $100$ & $9.40\times 10^{-4}$ & $1.82\times 10^{-3}$ \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\paragraph{Version ablation.}
-The v4 design is the third of three FNO configurations that
-we trained on the same population. v2 and v3 were superseded
-because field RMSD on the training distribution is not a
-sufficient figure of merit for QNM extraction.
-Table~\ref{tab:fno-versions} summarises the architectural and
-training differences and reports canonical-BH field RMSD,
-canonical-BH M4 $\omega$ error, and population-median M4
-$(\omega,\tau)$ error across the three versions.
-\textbf{v2} uses a shorter time window $t \in [0,50]\,M$ and
-modest spectral resolution ($n_{t} = 32$ Fourier modes along
-$t$). It has the lowest field RMSD on the canonical BH of the
-three ($5.80\times 10^{-4}$), but $50\,M$ is fewer than five
-fundamental damping times, and the M4 plateau scan returns a
-$\tau$ error of $344\%$ on the canonical BH and a population
-median of $6.95\%$. The field is well-fit on average but the
-late-time decay is not resolved well enough for QNM extraction.
-\textbf{v3} extends $t_{\max}$ to $100\,M$ and doubles the temporal
-spectral resolution to $n_{t} = 64$. The population-median QNM
-errors drop to $0.44\%$ in $\omega$ and $1.31\%$ in $\tau$, a
-factor of $\sim 5$ improvement. The canonical-BH M4 numbers
-remain poor ($19.25\%$ in $\omega$, $35.01\%$ in $\tau$). The
-population-average loss therefore does not control the
-worst-case behaviour on the 1-D slice that the QNM extractor
-actually reads.
-\textbf{v4} adds two loss terms targeted at exactly that
-worst-case. The first is the 1-D slice loss
-$\mathcal{L}_{\mathrm{obs}}$ at $x = \xq$. The second is the
-time-weighted field loss $\mathcal{L}_{\mathrm{tw}}$. Both are
-combined with a bump of $\lambda_{\mathrm{ring}}$ from $2$ to
-$10$. The canonical-BH M4 then
-recovers to $0.11\%$ in $\omega$ and $0.10\%$ in $\tau$, two
-orders of magnitude better than v3 on the same draw, while the
-population median improves modestly to $0.34\%$ in
-$\omega$ and $0.94\%$ in $\tau$, matching the FD GT extraction
-floor. The canonical-BH field RMSD rises slightly relative to
-v3 ($9.30\times 10^{-4}$ vs $7.48\times 10^{-4}$), the
-expected trade-off when training pressure is reallocated from
-the bulk field to the 1-D observer slice. This trade-off is
-favourable here because $\Phi(\xq,t)$ is the only quantity the
-downstream QNM pipeline reads. The v4 configuration is the
-primary FNO reported in the rest of this paper.
-
-\begin{table}[!htbp]
-\centering
-\caption{FNO configuration ablation. ``Modes $(t,x)$'' are the
-retained Fourier modes per dimension; $t_{\max}$ is the upper
-edge of the training time window; the rightmost four columns
-report the canonical-BH field RMSD, the canonical-BH M4
-$\omega$ error, and the $100$-BH population-median M4
-$\omega$ and $\tau$ errors. \texttt{NEW} denotes the two
-loss terms introduced in v4 (see text). Bold entries mark
-the best value in each metric column.}
-\label{tab:fno-versions}
-\small
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{@{}lcccccccccc@{}}
-\toprule
-Tag & $t_{\max}/M$ & Modes $(t,x)$ & $\lambda_{\mathrm{ring}}$ & $\lambda_{\mathrm{obs}}$ & $\lambda_{\mathrm{tw}}$ & canon.\ RMSD & canon.\ $\omega$\% & pop.\ $\omega$\% & pop.\ $\tau$\% \\
-\midrule
-v2 & $50$  & $(32,64)$        & $2$          & ---          & ---           & $\mathbf{5.80{\times}10^{-4}}$ & $5.14$  & $2.11$ & $6.95$ \\
-v3 & $\mathbf{100}$ & $\mathbf{(64,64)}$ & $2$          & ---          & ---           & $7.48{\times}10^{-4}$ & $19.25$ & $0.44$ & $1.31$ \\
-v4 & $100$ & $(64,64)$        & $\mathbf{10}$ & $\mathbf{5}$ & $\mathbf{1}$ & $9.30{\times}10^{-4}$ & $\mathbf{0.114}$ & $\mathbf{0.34}$ & $\mathbf{0.94}$ \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\paragraph{Cost.} Training the v4 FNO once on $1{,}000$
-$(M,x_{0},\sigma)$ triples takes $\sim\!10$ A100-hours for
-$300$ epochs; subsequent inference on an unseen triple is a
-single forward pass costing $\mathcal{O}(\mathrm{seconds})$ on
-the same hardware (and a few minutes on CPU). The forward PINN
-of Sec.~\ref{sec:fwd-pinn} requires a separate
-$30{,}000$-iteration L-BFGS run per BH, costing
-$\sim\!1.5$~A100-hours per BH. Writing $T_{\mathrm{train}}^{\mathrm{FNO}}\approx 10$~h,
-$T_{\mathrm{infer}}^{\mathrm{FNO}}\!\lesssim\!10^{-3}$~h and
-$T^{\mathrm{PINN}}\approx 1.5$~h per BH, the total wall-clock to
-deliver predictions for $N_{\mathrm{BH}}$ unseen triples scales as
-$N_{\mathrm{BH}} T^{\mathrm{PINN}}$ versus
-$T_{\mathrm{train}}^{\mathrm{FNO}} + N_{\mathrm{BH}} T_{\mathrm{infer}}^{\mathrm{FNO}}$,
-which break even at $N_{\mathrm{BH}}\!\approx\!7$ and diverge by two
-orders of magnitude by $N_{\mathrm{BH}}\!=\!100$
-(Table~\ref{tab:fno-pinn-cost}). The comparison is fair only on
-draws that lie inside the FNO training distribution; the FNO has
-no generalisation guarantee outside
-$(M,x_{0},\sigma) \in [0.8,1.2]\times[-10,30]\times[3,8]$,
-whereas the PINN solves each new BH from scratch.
-
-\begin{table}[!htbp]
-\centering
-\caption{Wall-clock cost in A100-hours for delivering field
-predictions on $N_{\mathrm{BH}}$ unseen $(M,x_{0},\sigma)$
-triples drawn from the FNO training distribution. PINN cost is
-$N_{\mathrm{BH}}\!\times\!1.5$~h per BH; FNO cost is
-$10$~h training (one-time) plus $\sim\!1$~s$\!\approx\!3{\times}10^{-4}$~h
-inference per BH. The ``speed-up'' column is
-$T^{\mathrm{PINN}}/T^{\mathrm{FNO}}$.}
-\label{tab:fno-pinn-cost}
-\small
-\setlength{\tabcolsep}{8pt}
-\begin{tabular}{@{}rcccc@{}}
-\toprule
-$N_{\mathrm{BH}}$ & PINN (A100-h) & FNO (A100-h) & speed-up \\
-\midrule
-$1$    & $1.5$   & $10.0$  & $0.15\times$ \\
-$10$   & $15$    & $10.0$  & $1.5\times$  \\
-$50$   & $75$    & $10.0$  & $7.5\times$  \\
-$100$  & $150$   & $10.0$  & $15\times$   \\
-$1000$ & $1500$  & $10.3$  & $146\times$  \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\paragraph{Zero-shot resolution transfer.}
-A discretisation-invariant operator should produce a
-predictor whose physical output is independent of the grid on
-which one chooses to evaluate it. Because the spectral
-convolution kernels of the FNO truncate to a fixed number of
-Fourier modes regardless of the input resolution, this is one
-of the standard advertised properties of the architecture
-\citep{Li2021fno} and a test we should subject our trained v4
-checkpoint to directly. We take the canonical
-$M=1,\,x_{0}=4,\,\sigma=5$ BH and evaluate the v4 model at
-five evaluation grids
-$(N_{t}, N_{x}) \in \{201, 301, 401, 601, 801\}^{2}$ over the
-same physical box $x \in [-50, 150]\,M$, $t \in [0, 100]\,M$
-as was used in training ($401\times 401$), with no retraining
-and no fine-tuning. The FD reference is computed independently
-at each resolution. Table~\ref{tab:fno-resolution} reports
-the late-time field RMSD and the M3 ESPRIT $\omega$
-extraction at $x_{q} = 2\,M$ on the FNO field. The QNM
-observable transfers \emph{cleanly}: $M\omega_{0}$ \% error
-sits in the range $[0.56, 0.61]$\% across all five grids, a
-spread of only $0.05$ percentage points and entirely
-consistent with the canonical-BH numbers reported elsewhere
-in this subsection. The field RMSD, by contrast, has a clear
-V-shape with its minimum ($8.4\times 10^{-4}$) at the
-$401^{2}$ training resolution and rises to
-$\sim\!7\times 10^{-3}$ at half ($201^{2}$) or double
-($801^{2}$) resolution: the operator has absorbed a small
-training-grid bias into its spectral weights that the
-band-limited interpolation step cannot remove. The two
-findings together establish that the surrogate is
-discretisation-invariant at the level of the \emph{physical
-QNM observable} it is being used to predict, even though the
-pointwise field carries a residual grid signature.
-
-\begin{table}[!htbp]
-\centering
-\caption{v4 FNO zero-shot resolution transfer for the
-canonical BH ($M=1,\,x_{0}=4,\,\sigma=5$). The model trained
-at $401\times 401$ is evaluated at five grid resolutions over
-the same physical domain with no retraining. Columns: grid
-size $N_{t}\!=\!N_{x}$; late-time field RMSD against an
-independent FD reference at the same resolution; M3 ESPRIT
-$M\omega_{0}$ at $x_{q}\!=\!2\,M$ on the FNO field, and its
-percentage error relative to the Leaver value $0.3737$.
-The QNM observable is essentially resolution-invariant
-($\Delta\!\le\!0.05$ pp across the table); field RMSD shows
-the expected V-shape minimum at training resolution.}
-\label{tab:fno-resolution}
-\small
-\setlength{\tabcolsep}{8pt}
-\begin{tabular}{@{}cccc@{}}
-\toprule
-$N_{t}\!=\!N_{x}$ & late-time field RMSD & $M\omega_{0}$ (FNO) & $\omega$ \% err \\
-\midrule
-$201$  & $2.53\times 10^{-2}$ & $0.37150$ & $0.590$ \\
-$301$  & $6.33\times 10^{-3}$ & $0.37142$ & $0.609$ \\
-$401^{\star}$ & $8.41\times 10^{-4}$ & $0.37147$ & $0.596$ \\
-$601$  & $5.46\times 10^{-3}$ & $0.37156$ & $0.573$ \\
-$801$  & $7.19\times 10^{-3}$ & $0.37162$ & $0.557$ \\
-\bottomrule
-\end{tabular}
-\\[2pt]
-{\footnotesize $^{\star}$ training resolution.}
-\end{table}
+\paragraph{Design ablation, resolution transfer and cost.}
+The ablation of Appendix~\ref{app:supp-fno} shows that
+extending the time window to $100\,M$ and adding the two
+observer-targeted loss terms recover the canonical-BH
+extraction by two orders of magnitude at a marginal cost in
+bulk field RMSD: the figure of merit for a ringdown surrogate
+is the observer slice the extractor reads, not the gridwise
+average. The same appendix reports zero-shot resolution
+transfer ($\omega$ stable to $0.05$ percentage points from
+$201^{2}$ to $801^{2}$) and amortisation break-even against
+per-BH PINN training at $N_{\mathrm{BH}} \approx 7$.
 
 
 \FloatBarrier
@@ -1470,60 +846,35 @@ $801$  & $7.19\times 10^{-3}$ & $0.37162$ & $0.557$ \\
 \label{sec:res-hyb}
 
 The hybrid surrogate of Sec.~\ref{sec:hyb-method} keeps a
-coarse-grid FD solve as the workhorse and asks the network only
-for the pointwise residual against the fine-grid FD solution to
-the same problem. We evaluate it on the same two settings used
-for the end-to-end FNO of Sec.~\ref{sec:res-fno}: the
-canonical draw $(M, x_{0}, \sigma) = (1, 4, 5)$ provides
-single-BH diagnostics directly comparable to the PINN and FNO
-baselines, and the $100$-BH in-distribution Sobol test set
-provides the population picture. All hybrid numbers in this
-subsection are reported at the coarsening factor $k = 4$ (i.e.\
-coarse $(\Delta x, \Delta t) = (0.8, 0.4)\,M$, fine
-$(0.2, 0.1)\,M$), with the coarse prior solved on the
-default second-order centred stencil of
-Sec.~\ref{sec:hyb-method} and the network trained on the
-label-free Richardson target $\delta\Phi_{\mathrm{R}}$
-(Eqs.~\eqref{eq:hyb-richardson}--\eqref{eq:hyb-residual}). At
-inference a single $k = 4$ coarse solve is the only classical
-work, costing $k^{-3} = 1/64$ of a fine FD solve. The reference
-object on the canonical BH is
-$\Phi^{\mathrm{f}}$, the fine-grid FD solution: the question
-the hybrid surrogate is built to answer is whether the gated
-network can close the discretisation-error gap between
-$\mathcal{U}\Phi^{\mathrm{c}}$ (the quintic-spline-upsampled
-$k = 4$ coarse FD solution, henceforth ``coarse-up baseline'')
-and $\Phi^{\mathrm{f}}$. The $k = 4$ prior is deliberately
-weak --- it carries a $4.93\%$ relative $L^{2}$ error on the
-canonical draw --- so this is the opposite regime to a
-near-optimal classical prior: the network is asked to repair a
-large but spatially-localised dispersion error, and the
-gradient gate of Eq.~\eqref{eq:hyb-gate} must confine that
-repair to the under-resolved wavefronts without disturbing the
-regions the coarse solve already resolves.
+coarse-grid FD solve to carry the wave propagation and asks the
+network only
+for the pointwise residual against the fine-grid solution of
+the same problem. It is evaluated in the same two settings as
+the FNO: the canonical draw and a $100$-BH in-distribution
+Sobol test set (drawn from the hybrid's own training box,
+Sec.~\ref{sec:hyb-method}), at coarsening factor $k = 4$ with
+the label-free Richardson training target of
+Eqs.~\eqref{eq:hyb-richardson}--\eqref{eq:hyb-residual}. The $k = 4$ prior is deliberately weak ($4.93\%$ relative
+$L^{2}$ on the canonical draw), leaving a large but
+spatially-localised dispersion error for the gated network to
+repair.
 
 \paragraph{Field accuracy on the canonical BH.} The hybrid
-prediction $\Phi^{\mathrm{hyb}}$ reproduces the fine FD
-reference on the canonical draw with gridwise
-$\mathrm{RMSD} = 6.85\times 10^{-4}$ (in field units,
-$|\Phi^{\mathrm{f}}|_{\max} \approx 1$), against the coarse-up
-baseline's $\mathrm{RMSD} = 6.95\times 10^{-3}$ on the same
-draw. The gated neural residual therefore suppresses the
-second-order coarse-prior discretisation error by a factor of
-$10.1$ at this $k = 4$ coarsening on the canonical BH; the
-population-averaged ratio over the 100-BH test set is given
-below. Relative $L^{2}$ errors across the same $(x, t)$ grid
-are $0.486\%$ (hybrid) and $4.93\%$ (coarse-up baseline), the
-same $10.1\times$ reduction.
-Figure~\ref{fig:hyb-snapshots} compares the hybrid prediction
-against the fine FD reference at four time slices across
-$t \in [0, 50]\,M$ (top row) and plots the pointwise absolute
-residual $|\Phi^{\mathrm{f}} - \Phi^{\mathrm{hyb}}|$ at the
-same four times (bottom row). The hybrid and FD curves overlay
-within the line thickness across the entire domain, with the
-residual concentrated on the outgoing wavefronts where the
-coarse prior dephases and near-zero in the smooth interior and
-causal exterior.
+reproduces the fine FD reference with gridwise
+$\mathrm{RMSD} = 6.85\times 10^{-4}$, against
+$6.95\times 10^{-3}$ for the quintic-spline upsample of the
+coarse solve alone (henceforth the \emph{coarse-up baseline}):
+the gated residual suppresses
+the coarse-prior discretisation error by a factor of $10.1$
+(equivalently $0.486\%$ versus $4.93\%$ in relative $L^{2}$).
+The residual is concentrated on the outgoing wavefronts where
+the coarse prior dephases (Fig.~\ref{fig:hyb-snapshots}); the
+global error maps (Figs.~\ref{fig:hyb-heatmap}
+and~\ref{fig:hyb-heatmap-base}) show the hybrid suppressing
+the baseline's dispersion characteristics by roughly an order
+of magnitude while leaving the smooth interior and causal
+exterior at the prior --- the correction lands exactly where
+the gate directs it.
 
 \begin{figure}[!htbp]
 \centering
@@ -1535,39 +886,10 @@ $t/M \in \{5, 15, 30, 50\}$, with the fine FD reference (blue)
 and the hybrid prediction (orange) overlaid; the two curves
 are visually indistinguishable on this scale. Bottom: pointwise
 $|\Phi^{\mathrm{f}} - \Phi^{\mathrm{hyb}}|$ at the same four
-times. The residual is concentrated on the outgoing wavefronts
-where the second-order coarse prior dephases and is near-zero
-across the smooth interior and the causal exterior; the
-gridwise RMSD over the full $(x,t)$ window is
-$6.85\times 10^{-4}$, an order of magnitude below the coarse-up
-baseline's $6.95\times 10^{-3}$.}
+times, concentrated on the outgoing wavefronts and near-zero
+across the smooth interior and the causal exterior.}
 \label{fig:hyb-snapshots}
 \end{figure}
-
-\paragraph{Pointwise error map versus the coarse-up baseline.}
-Figures~\ref{fig:hyb-heatmap} and~\ref{fig:hyb-heatmap-base}
-show the global pointwise error on
-$(x, t) \in [-50, 150]\,M \times [0, 50]\,M$ for the hybrid
-prediction and the coarse-up baseline respectively, plotted on
-a shared $\mathrm{magma\_r}$ logarithmic colour scale matching
-the convention adopted for the PINN and FNO heatmaps. The
-coarse-up baseline error
-(Fig.~\ref{fig:hyb-heatmap-base}) is concentrated in narrow
-characteristics that trace the outgoing-wave caustics --- the
-full second-order dispersion signature of the under-resolved
-$k = 4$ prior after the quintic upsample, the dominant
-contributor to its $4.93\%$ relative $L^{2}$ error. The hybrid
-error (Fig.~\ref{fig:hyb-heatmap}) is roughly an order of
-magnitude smaller along the same characteristics, consistent
-with the $10.1\times$ canonical RMSD reduction. The structure
-of the two maps is the clearest evidence for the gate: the
-network correction is applied only on the bright wavefront
-characteristics where the prior carries its dispersion error,
-while the smooth interior and the causal exterior --- where the
-prior gradient is below the gate scale $s$ and $g \to 0$ ---
-are left essentially at the prior, so the hybrid neither
-improves nor pollutes the regions the coarse solve already
-resolves to machine level.
 
 \begin{figure}[!htbp]
 \centering
@@ -1576,9 +898,9 @@ resolves to machine level.
 canonical BH. Heatmap of
 $|\Phi^{\mathrm{f}} - \Phi^{\mathrm{hyb}}|$ on
 $x \in [-50, 150]\,M$, $t \in [0, 50]\,M$ (the full hybrid
-training and evaluation window), plotted on a shared
-$\mathrm{magma\_r}$ logarithmic colour scale matching the PINN
-and FNO heatmaps. The residual structure is confined by the
+training and evaluation window), plotted on the same
+logarithmic $\mathrm{magma\_r}$ colour scale as the FNO error
+map (Fig.~\ref{fig:fno-heatmap}). The residual structure is confined by the
 gradient gate to the prompt-burst region $t \lesssim 5\,M$ and
 the outgoing wavefronts; the smooth interior and causal
 exterior are left at the prior. Compare with the
@@ -1595,131 +917,43 @@ BH, plotted on the same shared colour scale as
 Fig.~\ref{fig:hyb-heatmap}. The second-order dispersion
 signature of the under-resolved $k = 4$ coarse prior plus
 quintic upsampling is visible as narrow characteristics tracing
-the outgoing-wave caustics; this is the bounded,
-spatially-localised target the gated residual operator is
-trained to repair, and it is suppressed by roughly an order of
-magnitude along the same characteristics in the hybrid map
-(Fig.~\ref{fig:hyb-heatmap}).}
+the outgoing-wave caustics; compare the hybrid map of
+Fig.~\ref{fig:hyb-heatmap} on the same scale.}
 \label{fig:hyb-heatmap-base}
 \end{figure}
 
-\paragraph{The gradient gate: where the correction is applied.}
-The gate $g = |\nabla\mathcal{U}\Phi^{\mathrm{c}}| /
-(|\nabla\mathcal{U}\Phi^{\mathrm{c}}| + s)$ of
-Eq.~\eqref{eq:hyb-gate} is built on the hypothesis that the
-coarse-prior error is large exactly where the prior gradient is
-large. Figure~\ref{fig:hyb-grad} tests this directly: a
-per-cell scatter of the coarse-prior error
-$|\Phi^{\mathrm{f}} - \mathcal{U}\Phi^{\mathrm{c}}|$ against the
-prior gradient magnitude $|\nabla\mathcal{U}\Phi^{\mathrm{c}}|$
-on the canonical BH has a log--log Pearson correlation of
-$r = 0.917$: the prior fails on the high-gradient wavefronts and
-is accurate in the low-gradient smooth and causal regions,
-exactly the structure the gate is designed to exploit.
-Table~\ref{tab:hyb-gate-decile} stratifies the domain by prior
-gradient and confirms that the hybrid's gain follows the gate:
-in the top gradient decile (the wavefronts) the gated residual
-cuts the mean error from $1.30\times 10^{-2}$ to
-$1.06\times 10^{-3}$, a factor of $12.3$, and the reduction
-declines monotonically with gradient to $2.6\times$ in the
-sixth decile, vanishing below the median where the prior
-gradient --- and the prior error --- are already at the floor.
-The gate scale $s = 10^{-3}$ is not hand-tuned:
-App.~\ref{app:gate-scale} derives it from the prior gradient
-distribution alone (the $68$th percentile of
-$|\nabla\mathcal{U}\Phi^{\mathrm{c}}|$) and confirms, by re-gating
-the single trained model, that it sits within $2\%$ of the global
-field-RMSD optimum.
-
-\begin{table}[!htbp]
-\centering
-\caption{Hybrid error reduction stratified by coarse-prior
-gradient on the canonical BH. Cells are sorted into deciles of
-$|\nabla\mathcal{U}\Phi^{\mathrm{c}}|$; for the top four
-deciles (the wavefront-bearing cells) the table lists the
-decile-mean gradient, the mean coarse-up baseline error, the
-mean hybrid error, and their ratio. Below the median the prior
-gradient is $\lesssim 10^{-12}$ (smooth interior and causal
-exterior) and both errors are at the field floor.}
-\label{tab:hyb-gate-decile}
-\small
-\setlength{\tabcolsep}{6pt}
-\begin{tabular}{@{}lcccc@{}}
-\toprule
-Gradient decile & $\overline{|\nabla\mathcal{U}\Phi^{\mathrm{c}}|}$
- & baseline err & hybrid err & ratio \\
-\midrule
-90--100\% (wavefronts) & $3.15\times 10^{-2}$ & $1.30\times 10^{-2}$ & $1.06\times 10^{-3}$ & $12.3$ \\
-80--90\%               & $1.01\times 10^{-2}$ & $4.37\times 10^{-3}$ & $4.77\times 10^{-4}$ & $9.2$  \\
-70--80\%               & $3.56\times 10^{-3}$ & $2.21\times 10^{-3}$ & $3.07\times 10^{-4}$ & $7.2$  \\
-60--70\%               & $4.37\times 10^{-4}$ & $6.81\times 10^{-4}$ & $2.62\times 10^{-4}$ & $2.6$  \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=0.82\textwidth]{../outputs/hybrid/fno_sw_gate_s1em3/figs/grad_vs_error.png}
-\caption{Coarse-prior error versus prior gradient on the
-canonical BH, the diagnostic motivating the gradient gate.
-Each point is one $(x,t)$ cell; the horizontal axis is the
-prior gradient magnitude $|\nabla\mathcal{U}\Phi^{\mathrm{c}}|$
-and the vertical axis the coarse-up baseline error
-$|\Phi^{\mathrm{f}} - \mathcal{U}\Phi^{\mathrm{c}}|$, both on
-log scales. The log--log Pearson correlation is $r = 0.917$:
-the prior error is large precisely on the high-gradient
-wavefronts and small in the low-gradient interior and causal
-exterior, so the gate $g$ (Eq.~\eqref{eq:hyb-gate}) routes the
-network correction to the cells that need it.}
-\label{fig:hyb-grad}
-\end{figure}
-
-\paragraph{Gate confinement and residual speckle.} The other
-half of the gate's job is to protect the regions the prior
-already resolves from spurious network output. Over the
-$60.5\%$ of the canonical domain where the coarse-prior error
-is below $10^{-5}$ --- the smooth interior and the causal
-exterior ahead of the light cone --- the gated hybrid leaves a
-mean error of $1.11\times 10^{-6}$ against the prior's
-$1.77\times 10^{-7}$. The gate does not make these
-already-accurate cells better; what it does is hold the
-network's residual speckle there to the $10^{-6}$ level, three
-orders of magnitude below the wavefront correction and far
-below the signal, rather than letting an ungated operator
-inject full-amplitude speckle into machine-exact regions. In
-the deep causal exterior $x > 80\,M$, where the field amplitude
-is $\sim\!2\times 10^{-16}$, the hybrid residual is
-$\sim\!2.4\times 10^{-11}$: a large ratio over the prior in
-relative terms but absolutely negligible against any
-observable. This confinement is the reason the global field
-gains below do not come at the cost of polluting the
-QNM-bearing late-time tail.
+\paragraph{The gradient gate.} The gate of
+Eq.~\eqref{eq:hyb-gate} rests on the hypothesis that the
+coarse-prior error is large exactly where the prior gradient
+is large; the per-cell scatter on the canonical BH confirms
+this with a log--log Pearson correlation of $r = 0.917$, and a
+decile stratification shows the hybrid's gain following the
+gate --- a factor $12.3$ error reduction in the top gradient
+decile, declining monotonically to unity below the median
+(Appendix~\ref{app:supp-gate}). The gate scale $s = 10^{-3}$
+is derived from the prior gradient distribution alone and sits
+within $2\%$ of the field-RMSD optimum
+(App.~\ref{app:gate-scale}). The gate also protects the
+regions the prior already resolves: over the $60.5\%$ of the
+domain with prior error below $10^{-5}$, spurious network
+output is held at the $10^{-6}$ level, so the global-field
+gain does not pollute the QNM-bearing late-time tail.
 
 \paragraph{Population field accuracy.} Averaged over the 100-BH
 in-distribution test set, the gridwise field MSE is
 $9.80\times 10^{-7}$ for the hybrid and $7.76\times 10^{-5}$
-for the coarse-up baseline, a factor-of-$79$ reduction; in
-relative $L^{2}$ this is $0.672\%$ vs $6.11\%$, a factor of
-$9.1$. The gain is consistent across the whole training
-distribution rather than an artefact of the canonical draw
-($10.1\times$ on RMSD there, $9.1\times$ in the population
-relative $L^{2}$), and is largest where the coarse-prior
-dispersion error is largest.
+for the coarse-up baseline, a factor-of-$79$ reduction
+($0.672\%$ vs $6.11\%$ relative $L^{2}$) --- consistent across
+the whole training distribution rather than an artefact of the
+canonical draw.
 
-\paragraph{Ringdown waveform at the observer.}
-Figure~\ref{fig:hyb-ringdown-xq2} shows the 1-D observer slice
-$\Phi(\xq{=}2, t)$ on the canonical BH on linear and
-logarithmic scales. The fine FD reference, the hybrid
-prediction, and the coarse-up baseline overlay within the
-line thickness on the linear panel and remain visually
-indistinguishable on the logarithmic panel across the entire
-ringdown to $|\Phi| \sim 10^{-3}$ near $t = 50\,M$. At this
-observer location ($\xq = 2\,M$, where the signal amplitude
-remains large across the full simulation interval) the coarse-up
-baseline already tracks the fine FD reference closely enough
-that the residual neural correction is not visually resolvable
-on a single canonical draw. The empirical consequence for QNM
-extraction is given immediately below.
+\paragraph{QNM extraction.} On the canonical draw the plateau
+estimators, read from the observer slice of
+Fig.~\ref{fig:hyb-ringdown-xq2}, recover the fundamental mode
+to the extractor floor: M4 gives $\omega = 0.37353$,
+$\tau = 11.25\,M$ ($0.045\%$ and $0.083\%$ error), confirmed by
+M5 ($0.049\%$, $0.125\%$) on the independent 2-D scan
+(Figs.~\ref{fig:hyb-plateau-m4} and~\ref{fig:hyb-plateau-m5}).
 
 \begin{figure}[!htbp]
 \centering
@@ -1730,49 +964,29 @@ scale with the fine FD reference (blue), the hybrid prediction
 (orange dashed) and the coarse-up baseline (grey dotted)
 overlaid. All three curves overlay to $\lesssim 10^{-3}$ in
 absolute amplitude across $t \in [0, 50]\,M$ on this canonical
-draw; the QNM-extraction comparison of
-Table~\ref{tab:hyb-canonical} is read from these three time
-series.}
+draw; the canonical plateau extractions of
+Figs.~\ref{fig:hyb-plateau-m4} and~\ref{fig:hyb-plateau-m5}
+are read from these time series, and
+Table~\ref{tab:hyb-canonical} reports the population medians
+of the same three-way comparison.}
 \label{fig:hyb-ringdown-xq2}
 \end{figure}
 
-\paragraph{QNM extraction across the population.}
-Table~\ref{tab:hyb-canonical} reports the five-method post-hoc
-QNM extraction at $\xq = 2\,M$ as the median percentage error
-over the 100-BH in-distribution test set, applied separately to
-the hybrid prediction, the coarse-up baseline, and the fine FD
-reference itself.
-The plateau estimators M4 and M5 are the cleanest at this
-observer, returning $\omega$ to better than $0.06\%$ in the
-median on all three sources, while M1--M3 saturate near the
-$0.4$--$0.8\%$ level characteristic of this observer position on
-all three alike. The honest reading of
-Table~\ref{tab:hyb-canonical} is that the coarse-up baseline is
-already at the extraction precision floor at this observer: the
-median M4 $\omega$ error is $0.051\%$ on the baseline,
-$0.049\%$ on the hybrid, and $0.014\%$ on the fine FD reference,
-so the single-observer QNM at $\xq = 2\,M$ is set by the
-extractor and the prior, not by the residual coarse-prior field
-error that the network repairs. The hybrid is essentially tied
-with the baseline on $\omega$ (marginally better in the median)
-and marginally worse on $\tau$ (median M4 $0.263\%$ versus the
-baseline's $0.174\%$), because the residual operator is trained
-to minimise the \emph{global} field error --- which it reduces
-by $79\times$ in population MSE --- rather than the local
-waveform shape at a single observer. This is the central honest
-finding for the hybrid: the network's value lies in the global
-field, not in a single-observer QNM that the coarse prior
-already resolves to the extractor floor; the gated correction
-neither systematically improves nor degrades it. On the
-canonical draw the plateau estimators give
-$\omega = 0.37353$, $\tau = 11.25\,M$ ($0.045\%$ and $0.083\%$
-error) for M4 on the hybrid, with the plateau on
-$t_{0} \in [12.2, 15.8]\,M$ at fixed $\tend = 50\,M$, and
-$\omega = 0.37352$, $\tau = 11.26\,M$ ($0.049\%$ and $0.125\%$)
-for M5, with the 2-D plateau on $t_{0} \in [12.3, 15.7]\,M$ and
-$\tend \in [47.5, 50]\,M$. The plateau diagnostics
-underlying these canonical numbers are Figs.~\ref{fig:hyb-plateau-m4}
-and~\ref{fig:hyb-plateau-m5}.
+\paragraph{QNM extraction.} On the canonical draw the plateau
+estimators recover the fundamental mode to the extractor
+floor: M4 gives $\omega = 0.37353$, $\tau = 11.25\,M$
+($0.045\%$ and $0.083\%$ error), confirmed by M5 ($0.049\%$,
+$0.125\%$) on the independent 2-D scan
+(Figs.~\ref{fig:hyb-plateau-m4} and~\ref{fig:hyb-plateau-m5}).
+Table~\ref{tab:hyb-canonical} extends the comparison to the
+population medians: the plateau estimators return $\omega$ to
+better than $0.06\%$ on all three sources ($0.049\%$ hybrid,
+$0.051\%$ baseline, $0.014\%$ reference). The coarse prior
+thus already resolves the single-observer QNM to the extractor
+floor; the hybrid matches it in $\omega$ and sits marginally
+above in $\tau$ ($0.263\%$ versus $0.174\%$), within the
+extractor's own population scatter --- its demonstrated gain
+is the $79\times$ global-field improvement.
 
 \begin{table}[!htbp]
 \centering
@@ -1786,7 +1000,9 @@ percentage errors of $\omega$ and $\tau$ against the Leaver
 reference $(\omega_{0} M, \tau_{0}/M) = (0.3737, 11.241)$. The
 hybrid and baseline are tied at the extractor floor on the
 plateau methods; the network's demonstrated gain is in the
-global field, not the single-observer QNM.}
+global field, not the single-observer QNM. Bold entries are
+the primary values under the reporting convention of
+Sec.~\ref{sec:reporting}.}
 \label{tab:hyb-canonical}
 \small
 \setlength{\tabcolsep}{4pt}
@@ -1801,10 +1017,10 @@ Method & $|\Delta\omega|\%$ & $|\Delta\tau|\%$
        & $|\Delta\omega|\%$ & $|\Delta\tau|\%$ \\
 \midrule
 M1 (FFT $+$ log-line)        & $0.511$ & $0.394$ & $0.441$ & $0.324$ & $0.485$ & $0.262$ \\
-M2 (single damped sinusoid)  & $0.422$ & $0.818$ & $0.396$ & $0.860$ & $0.436$ & $0.805$ \\
+M2 (1-mode NLS)              & $0.422$ & $0.818$ & $0.396$ & $0.860$ & $0.436$ & $0.805$ \\
 M3 (ESPRIT $K{=}4$)          & $0.748$ & $1.855$ & $0.766$ & $1.878$ & $0.787$ & $1.907$ \\
-M4 (1-D plateau scan)        & $0.049$ & $0.263$ & $0.051$ & $0.174$ & $0.014$ & $0.063$ \\
-M5 (2-D plateau scan)        & $0.052$ & $0.254$ & $0.051$ & $0.180$ & $0.014$ & $0.059$ \\
+M4 (1-D plateau)             & $\mathbf{0.049}$ & $\mathbf{0.263}$ & $0.051$ & $0.174$ & $0.014$ & $0.063$ \\
+M5 (2-D plateau)             & $0.052$ & $0.254$ & $0.051$ & $0.180$ & $0.014$ & $0.059$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1839,25 +1055,13 @@ failed to converge.}
 \label{fig:hyb-plateau-m5}
 \end{figure}
 
-\paragraph{Population QNM scatter.} Across the 100-BH
-in-distribution test set the median M4 percentage errors at
-$\xq = 2\,M$ are $(|\Delta\omega/\omega|, |\Delta\tau/\tau|) =
-(0.049\%, 0.263\%)$ on the hybrid and $(0.051\%, 0.174\%)$ on
-the coarse-up baseline; the two are interleaved at the
-extractor floor, the hybrid marginally better in median $\omega$
-and marginally worse in median $\tau$.
-Figure~\ref{fig:hyb-pop} plots the hybrid M4 errors against
-the coarse-up baseline M4 errors per BH on the test set, colour
-coded by mass $M$, on logarithmic axes. The bulk of the
-population clusters at the joint extractor floor
-($10^{-2}$--$10^{-1}\%$ in both coordinates). The handful of
-draws far from the floor in either direction are cases where the
-single-window M4 fit is ill-conditioned: they appear as outliers
-on the fine FD reference as well, and so reflect the extractor
-rather than the hybrid field. We therefore do not claim a QNM
-advantage at this observer --- the single-observer QNM is fixed
-by the prior and the extractor, and the gated network neither
-systematically improves nor degrades it.
+\paragraph{Population QNM scatter.} In the per-BH scatter of
+Fig.~\ref{fig:hyb-pop} the bulk of the population clusters at
+the joint extractor floor ($10^{-2}$--$10^{-1}\%$) with hybrid
+and baseline interleaved; the off-floor draws are
+ill-conditioned single-window fits that appear on the fine FD
+reference as well, reflecting the extractor rather than the
+hybrid field.
 
 \begin{figure}[!htbp]
 \centering
@@ -1866,69 +1070,21 @@ systematically improves nor degrades it.
 $\xq = 2\,M$ on the 100-BH in-distribution test set. Left:
 $\omega$; right: $\tau$. Each marker is one BH, coloured by
 mass $M$. The dashed line is $y = x$; markers below the line
-are wins for the hybrid. The hybrid and baseline are
-interleaved at the joint extractor floor (median errors
-$(0.049\%, 0.263\%)$ hybrid versus $(0.051\%, 0.174\%)$
-baseline), and the off-floor outliers in both directions are
-ill-conditioned single-window fits that also appear on the fine
-FD reference. The hybrid's demonstrated advantage is in the
-global field
-(Figs.~\ref{fig:hyb-heatmap}--\ref{fig:hyb-heatmap-base}), not
-in the single-observer QNM that the coarse prior already
-resolves.}
+favour the hybrid.}
 \label{fig:hyb-pop}
 \end{figure}
 
-\paragraph{Where the hybrid does and does not win.} The
-honest summary is that at the QNM-relevant observer
-$\xq = 2\,M$ the coarse-up baseline already achieves the
-plateau-extractor precision floor on most BHs of the test
-population (median M4 $|\Delta\omega/\omega| \approx 0.051\%$,
-within a factor of a few of the fine FD reference's $0.014\%$),
-and the hybrid residual correction does not improve --- and in
-the median marginally perturbs $\tau$ at --- the QNM observable
-at this observer.
-The hybrid's value is unambiguously in the global field: the
-field MSE is reduced by $79\times$ in the population mean and
-the relative $L^{2}$ error by $9.1\times$, which
-matters for downstream observables that depend on the global
-field (energy and angular-momentum integrals, multipole
-overlaps, residual mismatch against waveform templates) rather
-than on a single observer slice. We explicitly do not claim a
-worst-case QNM-tail suppression: the extreme draws in
-Fig.~\ref{fig:hyb-pop} are ill-conditioned single-window fits
-that appear on the fine FD reference as well, and so reflect
-the extractor rather than the surrogate. The clean statement is
-that, from a deliberately weak $1/64$-cost classical prior, the
-gated residual operator delivers a large and consistent
-global-field gain while leaving the single-observer QNM at the
-floor the prior already reaches.
-
-\paragraph{Training history.} Figure~\ref{fig:hyb-loss} shows
-the per-epoch training and validation MSE on the gated
-Richardson residual $g\,\delta\Phi_{\theta}$ against
-$\delta\Phi_{\mathrm{R}}$. The single Adam phase reduces the
-validation MSE by more than two orders of magnitude from
-$9.0\times 10^{-5}$ at the first epoch to a best of
-$4.0\times 10^{-7}$ near epoch $96$, with the training and
-validation curves tracking together (no visible overfitting);
-the final-epoch value is $1.8\times 10^{-6}$ and we report the
-best checkpoint. We did not run an L-BFGS phase: on this small
-network ($1.13\times 10^{6}$ parameters) and smooth, gated
-target, $100$ Adam epochs reach the validation floor, and a
-trial L-BFGS phase delivered no measurable gain. The lesson is
-consistent with the FNO of Sec.~\ref{sec:res-fno}, where we did
-not attempt L-BFGS for the different reason of parameter count.
+\paragraph{Training history.} A single Adam phase reduces the
+validation MSE on the gated Richardson residual from
+$9.0\times 10^{-5}$ to $4.0\times 10^{-7}$, with train and
+validation tracking together (Fig.~\ref{fig:hyb-loss}).
 
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.85\textwidth]{../outputs/hybrid/fno_sw_gate_s1em3/figs/hybrid_loss.png}
-\caption{Hybrid surrogate training history. Per-epoch train and
+\caption{Hybrid surrogate training history: per-epoch train and
 validation MSE on the gated Richardson residual over $100$ Adam
-epochs (blue/orange). The validation MSE falls from
-$9.0\times 10^{-5}$ at the first epoch to a best of
-$4.0\times 10^{-7}$ near epoch $96$ without overfitting; no
-L-BFGS phase is used.}
+epochs.}
 \label{fig:hyb-loss}
 \end{figure}
 

@@ -1,0 +1,408 @@
+{
+  "_meta": {
+    "description": "Consolidated reportable metrics for the Schwarzschild QNM project. ALL Zerilli numbers are transcribed verbatim from paper/sections/results.tex (which paper/main.tex \\input's) -- the single authoritative source. The Regge-Wheeler block is a local verified run. The slides block is quarantined and NON-authoritative.",
+    "last_updated": "2026-07-02",
+    "authoritative_source": "paper/sections/results.tex (== paper/main.tex). This file takes precedence over slides, memory, and any prior transcription.",
+    "units": "Geometric units, M=1. M_omega = M*Re(omega); tau_over_M = tau/M. Percentage errors are |extracted - theory|/theory * 100.",
+    "provenance_legend": {
+      "results_tex": "Transcribed verbatim from paper/sections/results.tex tables/equations (authoritative; part of main.tex).",
+      "main_tex_abstract": "From paper/main.tex abstract prose (authoritative but rounded).",
+      "this_run_local": "Computed locally in this workspace and verified (exact float values from saved JSON).",
+      "slides": "presentation/slides.tex (model in base repo PC_Physics_Inspired_Neural_Network). AUTHORITATIVE alongside main.tex per project lead. Holds the faithful Zerilli reproduction + the RAD-sampling ablation.",
+      "chat_memory_post_HPC_loss": "Kerr Teukolsky results reconstructed from Copilot chat history + notes/results_record_2026-06-30.md after the CSD3 HPC (which held all models/corpora/report.json) went offline. LOWEST confidence: NOT independently reproduced in this clone; code re-implemented + only synthetically validated."
+    },
+    "reproducibility": "The paper aggregator scripts/aggregate_results.py rebuilds outputs/reportable_results.json from the per-run outputs/ JSONs (HPC-only, not in this clone). Keys here mirror the results.tex tables so values can be cross-checked.",
+    "paper_structure": "Section 1 = faithful reproduction of Patel (2024) for BOTH potentials at base config (uniform, 15k L-BFGS): zerilli_l2_faithful_reproduction + regge_wheeler_l2_faithful_reproduction, each compared to patel2024_baseline. Sections 2+ = our extensions (forward_pinn greedy+30k, inverse, curriculum, fno, hybrid), reported for ZERILLI ONLY -- justified by isospectrality (RW and Zerilli share the QNM spectrum, so the QNM-targeting extensions give equivalent conclusions on the axial potential)."
+  },
+
+  "truth": {
+    "M_true": 1.0,
+    "M_init": 1.2,
+    "M_omega_true": 0.3737,
+    "tau_over_M_true": 11.241,
+    "source": "Leaver 1985 continued-fraction Schwarzschild l=2 fundamental; Berti, Cardoso & Starinets 2009 Table II"
+  },
+
+  "patel2024_baseline": {
+    "provenance": "patel2024 (paper.txt Table 3 QNM for both potentials; Zerilli field RL2/MAD via results_tex Table 2)",
+    "reference": "Patel, Aykutalp & Laguna (2024), arXiv:2401.01440",
+    "note": "Target-paper reported values, ell=2. Patel's QNM reference: tau=11.241 M, omega=0.374/M (note: they round omega to 0.374, we use 0.3737 -- their % errors are vs 0.374). Table 3: FD1/FD2 = FFT+envelope / curve-fit on FD; PINN1/PINN2 = same on PINN. Percentages are Patel's reported % errors.",
+    "field_zerilli": { "RL2_pct": 28.06, "MAD": 1.82e-02 },
+    "qnm_table3": {
+      "regge_wheeler": {
+        "FD1":   { "tau_over_M": 10.488, "tau_pct_err": 6.70, "M_omega": 0.370, "omega_pct_err": 0.90 },
+        "FD2":   { "tau_over_M": 11.489, "tau_pct_err": 2.21, "M_omega": 0.387, "omega_pct_err": 3.68 },
+        "PINN1": { "tau_over_M": 10.474, "tau_pct_err": 6.82, "M_omega": 0.373, "omega_pct_err": 0.11 },
+        "PINN2": { "tau_over_M": 10.636, "tau_pct_err": 5.39, "M_omega": 0.383, "omega_pct_err": 2.51 }
+      },
+      "zerilli": {
+        "FD1":   { "tau_over_M": 10.804, "tau_pct_err": 3.89, "M_omega": 0.370, "omega_pct_err": 0.90 },
+        "FD2":   { "tau_over_M": 11.073, "tau_pct_err": 1.49, "M_omega": 0.378, "omega_pct_err": 1.26 },
+        "PINN1": { "tau_over_M": 10.089, "tau_pct_err": 10.25, "M_omega": 0.375, "omega_pct_err": 0.29 },
+        "PINN2": { "tau_over_M": 9.620,  "tau_pct_err": 14.42, "M_omega": 0.376, "omega_pct_err": 0.52 }
+      }
+    }
+  },
+
+  "shared_hyperparameters": {
+    "provenance": "results_tex (appendix tab:fwd-hyper / tab:inv-hyper)",
+    "note": "Architecture + training config shared by the forward PINN and all 6 inverse variants. Forward/inverse differ only in L-BFGS iters (30k/15k) + inverse-specific blocks.",
+    "domain": { "x_over_M": [-50, 150], "t_over_M": [0, 50] },
+    "initial_data": { "A0": 1.0, "x0_over_M": 4.0, "sigma0_over_M": 5.0, "velocity_profile": "outgoing" },
+    "fd_reference": { "dx_over_M": 0.2, "dt_over_M": 0.1, "scheme": "RK4-MoL" },
+    "network": { "hidden_layers": [80, 40, 20, 10], "activation": "tanh", "output_transform": "A*tanh", "dtype": "float64", "seed": 1234 },
+    "collocation": { "Nr": 32000, "Ni": 800, "Nb": 400 },
+    "loss_weights_lambda": [100, 100, 100, 1, 100, 1, 1],
+    "adam": { "lr": 1e-3, "iters": 10000 },
+    "lbfgs_iters": { "forward": 30000, "inverse": 15000 },
+    "adaptive_sampling": { "method": "greedy", "period": 1000, "candidates": 100000, "greedy_fraction": 0.3 },
+    "observer_xq_over_M": 10.0,
+    "qnm_window_over_M": [10, 50],
+    "inverse_common": { "M_init": 0.8, "omega_init": 0.30, "tau_init": 8.0, "A_ring_init": 0.5, "phi0_init": 0.0, "lambda_data": 10, "Nobs": 500, "sigma_noise": 0.01 }
+  },
+
+  "forward_pinn_zerilli_l2": {
+    "provenance": "results_tex",
+    "run": "zerilli_l2_greedy_f03_lbfgs30k",
+    "config_note": "Enhanced: architecture-matched Patel baseline + doubled L-BFGS (15k->30k) + residual-greedy adaptive sampling (0.3*Nr on high-residual band). This IS the paper's forward result.",
+    "field": { "RMSD": 8.17e-04, "MAD": 4.99e-04, "RL2": 5.79e-03, "RL2_pct": 0.58 },
+    "field_vs_patel": { "RL2_factor": 50, "MAD_factor": 36 },
+    "qnm_extraction": {
+      "M1_fft_logline":      { "M_omega": 0.3712,  "omega_pct_err": 0.68,  "tau_over_M": 10.92,  "tau_pct_err": 2.83, "window": "[10,50]M" },
+      "M2_nls_wide":         { "M_omega": 0.3794,  "omega_pct_err": 1.54,  "tau_over_M": 11.464, "tau_pct_err": 1.99, "window": "[10,50]M" },
+      "M2_nls_on_m4_plateau":{ "M_omega": 0.3749,  "omega_pct_err": 0.31,  "tau_over_M": 10.41,  "tau_pct_err": 7.38, "window": "[14,50]M" },
+      "M3_esprit_K6":        { "M_omega": 0.4829,  "omega_pct_err": 29.2,  "tau_over_M": 7.84,   "tau_pct_err": 30.3, "window": "[10,50]M", "note": "ill-conditioned, |c_k|~1e-23; appendix only" },
+      "M4_1d_plateau":       { "M_omega": 0.37359, "M_omega_std": 2e-04, "omega_pct_err": 0.029, "tau_over_M": 10.94, "tau_over_M_std": 0.02, "tau_pct_err": 2.65, "plateau": "t0 in [14,21]M, tend=50M" },
+      "M5_2d_plateau":       { "M_omega": 0.3728,  "M_omega_std": 8e-04, "omega_pct_err": 0.23,  "tau_over_M": 10.80, "tau_over_M_std": 0.12, "tau_pct_err": 3.91, "plateau": "t0 in [10,16.7]M, tend in [42,50]M" }
+    },
+    "esprit_m3_decomposition": {
+      "note": "Full K=6 ESPRIT decomposition of the forward PINN field on [10,50]M (appendix tab:esprit-fwd). All |A_k| are >=20 orders below the signal (~1e-1); decomposition is in the numerical-noise floor. M3 selects largest-amplitude (k=6, spurious); (omega,tau)-closest to Leaver is k=5.",
+      "modes": [
+        { "k": 1, "omega": 10.803, "tau_over_M": 0.025, "abs_A": 0.0 },
+        { "k": 2, "omega": 0.0006, "tau_over_M": "inf", "abs_A": 8.0e-24 },
+        { "k": 3, "omega": -0.0787, "tau_over_M": 1.190, "abs_A": 1.5e-39 },
+        { "k": 4, "omega": -0.0008, "tau_over_M": "inf", "abs_A": 7.4e-40 },
+        { "k": 5, "omega": 0.376, "tau_over_M": 11.098, "abs_A": 2.3e-41, "flag": "closest to Leaver n=0 (0.6%/1.3%)" },
+        { "k": 6, "omega": 0.483, "tau_over_M": 7.837, "abs_A": 9.2e-41, "flag": "SELECTED by max-amp (M3 primary; spurious)" }
+      ]
+    }
+  },
+
+  "inverse_pinn_zerilli_l2": {
+    "provenance": "results_tex",
+    "setup": "Joint training of network field, mass M, and single-mode ringdown template against Nobs=500 noisy field samples at 1% Gaussian noise; 10k Adam + 15k L-BFGS. omega from M4 plateau; tau from post-hoc M2-wide on the converged field (avoids A_ring-tau template degeneracy). Best = variant D (run zerilli_l2_inverse_qnm_combo).",
+    "variants_summary": {
+      "columns": "RL2_pct, M_pct_err, M_omega_M4, sigma_omega, omega_pct_err, tau_over_M_M2wide, tau_pct_err",
+      "baseline": { "RL2_pct": 3.5, "M_pct_err": 0.41, "M_omega_M4": 0.379, "sigma_omega": 0.166, "omega_pct_err": 1.5, "tau_over_M_M2wide": 11.83, "tau_pct_err": 5.3, "flag": "no genuine plateau (sigma_omega/omega>30%): failed M4" },
+      "A":        { "RL2_pct": 2.9, "M_pct_err": 0.45, "M_omega_M4": 0.370, "sigma_omega": 2e-04, "omega_pct_err": 0.89, "tau_over_M_M2wide": 11.29, "tau_pct_err": 0.43 },
+      "B":        { "RL2_pct": 6.9, "M_pct_err": 1.25, "M_omega_M4": null, "sigma_omega": null, "omega_pct_err": null, "tau_over_M_M2wide": 8.63, "tau_pct_err": 23.3, "flag": "two-mode NLS did not converge; M4 undefined" },
+      "C":        { "RL2_pct": 3.6, "M_pct_err": 0.34, "M_omega_M4": 0.561, "sigma_omega": 0.188, "omega_pct_err": 50.0, "tau_over_M_M2wide": 11.82, "tau_pct_err": 5.1, "flag": "no genuine plateau: failed M4" },
+      "D":        { "RL2_pct": 3.0, "M_pct_err": 0.34, "M_omega_M4": 0.3748, "sigma_omega": 4e-05, "omega_pct_err": 0.30, "tau_over_M_M2wide": 11.06, "tau_pct_err": 1.6, "flag": "BEST (tightest plateau, smallest omega error)" },
+      "E":        { "RL2_pct": 3.5, "M_pct_err": 1.44, "M_omega_M4": 0.364, "sigma_omega": 4e-03, "omega_pct_err": 2.6, "tau_over_M_M2wide": 11.10, "tau_pct_err": 1.3, "note": "two-mode template" }
+    },
+    "variant_D_qnm_extraction": {
+      "M1_fft_logline":      { "M_omega": 0.3726,  "omega_pct_err": 0.29, "tau_over_M": 9.91,  "tau_pct_err": 11.86, "window": "[10,50]M" },
+      "M2_nls_wide":         { "M_omega": 0.3798,  "omega_pct_err": 1.63, "tau_over_M": 11.06, "tau_pct_err": 1.59,  "window": "[10,50]M" },
+      "M2_nls_on_m4_plateau":{ "M_omega": 0.3748,  "omega_pct_err": 0.30, "tau_over_M": 9.48,  "tau_pct_err": 15.66, "window": "[18,50]M" },
+      "M3_esprit_K6":        null,
+      "M4_1d_plateau":       { "M_omega": 0.37484, "M_omega_std": 4e-05, "omega_pct_err": 0.30, "tau_over_M": 9.481, "tau_over_M_std": 3e-03, "tau_pct_err": 15.66, "plateau": "t0 in [10,25]M, tend=50M" },
+      "M5_2d_plateau":       { "M_omega": 0.37485, "M_omega_std": 3e-05, "omega_pct_err": 0.30, "tau_over_M": 9.485, "tau_over_M_std": 3e-03, "tau_pct_err": 15.62, "plateau": "t0 in [10,16.7]M, tend in [42,50]M" }
+    },
+    "learned_template_params": {
+      "columns": "omega_learned, tau_learned_over_M, A_ring, phi",
+      "baseline":  { "omega_learned": 0.3820, "tau_learned_over_M": 11.89, "A_ring": 1.92, "phi": -0.99 },
+      "A":         { "omega_learned": 0.3704, "tau_learned_over_M": 10.10, "A_ring": 2.59, "phi": -0.72 },
+      "B":         { "omega_learned": 0.4050, "tau_learned_over_M": 8.62,  "A_ring": 2.97, "phi": -1.38 },
+      "C":         { "omega_learned": 0.3822, "tau_learned_over_M": 11.84, "A_ring": 1.92, "phi": -0.99 },
+      "D":         { "omega_learned": 0.3748, "tau_learned_over_M": 9.48,  "A_ring": 2.93, "phi": -0.85 },
+      "E_mode0":   { "omega_learned": 0.3496, "tau_learned_over_M": 9.22,  "A_ring": 2.52, "phi": 0.31 },
+      "E_mode1":   { "omega_learned": 0.3810, "tau_learned_over_M": 7.38,  "A_ring": 3.24, "phi": -1.90 }
+    },
+    "tau_degeneracy_diagnostic": {
+      "columns": "tau_learned_over_M, tau_M2wide_over_M, bias_gap_over_M (truth tau/M=11.241)",
+      "baseline": { "tau_learned_over_M": 11.89, "tau_M2wide_over_M": 11.83, "bias_gap": 0.06 },
+      "A":        { "tau_learned_over_M": 10.10, "tau_M2wide_over_M": 11.29, "bias_gap": 1.19 },
+      "B":        { "tau_learned_over_M": 8.62,  "tau_M2wide_over_M": 8.63,  "bias_gap": 0.01 },
+      "C":        { "tau_learned_over_M": 11.84, "tau_M2wide_over_M": 11.82, "bias_gap": 0.02 },
+      "D":        { "tau_learned_over_M": 9.48,  "tau_M2wide_over_M": 11.06, "bias_gap": 1.58 },
+      "E":        { "tau_learned_over_M": 9.22,  "tau_M2wide_over_M": 11.10, "bias_gap": 1.88 }
+    },
+    "variant_definitions": {
+      "note": "appendix tab:inv-hyper. Common: M_init=0.8, (omega,tau,A_ring,phi)_init=(0.30,8.0,0.5,0.0), lambda_data=10, Nobs=500, sigma_noise=0.01. Varying columns below.",
+      "baseline": { "config": "inverse_qnm",          "lambda_ring": 1,   "t_ring_min_over_M": 10, "N_ring": 200 },
+      "A":        { "config": "inverse_qnm_tring18",   "lambda_ring": 1,   "t_ring_min_over_M": 18, "N_ring": 200 },
+      "B":        { "config": "inverse_qnm_lring100",  "lambda_ring": 100, "t_ring_min_over_M": 10, "N_ring": 200 },
+      "C":        { "config": "inverse_qnm_nring1000", "lambda_ring": 1,   "t_ring_min_over_M": 10, "N_ring": 1000 },
+      "D":        { "config": "inverse_qnm_combo",     "lambda_ring": 100, "t_ring_min_over_M": 18, "N_ring": 1000 },
+      "E":        { "config": "inverse_qnm_2mode",     "lambda_ring": 100, "t_ring_min_over_M": 18, "N_ring": 1000, "note": "two-mode template (n=0,1)" }
+    },
+    "all_variants_all_methods": {
+      "note": "appendix tab:m1m2-all + tab:m4m5-all: M1/M2/M4/M5 for forward + all 6 inverse variants. M4/M5 carry sigma_omega. Minor rounding differences vs the main-text summary tables; appendix is the fuller set.",
+      "forward":  { "M1": { "M_omega": 0.3712, "omega_pct_err": 0.68, "tau_over_M": 10.92,  "tau_pct_err": 2.83 }, "M2": { "M_omega": 0.3794, "omega_pct_err": 1.54, "tau_over_M": 11.464, "tau_pct_err": 1.99 }, "M4": { "M_omega": 0.3736, "sigma_omega": 2.0e-04, "omega_pct_err": 0.029, "tau_pct_err": 2.65 }, "M5": { "M_omega": 0.3728, "sigma_omega": 8.4e-04, "omega_pct_err": 0.23, "tau_pct_err": 3.91 } },
+      "baseline": { "M1": { "M_omega": 0.3775, "omega_pct_err": 1.02, "tau_over_M": 11.41,  "tau_pct_err": 1.52 }, "M2": { "M_omega": 0.3819, "omega_pct_err": 2.18, "tau_over_M": 11.83,  "tau_pct_err": 5.27 }, "M4": { "M_omega": 0.3792, "sigma_omega": 1.7e-01, "omega_pct_err": 1.46, "tau_pct_err": 42.6 }, "M5": { "M_omega": 0.4062, "sigma_omega": 7.2e-02, "omega_pct_err": 8.70, "tau_pct_err": 34.4 } },
+      "A":        { "M1": { "M_omega": 0.3705, "omega_pct_err": 0.86, "tau_over_M": 10.44,  "tau_pct_err": 7.10 }, "M2": { "M_omega": 0.3800, "omega_pct_err": 1.67, "tau_over_M": 11.29,  "tau_pct_err": 0.43 }, "M4": { "M_omega": 0.3704, "sigma_omega": 2.3e-04, "omega_pct_err": 0.89, "tau_pct_err": 8.21 }, "M5": { "M_omega": 0.3703, "sigma_omega": 3.8e-04, "omega_pct_err": 0.90, "tau_pct_err": 7.83 } },
+      "B":        { "M1": { "M_omega": 0.4024, "omega_pct_err": 7.69, "tau_over_M": 8.79,   "tau_pct_err": 21.85 }, "M2": { "M_omega": 0.4050, "omega_pct_err": 8.37, "tau_over_M": 8.62,   "tau_pct_err": 23.27 }, "M4": null, "M5": null },
+      "C":        { "M1": { "M_omega": 0.3778, "omega_pct_err": 1.09, "tau_over_M": 11.43,  "tau_pct_err": 1.66 }, "M2": { "M_omega": 0.3822, "omega_pct_err": 2.27, "tau_over_M": 11.82,  "tau_pct_err": 5.14 }, "M4": { "M_omega": 0.5615, "sigma_omega": 1.9e-01, "omega_pct_err": 50.3, "tau_pct_err": 74.9 }, "M5": { "M_omega": 0.3654, "sigma_omega": 8.9e-02, "omega_pct_err": 2.23, "tau_pct_err": 37.9 } },
+      "D":        { "M1": { "M_omega": 0.3726, "omega_pct_err": 0.29, "tau_over_M": 9.91,   "tau_pct_err": 11.86 }, "M2": { "M_omega": 0.3798, "omega_pct_err": 1.63, "tau_over_M": 11.06,  "tau_pct_err": 1.59 }, "M4": { "M_omega": 0.3748, "sigma_omega": 4.4e-05, "omega_pct_err": 0.31, "tau_pct_err": 15.66 }, "M5": { "M_omega": 0.3748, "sigma_omega": 3.4e-05, "omega_pct_err": 0.31, "tau_pct_err": 15.62 } },
+      "E":        { "M1": { "M_omega": 0.3683, "omega_pct_err": 1.44, "tau_over_M": 9.79,   "tau_pct_err": 12.95 }, "M2": { "M_omega": 0.3777, "omega_pct_err": 1.08, "tau_over_M": 11.10,  "tau_pct_err": 1.30 }, "M4": { "M_omega": 0.3639, "sigma_omega": 4.1e-03, "omega_pct_err": 2.63, "tau_pct_err": 18.95 }, "M5": { "M_omega": 0.3625, "sigma_omega": 1.4e-02, "omega_pct_err": 3.01, "tau_pct_err": 18.74 } }
+    }
+  },
+
+  "curriculum_pinn_zerilli_l2": {
+    "provenance": "results_tex",
+    "setup": "Temporal domain split into windows trained sequentially with numerical-IC transfer; per-window Adam 10k + L-BFGS 30k. Compared against single-window forward baseline.",
+    "field_rmsd": {
+      "units": "1e-3",
+      "columns": "full_domain, W1, W2, W3_or_overlap",
+      "baseline_single_window": { "full_domain": 0.817, "W1": null, "W2": null, "W3_overlap": null },
+      "Cur_2w":  { "full_domain": 0.845, "W1": 0.516, "W2": 1.077, "W3_overlap": null, "partition": "[0,25]U[25,50]M" },
+      "Cur_3w":  { "full_domain": 0.976, "W1": 0.554, "W2": 0.920, "W3_overlap": 1.322, "partition": "[0,17]U[17,34]U[34,50]M" },
+      "Cur_soft":{ "full_domain": 3.155, "W1": 1.739, "W2": 3.932, "W3_overlap": 2.394, "partition": "soft overlap [20,30]M" }
+    },
+    "note": "W1=[0,25]M reaches RMSD 5.16e-4, a 37% improvement on the time-restricted baseline RMSD (8.2e-4) over the same sub-domain, but full-domain RMSD does not improve (IC-transfer interpolation error compounds per splice).",
+    "qnm_extraction": {
+      "baseline": {
+        "M1": { "M_omega": 0.3712, "omega_pct_err": 0.68, "tau_over_M": 10.92, "tau_pct_err": 2.83 },
+        "M2_wide": { "M_omega": 0.3795, "omega_pct_err": 1.54, "tau_over_M": 11.46, "tau_pct_err": 1.99 },
+        "M2_on_m4_plateau": { "M_omega": 0.3749, "omega_pct_err": 0.31, "tau_over_M": 10.41, "tau_pct_err": 7.38 },
+        "M3": { "M_omega": 0.4829, "omega_pct_err": 29.2, "tau_over_M": 7.84, "tau_pct_err": 30.3 },
+        "M4": { "M_omega": 0.37359, "M_omega_std": 2e-04, "omega_pct_err": 0.029, "tau_over_M": 10.94, "tau_over_M_std": 0.02, "tau_pct_err": 2.65 },
+        "M5": { "M_omega": 0.3728, "M_omega_std": 8e-04, "omega_pct_err": 0.23, "tau_over_M": 10.80, "tau_over_M_std": 0.12, "tau_pct_err": 3.91 }
+      },
+      "Cur_2w": {
+        "M1": { "M_omega": 0.3711, "omega_pct_err": 0.70, "tau_over_M": 10.91, "tau_pct_err": 2.95 },
+        "M2_wide": { "M_omega": 0.3794, "omega_pct_err": 1.53, "tau_over_M": 11.48, "tau_pct_err": 2.11 },
+        "M2_on_m4_plateau": { "M_omega": 0.3748, "omega_pct_err": 0.31, "tau_over_M": 10.44, "tau_pct_err": 7.16 },
+        "M3": { "M_omega": 0.3774, "omega_pct_err": 1.00, "tau_over_M": 10.46, "tau_pct_err": 6.97 },
+        "M4": { "M_omega": 0.3708, "M_omega_std": 9e-04, "omega_pct_err": 0.79, "tau_over_M": 10.98, "tau_over_M_std": 0.08, "tau_pct_err": 2.28 },
+        "M5": { "M_omega": 0.3729, "M_omega_std": 1.8e-03, "omega_pct_err": 0.22, "tau_over_M": 10.91, "tau_over_M_std": 0.08, "tau_pct_err": 2.98 }
+      },
+      "Cur_3w": {
+        "M1": { "M_omega": 0.3711, "omega_pct_err": 0.69, "tau_over_M": 10.81, "tau_pct_err": 3.83 },
+        "M2_wide": { "M_omega": 0.3796, "omega_pct_err": 1.59, "tau_over_M": 11.46, "tau_pct_err": 1.93 },
+        "M2_on_m4_plateau": { "M_omega": 0.3751, "omega_pct_err": 0.36, "tau_over_M": 10.39, "tau_pct_err": 7.58 },
+        "M3": { "M_omega": 0.3776, "omega_pct_err": 1.04, "tau_over_M": 10.45, "tau_pct_err": 7.03 },
+        "M4": { "M_omega": 0.3713, "M_omega_std": 5e-04, "omega_pct_err": 0.64, "tau_over_M": 10.78, "tau_over_M_std": 0.04, "tau_pct_err": 4.12 },
+        "M5": { "M_omega": 0.3713, "M_omega_std": 7e-04, "omega_pct_err": 0.64, "tau_over_M": 10.82, "tau_over_M_std": 0.08, "tau_pct_err": 3.78 }
+      },
+      "Cur_soft": {
+        "M1": { "M_omega": 0.3692, "omega_pct_err": 1.20, "tau_over_M": 10.53, "tau_pct_err": 6.37 },
+        "M2_wide": { "M_omega": 0.3782, "omega_pct_err": 1.19, "tau_over_M": 11.44, "tau_pct_err": 1.77 },
+        "M2_on_m4_plateau": { "M_omega": 0.3669, "omega_pct_err": 1.82, "tau_over_M": 10.55, "tau_pct_err": 6.12 },
+        "M3": { "M_omega": 0.3777, "omega_pct_err": 1.07, "tau_over_M": 10.48, "tau_pct_err": 6.78 },
+        "M4": { "M_omega": 0.278, "omega_pct_err": 25.7, "tau_over_M": null, "tau_pct_err": null, "flag": "no plateau (sigma_omega/|omega|>0.06)" },
+        "M5": { "M_omega": 0.385, "M_omega_std": 3.8e-02, "omega_pct_err": 2.95, "tau_over_M": 11.99, "tau_over_M_std": 2.98, "tau_pct_err": 6.66 }
+      }
+    }
+  },
+
+  "fno_operator_zerilli_l2": {
+    "provenance": "results_tex",
+    "run": "fno_xq2_comparison (v4)",
+    "setup": "Amortised 2D FNO (~7.8e7 params) trained once on 1000 (M,x0,sigma) draws (M in [0.8,1.2], x0 in [-10,30], sigma in [3,8]); 300 epochs Adam cosine, no L-BFGS. Extraction primarily at xq=2M.",
+    "canonical_bh": {
+      "draw": "(M,x0,sigma)=(1,4,5)",
+      "field_RMSD": 9.30e-04,
+      "qnm_extraction_xq2": {
+        "columns": "FNO omega_pct_err, FNO tau_pct_err, FD omega_pct_err, FD tau_pct_err",
+        "M1_fft_logline": { "fno_omega_pct_err": "~100", "fno_tau_pct_err": 3.93, "fd_omega_pct_err": "~100", "fd_tau_pct_err": 0.11, "note": "saturates: xq=2M inside prompt-pulse support" },
+        "M2_1mode_nls":   { "fno_omega_pct_err": "~100", "fno_tau_pct_err": 3.93, "fd_omega_pct_err": "~100", "fd_tau_pct_err": 0.11 },
+        "M3_esprit":      { "fno_omega_pct_err": 0.596, "fno_tau_pct_err": 3.34, "fd_omega_pct_err": 0.511, "fd_tau_pct_err": 3.10 },
+        "M4_1d_plateau":  { "fno_omega_pct_err": 0.114, "fno_tau_pct_err": 0.099, "fd_omega_pct_err": 0.019, "fd_tau_pct_err": 0.005 },
+        "M5_2d_plateau":  { "fno_omega_pct_err": 0.115, "fno_tau_pct_err": 0.098, "fd_omega_pct_err": 0.019, "fd_tau_pct_err": 0.005 }
+      }
+    },
+    "population_100bh_median_xq2": {
+      "columns": "omega_pct_err_median, tau_pct_err_median, n_omega, n_tau, pass1(<1% omega)",
+      "v4_FNO":       { "omega_pct_err": 0.343, "tau_pct_err": 0.940, "n_omega": 59, "n_tau": 59, "pass1": 0.32 },
+      "FD_reference": { "omega_pct_err": 0.335, "tau_pct_err": 0.661, "n_omega": 62, "n_tau": 62, "pass1": 0.33 }
+    },
+    "population_field_rmsd_by_bin": {
+      "note": "appendix tab:fno-pop-heatmap: v4 late-time field RMSD sqrt(<(Phi_FNO-Phi_FD)^2>)_{t>T/2} across the 100-BH test set, binned per initial-data axis. ~3x band across the whole box; no isolated failure region.",
+      "M":     [ { "bin": "[0.80,0.93]", "n": 30, "median": 1.15e-03, "max": 1.82e-03 }, { "bin": "[0.93,1.07]", "n": 41, "median": 8.71e-04, "max": 1.41e-03 }, { "bin": "[1.07,1.20]", "n": 29, "median": 8.82e-04, "max": 1.13e-03 } ],
+      "x0":    [ { "bin": "[-10.0,3.33]", "n": 34, "median": 1.01e-03, "max": 1.82e-03 }, { "bin": "[3.33,16.67]", "n": 39, "median": 8.90e-04, "max": 1.68e-03 }, { "bin": "[16.67,30.0]", "n": 27, "median": 9.06e-04, "max": 1.54e-03 } ],
+      "sigma": [ { "bin": "[3.00,4.67]", "n": 32, "median": 1.07e-03, "max": 1.82e-03 }, { "bin": "[4.67,6.33]", "n": 35, "median": 8.20e-04, "max": 1.54e-03 }, { "bin": "[6.33,8.00]", "n": 33, "median": 9.80e-04, "max": 1.35e-03 } ],
+      "all":   { "n": 100, "median": 9.40e-04, "max": 1.82e-03 }
+    },
+    "version_ablation": {
+      "columns": "tmax_over_M, modes_t, modes_x, lambda_ring, lambda_obs, lambda_tw, canonical_field_RMSD, canonical_omega_pct_err, pop_omega_pct_err, pop_tau_pct_err",
+      "v2": { "tmax_over_M": 50,  "modes_t": 32, "modes_x": 64, "lambda_ring": 2,  "lambda_obs": null, "lambda_tw": null, "canonical_field_RMSD": 5.80e-04, "canonical_omega_pct_err": 5.14,  "pop_omega_pct_err": 2.11, "pop_tau_pct_err": 6.95 },
+      "v3": { "tmax_over_M": 100, "modes_t": 64, "modes_x": 64, "lambda_ring": 2,  "lambda_obs": null, "lambda_tw": null, "canonical_field_RMSD": 7.48e-04, "canonical_omega_pct_err": 19.25, "pop_omega_pct_err": 0.44, "pop_tau_pct_err": 1.31 },
+      "v4": { "tmax_over_M": 100, "modes_t": 64, "modes_x": 64, "lambda_ring": 10, "lambda_obs": 5,    "lambda_tw": 1,    "canonical_field_RMSD": 9.30e-04, "canonical_omega_pct_err": 0.114, "pop_omega_pct_err": 0.34, "pop_tau_pct_err": 0.94 }
+    },
+    "zero_shot_resolution_transfer": {
+      "note": "v4 trained at 401x401, evaluated at 5 grids with no retraining; canonical BH; M3 ESPRIT omega at xq=2M.",
+      "columns": "N (=Nt=Nx), late_time_field_RMSD, M_omega_FNO, omega_pct_err",
+      "201": { "late_field_RMSD": 2.53e-02, "M_omega": 0.37150, "omega_pct_err": 0.590 },
+      "301": { "late_field_RMSD": 6.33e-03, "M_omega": 0.37142, "omega_pct_err": 0.609 },
+      "401_train": { "late_field_RMSD": 8.41e-04, "M_omega": 0.37147, "omega_pct_err": 0.596 },
+      "601": { "late_field_RMSD": 5.46e-03, "M_omega": 0.37156, "omega_pct_err": 0.573 },
+      "801": { "late_field_RMSD": 7.19e-03, "M_omega": 0.37162, "omega_pct_err": 0.557 }
+    },
+    "cost_A100_hours": {
+      "note": "FNO ~10 A100-h train (one-time, 300 epochs) + ~3e-4 h/BH inference; PINN ~1.5 A100-h/BH. Break-even ~7 BH.",
+      "columns": "N_BH, PINN_h, FNO_h, speedup",
+      "1":    { "PINN_h": 1.5,  "FNO_h": 10.0, "speedup": "0.15x" },
+      "10":   { "PINN_h": 15,   "FNO_h": 10.0, "speedup": "1.5x" },
+      "50":   { "PINN_h": 75,   "FNO_h": 10.0, "speedup": "7.5x" },
+      "100":  { "PINN_h": 150,  "FNO_h": 10.0, "speedup": "15x" },
+      "1000": { "PINN_h": 1500, "FNO_h": 10.3, "speedup": "146x" }
+    }
+  },
+
+  "hybrid_surrogate_zerilli_l2": {
+    "provenance": "results_tex (param count from main_tex_abstract)",
+    "run": "fno_sw_gate_s1em3",
+    "setup": "1.13e6-param 2D FNO learns the discretisation residual of a weak k=4 coarse FD solve (coarse dx,dt=(0.8,0.4)M; 1/64 fine cost) against a label-free Richardson-extrapolated target, with a parameter-free gradient gate (scale s=1e-3, the 68th percentile of |grad prior|). k=4 prior RL2 = 4.93%.",
+    "params": 1130000,
+    "canonical_bh_field": {
+      "draw": "(M,x0,sigma)=(1,4,5)",
+      "hybrid_RMSD": 6.85e-04,
+      "coarse_up_baseline_RMSD": 6.95e-03,
+      "rmsd_improvement_factor": 10.1,
+      "hybrid_RL2_pct": 0.486,
+      "coarse_up_RL2_pct": 4.93
+    },
+    "population_100bh_field": {
+      "hybrid_MSE": 9.80e-07,
+      "coarse_up_MSE": 7.76e-05,
+      "mse_improvement_factor": 79,
+      "hybrid_RL2_pct": 0.672,
+      "coarse_up_RL2_pct": 6.11,
+      "rl2_improvement_factor": 9.1
+    },
+    "qnm_extraction_xq2_median_100bh": {
+      "columns": "hybrid omega%, hybrid tau%, coarse-up omega%, coarse-up tau%, fine-FD omega%, fine-FD tau%",
+      "M1": { "hyb_omega": 0.511, "hyb_tau": 0.394, "base_omega": 0.441, "base_tau": 0.324, "fd_omega": 0.485, "fd_tau": 0.262 },
+      "M2": { "hyb_omega": 0.422, "hyb_tau": 0.818, "base_omega": 0.396, "base_tau": 0.860, "fd_omega": 0.436, "fd_tau": 0.805 },
+      "M3": { "hyb_omega": 0.748, "hyb_tau": 1.855, "base_omega": 0.766, "base_tau": 1.878, "fd_omega": 0.787, "fd_tau": 1.907 },
+      "M4": { "hyb_omega": 0.049, "hyb_tau": 0.263, "base_omega": 0.051, "base_tau": 0.174, "fd_omega": 0.014, "fd_tau": 0.063 },
+      "M5": { "hyb_omega": 0.052, "hyb_tau": 0.254, "base_omega": 0.051, "base_tau": 0.180, "fd_omega": 0.014, "fd_tau": 0.059 }
+    },
+    "canonical_qnm": {
+      "M4_hybrid": { "M_omega": 0.37353, "omega_pct_err": 0.045, "tau_over_M": 11.25, "tau_pct_err": 0.083, "plateau": "t0 in [12.2,15.8]M, tend=50M" },
+      "M5_hybrid": { "M_omega": 0.37352, "omega_pct_err": 0.049, "tau_over_M": 11.26, "tau_pct_err": 0.125, "plateau": "t0 in [12.3,15.7]M, tend in [47.5,50]M" }
+    },
+    "gate_decile_canonical": {
+      "columns": "mean_grad, coarse_up_err, hybrid_err, ratio",
+      "grad_corr_r": 0.917,
+      "90_100pct_wavefronts": { "mean_grad": 3.15e-02, "coarse_up_err": 1.30e-02, "hybrid_err": 1.06e-03, "ratio": 12.3 },
+      "80_90pct": { "mean_grad": 1.01e-02, "coarse_up_err": 4.37e-03, "hybrid_err": 4.77e-04, "ratio": 9.2 },
+      "70_80pct": { "mean_grad": 3.56e-03, "coarse_up_err": 2.21e-03, "hybrid_err": 3.07e-04, "ratio": 7.2 },
+      "60_70pct": { "mean_grad": 4.37e-04, "coarse_up_err": 6.81e-04, "hybrid_err": 2.62e-04, "ratio": 2.6 }
+    },
+    "gate_scale_sweep": {
+      "note": "appendix tab:gate-scale-sweep: label-free re-gating of the single trained model; canonical-BH field error vs gate scale s. Deployed s=1e-3 is within 2% of the global-RMSD optimum (s~1.5e-3). Columns: smooth-cell RMS (bottom 60% gradient), wavefront-cell RMS (top 40%), global RMSD.",
+      "deployed_s": 1e-3,
+      "rows": [
+        { "s": 1e-4,   "smooth_rms": 7.09e-06, "wavefront_rms": 1.487e-03, "global_RMSD": 9.41e-04 },
+        { "s": 3e-4,   "smooth_rms": 3.72e-06, "wavefront_rms": 1.310e-03, "global_RMSD": 8.28e-04 },
+        { "s": 5e-4,   "smooth_rms": 3.30e-06, "wavefront_rms": 1.207e-03, "global_RMSD": 7.64e-04 },
+        { "s": 7e-4,   "smooth_rms": 3.17e-06, "wavefront_rms": 1.141e-03, "global_RMSD": 7.21e-04 },
+        { "s": 1e-3,   "smooth_rms": 3.10e-06, "wavefront_rms": 1.083e-03, "global_RMSD": 6.85e-04, "flag": "DEPLOYED" },
+        { "s": 1.5e-3, "smooth_rms": 3.06e-06, "wavefront_rms": 1.063e-03, "global_RMSD": 6.72e-04, "flag": "RMSD optimum" },
+        { "s": 2e-3,   "smooth_rms": 3.05e-06, "wavefront_rms": 1.101e-03, "global_RMSD": 6.96e-04 },
+        { "s": 3e-3,   "smooth_rms": 3.03e-06, "wavefront_rms": 1.264e-03, "global_RMSD": 7.99e-04 },
+        { "s": 5e-3,   "smooth_rms": 3.03e-06, "wavefront_rms": 1.682e-03, "global_RMSD": 1.064e-03 }
+      ]
+    },
+    "honest_finding": "At xq=2M the coarse-up baseline already sits at the plateau-extractor floor; the hybrid's value is the GLOBAL field (79x population MSE, 10.1x canonical RMSD), NOT the single-observer QNM."
+  },
+
+  "zerilli_l2_faithful_reproduction": {
+    "provenance": "slides",
+    "config": "configs/zerilli_l2_paper.yaml (uniform resampling, Adam 10k + L-BFGS 15k; Patel settings)",
+    "note": "Faithful reproduction of Patel for the even-parity (Zerilli) potential at base config (no greedy/RAD/extra iters). Model trained in base repo PC_Physics_Inspired_Neural_Network; numbers from presentation/slides.tex (authoritative). QNM methods: M1 = FFT+envelope, M2 = damped-cosine curve fit (Patel's two methods). Compare to patel2024_baseline.qnm_table3.zerilli.",
+    "field": { "RMSD": 0.00183, "RL2_pct": 1.30 },
+    "qnm_extraction": {
+      "pinn": {
+        "M1_fft_envelope": { "M_omega": 0.3697, "omega_pct_err": 1.08, "tau_over_M": 10.671, "tau_pct_err": 5.07 },
+        "M2_curve_fit":    { "M_omega": 0.3784, "omega_pct_err": 1.25, "tau_over_M": 11.410, "tau_pct_err": 1.50 }
+      },
+      "fd": {
+        "M1_fft_envelope": { "M_omega": 0.3716, "omega_pct_err": 0.56, "tau_over_M": 10.929, "tau_pct_err": 2.78 },
+        "M2_curve_fit":    { "M_omega": 0.3798, "omega_pct_err": 1.63, "tau_over_M": 11.465, "tau_pct_err": 2.00 }
+      }
+    }
+  },
+
+  "regge_wheeler_l2_faithful_reproduction": {
+    "provenance": "this_run_local",
+    "run_date": "2026-06-30",
+    "config": "configs/regge_wheeler_l2_paper.yaml",
+    "config_note": "FAITHFUL paper reproduction (uniform resampling, Adam 10k + L-BFGS 15k, NO greedy/RAD, NO extra iters). Odd-parity (axial) potential; pairs with zerilli_l2_faithful_reproduction for the reproduction section. Isospectral with Zerilli. Compare to patel2024_baseline.qnm_table3.regge_wheeler.",
+    "training": { "adam_iters": 10000, "lbfgs_iters": 15000, "total_steps_logged": 25060, "final_train_loss": 3.03e-06, "wall_time_s": 7968.464552, "dtype": "float64", "device": "cuda RTX 5070 Ti Laptop sm_120" },
+    "field": { "RMSD": 0.0037717268847468283, "MAD": 0.0025277435553099133, "RL2": 0.02670867945364385, "RL2_pct": 2.67 },
+    "qnm_extraction": {
+      "note": "All five methods (M1-M5) + M2-on-M4-plateau, matching the paper's Zerilli coverage. M3 ESPRIT is ill-conditioned (|amp|~1e-24) and returns garbage, exactly as for the paper's forward Zerilli field -- diagnostic only.",
+      "pinn": {
+        "M1_fft_logline":      { "M_omega": 0.3716016599283363, "omega_pct_err": 0.561503899294528, "tau_over_M": 10.753354764315885, "tau_pct_err": 4.338094793026551 },
+        "M2_nls_wide":         { "M_omega": 0.3810537838838509, "omega_pct_err": 1.9678308493045062, "tau_over_M": 11.41639803586462, "tau_pct_err": 1.560341925670501, "A": 2.0068174149242215, "phi": -0.871171188801896 },
+        "M2_nls_on_m4_plateau":{ "M_omega": 0.37812333113743474, "omega_pct_err": 1.1836583188211829, "tau_over_M": 10.7633467077764, "tau_pct_err": 4.249206407113247, "window": "[11,50]M" },
+        "M3_esprit_K6":        { "M_omega": 1.2340586458741813, "omega_pct_err": 230.22709282156316, "tau_over_M": 0.15397088472802814, "tau_pct_err": 98.6302741328349, "note": "ill-conditioned (max |A|~1.3e-24); (omega,tau)-closest physical mode ~ (0.3751, 10.23)" },
+        "M4_1d_plateau":       { "M_omega": 0.3711696254375173, "M_omega_std": 8.64679793716967e-05, "omega_pct_err": 0.6771138781061476, "tau_over_M": 10.56722698625369, "tau_over_M_std": 0.0077577654893190495, "tau_pct_err": 5.993888566375853, "plateau": "t0 in [11,18]M, tend=50M" },
+        "M5_2d_plateau":       { "M_omega": 0.3709962384921005, "M_omega_std": 0.000544194323082446, "omega_pct_err": 0.7235112410755878, "tau_over_M": 10.621772092036306, "tau_over_M_std": 0.03444376514281007, "tau_pct_err": 5.5086549947842185, "plateau": "t0 in [10,16.7]M, tend in [38,46]M" }
+      },
+      "fd": {
+        "M1_fft_logline":      { "M_omega": 0.37331872159637614, "omega_pct_err": 0.10202793781745825, "tau_over_M": 11.074316777563407, "tau_pct_err": 1.4828148957974612 },
+        "M2_nls_wide":         { "M_omega": 0.38207029173626894, "omega_pct_err": 2.239842583962795, "tau_over_M": 11.548904555040869, "tau_pct_err": 2.7391206746808026, "A": 1.9831937101479369, "phi": -0.8838468491980082 },
+        "M2_nls_on_m4_plateau":{ "M_omega": 0.3793014313344577, "omega_pct_err": 1.498911248182427, "tau_over_M": 10.903067631775238, "tau_pct_err": 3.00624827172637, "window": "[11,50]M" },
+        "M3_esprit_K6":        { "M_omega": 0.958688326661421, "omega_pct_err": 156.5395575759757, "tau_over_M": 0.22677483353505148, "tau_pct_err": 97.98260978974244, "note": "ill-conditioned; diagnostic only" },
+        "M4_1d_plateau":       { "M_omega": 0.37419133742841465, "M_omega_std": 0.0002232623195639754, "omega_pct_err": 0.13147910848666663, "tau_over_M": 10.98942208855263, "tau_over_M_std": 0.05936609687689284, "tau_pct_err": 2.238038532580466, "plateau": "t0 in [11,18]M, tend=50M" },
+        "M5_2d_plateau":       { "M_omega": 0.37390692081170324, "M_omega_std": 0.0001698542700929163, "omega_pct_err": 0.05537083535008282, "tau_over_M": 10.894611394299973, "tau_over_M_std": 0.05218737806983703, "tau_pct_err": 3.0814750084514393, "plateau": "t0 in [10,16.7]M, tend in [34,42]M" }
+      }
+    }
+  },
+
+  "kerr_teukolsky_hybrid_NONreproduced": {
+    "provenance": "chat_memory_post_HPC_loss",
+    "WARNING": "Kerr Teukolsky s=-2 hybrid (coarse-FD + FNO residual). Computed on the CSD3 HPC, now LOST; reconstructed from chat history + notes/results_record_2026-06-30.md. NOT in main.tex. NOT reproduced in this clone (corpus/model lost; code re-implemented + synthetically validated only). Lowest confidence -- re-run locally before reporting.",
+    "setup": "Hyperboloidal minimal-gauge Teukolsky s=-2, sigma in [0,1]; ell=4, m=2, M=1. Decoupled label-free design: model input = N=101 order-2 coarse prior (k8, keeps QNM headroom); target = order-4 Richardson (16*u401 - u201)/15 (both rungs 4th order); no fine solve in any label.",
+    "best_run_decoupled_label_free": {
+      "corpus": "phase_c_l4_decoupled: ell=4; Sobol a/M in [0,0.95], r0 in [8,11], w in [1,1.5]; train 1024 / val 128 / test 128; grids fine=801, k2=401(o4), k4=201(o4), k8=101(o2 prior); float32 storage.",
+      "training": { "best_val_MSE": 1.39e-04, "epoch": "196/200", "params": 7697042 },
+      "richardson_target_field_pct_err": 0.026,
+      "test_medians_by_spin": {
+        "note": "median % errors over 128-sample held-out test set; field prior->hybrid; Mw/tau prior->hybrid, fine-field floor in _fine.",
+        "a_over_M_0.0_0.3":  { "n": 41, "field_prior": 51.2, "field_hybrid": 0.70, "Mw_prior": 2.92, "Mw_hybrid": 3.43, "Mw_fine": 2.46, "tau_prior": 3.53, "tau_hybrid": 9.83, "tau_fine": 2.82 },
+        "a_over_M_0.3_0.6":  { "n": 40, "field_prior": 59.1, "field_hybrid": 0.71, "Mw_prior": 1.31, "Mw_hybrid": 0.92, "Mw_fine": 0.58, "tau_prior": 3.98, "tau_hybrid": 8.54, "tau_fine": 4.18 },
+        "a_over_M_0.6_0.8":  { "n": 27, "field_prior": 65.7, "field_hybrid": 0.86, "Mw_prior": 1.05, "Mw_hybrid": 0.56, "Mw_fine": 0.40, "tau_prior": 1.75, "tau_hybrid": 3.42, "tau_fine": 0.76 },
+        "a_over_M_0.8_0.95": { "n": 20, "field_prior": 73.6, "field_hybrid": 1.08, "Mw_prior": 8.16, "Mw_hybrid": 0.68, "Mw_fine": 0.31, "tau_prior": 21.42, "tau_hybrid": 8.62, "tau_fine": 0.47 },
+        "overall":           { "n": 128, "field_prior": 59.5, "field_hybrid": 0.78, "Mw_prior": 1.82, "Mw_hybrid": 1.16, "Mw_fine": 0.64, "tau_prior": 3.87, "tau_hybrid": 6.57, "tau_fine": 2.03 }
+      },
+      "gates": { "field_pass": true, "qnm_pass": false, "overall_pass": false, "note": "field 0.78%<<5% PASS; Mw median 1.16%>1% FAIL (dragged by low-spin bin where fine itself only 2.46% = extraction-floor regime)." },
+      "floor_theory": "target field 0.026% << hybrid 0.78% => model hit its input-limited floor (~0.77%), did not saturate the cheap target."
+    },
+    "three_way_comparison": {
+      "note": "field / Mw(high spin) / tau median % err. Point: decoupled order-4 Richardson matches supervised, label-free, at ~0.32x fine cost.",
+      "old_order2_richardson_coupled": { "field_pct": 15.0, "Mw_high_spin_pct": 1.80, "tau_pct": 8.83, "uses_fine_solve": false, "cost_vs_fine": "~0.08x", "flag": "field FAIL (saturated bad order-2 target)" },
+      "supervised_fine_labels":        { "field_pct": 0.77, "Mw_high_spin_pct": 0.80, "tau_pct": 6.28, "uses_fine_solve": true, "cost_vs_fine": "1.0x" },
+      "decoupled_order4_richardson":   { "field_pct": 0.78, "Mw_high_spin_pct": 0.79, "tau_pct": 6.57, "uses_fine_solve": false, "cost_vs_fine": "~0.32x", "flag": "BEST: matches supervised on field+Mw, label-free" }
+    },
+    "tau_weakness_diagnosis": {
+      "status": "diagnosed; envelope-normalization fix implemented + synthetically validated locally (kerr/src/hybrid_data_pipe.py norm_mode=envelope), but NOT trained on a real corpus.",
+      "hybrid_tau_pct": 6.57,
+      "fine_tau_pct": 2.03,
+      "root_cause": "dynamic range, not noise: late ringdown is clean learnable signal (Richardson label matches fine to 0.0-0.2% there) but amplitude-weighted L2 + single peak-dominated scale s=rms(|prior|) give it ~1e-10 of the loss.",
+      "field_error_by_time_window_pct": { "global": "0.7-1.1", "early_ring": "1-2", "late_ring_8to14_tauref": "79-175" },
+      "amplitude_decay_over_peak": { "8_tauref": 4.7e-03, "10_tauref": 5.9e-04, "12_tauref": 8.7e-05, "14_tauref": 1.2e-05 }
+    },
+    "earlier_runs_superseded": {
+      "ell2_phase_c": { "field_prior_pct": 8.35, "field_hybrid_pct": 0.79, "field_factor": 10, "qnm": "net-negative (ensemble prior 0.119% -> hybrid 0.510%): prior already at QNM floor, no headroom at ell=2", "outcome": "field win only" },
+      "ell4_n101_order2_richardson": { "field_pct": 15.0, "outcome": "FAIL (student saturated bad order-2 target); motivated the order-4 fix" },
+      "ell4_n101_supervised": { "field_pct": 0.77, "Mw_high_spin": "18.3 -> 0.80", "outcome": "dual-win but uses fine labels (replaced by decoupled run)" }
+    }
+  },
+
+  "rad_sampling_ablation_zerilli_l2": {
+    "provenance": "slides",
+    "note": "AUTHORITATIVE (presentation/slides.tex). Extension exploration: residual-adaptive distribution (RAD) sampling sweep on the Zerilli base model (15k L-BFGS). Motivated the residual-greedy adaptive sampling in the final forward extension (forward_pinn_zerilli_l2). p_i ~ |r_i|^k + c. This is an EXTENSION, distinct from the faithful reproduction (zerilli_l2_faithful_reproduction) and from the final forward result (greedy+30k, RL2 0.58%).",
+    "sweep": [
+      { "config": "uniform (paper repro)", "k": null, "c": null, "final_loss": 1.18e-06, "RMSD": 0.00183, "RL2_pct": 1.30 },
+      { "config": "RAD baseline", "k": 1, "c": 1, "final_loss": 7.40e-07, "RMSD": 0.00115, "RL2_pct": 0.82 },
+      { "config": "RAD aggressive", "k": 2, "c": 0.1, "final_loss": 9.07e-07, "RMSD": 0.00095, "RL2_pct": 0.67 },
+      { "config": "RAD k=2 P=500", "k": 2, "c": 0.1, "final_loss": 1.06e-06, "RMSD": 0.00105, "RL2_pct": 0.75 },
+      { "config": "RAD + anchor 20%", "k": 1, "c": 1, "final_loss": 8.20e-07, "RMSD": 0.00141, "RL2_pct": 1.00 }
+    ]
+  }
+}

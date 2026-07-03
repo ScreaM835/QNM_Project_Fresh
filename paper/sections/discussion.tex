@@ -3,323 +3,154 @@
 % =============================================================
 \section{Discussion}\label{sec:discussion}
 
-The forward PINN here matches the architecture, training schedule
-and physics setup of \citet{Patel2024pinn} to enable a direct
-field-accuracy comparison. Two changes
-account for the improvement from $\mathrm{RL2}=28.06\%$ in their
-Table~2 to $\mathrm{RL2}=0.58\%$ in our
-Eq.~\eqref{eq:fwd-metrics}. The first is the doubled number of L-BFGS
-iterations ($30{,}000$ versus $15{,}000$). The second is the greedy adaptive
-resampling of Sec.~\ref{sec:fwd-pinn} (with resampling period
-$1{,}000$ iterations versus the $100$ of \citet{Patel2024pinn},
-so that each resampling event uses a residual field evaluated
-after more iterations). The frequency-domain Schwarzschild
-eigenvalue PINN of \citet{Cornell2022pinnqnm} reaches sub-permille
-accuracy on the same $\ell = 2$ fundamental mode by training
-$\omega$ as a complex parameter alongside the network weights, but
-that result is in the eigenvalue class and not directly comparable
-to our time-domain post-hoc fit. \citet{Luna2022teukolskypinn}
-enforce normalisation boundary conditions hard via an output
-transform on a time-domain Teukolsky PINN; we use soft enforcement
-through the loss, and a hard output-transform variant of the
-forward setup of Sec.~\ref{sec:fwd-pinn} is a natural follow-up.
-The inverse PINN of Sec.~\ref{sec:inv-pinn}, which jointly
-recovers the black-hole mass and a single-mode ringdown template
-from noisy field observations, has no precedent in the
-PINN-for-QNM literature. We isolate the
-$A_{\mathrm{ring}}$--$\tau$ degeneracy of the template loss
-(Sec.~\ref{sec:res-inv} and Table~\ref{tab:tau-degeneracy}),
-adopt a reporting convention (Sec.~\ref{sec:reporting}) that
-extracts $\tau$ from the converged network field rather than from
-the learned scalar, and replace the fixed-window QNM fit by the
-plateau-based estimators M4 and M5, whose
-in-window scatter also serves as a quality flag. The
-six-variant ablation of Table~\ref{tab:variants} isolates the
-effects of the ringdown weight $\lambda_{\mathrm{ring}}$, the
-ringdown lower bound $\tring$, and the addition of an overtone
-in the template.
-The curriculum-learning extension of Sec.~\ref{sec:cur-pinn}
-addresses a different question, namely whether splitting the temporal
-domain into smaller windows lowers the full-domain forward error.
-The answer is no.
-Table~\ref{tab:cur-summary} shows that, while the
-$W_{1} = [0,25]\,M$ window of the 2-window curriculum reaches
-RMSD $5.2\times 10^{-4}$ (the lowest sub-domain RMSD recorded
-anywhere in this work), the $W_{2}$ stitching error and the
-late-time error growth offset the local gain, leaving the
-full-domain RMSD slightly worse than the single-window
-greedy-adaptive baseline; the 3-window variant compounds the
-stitching error monotonically across windows, and the
-soft-overlap variant performs worse still. The curriculum
-literature \citep{Krishnapriyan2021failure,Bengio2009curriculum}
-predicts gains for problems whose loss landscape is dominated by
-late-time stiffness once the network has been forced to learn
-the full domain at once. In our setup, the residual-greedy
-adaptive sampler of Sec.~\ref{sec:fwd-pinn} already concentrates
-$0.3\,N_r$ of the collocation budget on the high-residual
-late-time band within a single network, and so absorbs the same
-benefit a curriculum would provide without paying the per-stitch
-interpolation cost. We expect the curriculum strategy to be
-worthwhile when the time domain is long enough that even a
-fully-greedy single-window PINN cannot cover the late-time decay
-range with adequate collocation density (e.g.\ for
-$t_{\max} \gtrsim 5\,t_{\mathrm{tail}}$, where the QNM regime,
-the late tail, and the Sommerfeld arrival time all enter the
-same training window). On the present
-$[0,50]\,M$ domain a single greedy PINN suffices.
-The analysis of Sec.~\ref{sec:res-inv} (Table~\ref{tab:tau-degeneracy})
-shows that the optimiser drifts along the amplitude--damping-time
-degeneracy of Eq.~\eqref{eq:loss-ring} during L-BFGS, leaving the
-learned
-$\tau$ ten to twenty percent below the Leaver value while the
-network field $\Phi_\theta(\xq,t)$ retains the physical decay
-rate; the reporting convention of Sec.~\ref{sec:reporting}
-therefore quotes the post-hoc M2 wide-window value of $\tau$ on
-$\Phi_\theta$, which recovers $\tau$ to within a few percent on
-the same runs. We expect the same convention to apply to any
+\paragraph{Relation to prior work.}
+Section~\ref{sec:res-repro} makes the comparison with
+\citet{Patel2024pinn} exact: at fully matched settings the
+reproduction reaches $1.30\%$/$2.67\%$ against their
+$28.06\%$/$23.59\%$, with damping-time errors symmetric across
+the isospectral pair where the prior study's are not; the
+further improvement to $\mathrm{RL2}=0.58\%$
+(Eq.~\eqref{eq:fwd-metrics}) is accounted for by the doubled
+L-BFGS budget and the greedy adaptive resampling of
+Sec.~\ref{sec:fwd-pinn}. The sub-permille eigenvalue PINN of
+\citet{Cornell2022pinnqnm} is frequency-domain and not directly
+comparable to a time-domain post-hoc fit; the hard boundary
+enforcement of \citet{Luna2022teukolskypinn} is a natural
+variant of our soft setup.
+
+\paragraph{Inverse problem and the template degeneracy.}
+The joint recovery of the black-hole mass and a ringdown
+template from noisy field observations has no precedent in the
+PINN-for-QNM literature. During L-BFGS the optimiser drifts
+along the amplitude--damping-time degeneracy of
+Eq.~\eqref{eq:loss-ring}, leaving the learned $\tau$ ten to
+twenty percent below the Leaver value while the network field
+retains the physical decay rate
+(Table~\ref{tab:tau-degeneracy}); the reporting convention of
+Sec.~\ref{sec:reporting} therefore quotes the post-hoc
+wide-window $\tau$, and the same convention should apply to any
 inverse PINN whose template loss admits a comparable
-amplitude--damping-time degeneracy.
+degeneracy.
 
-The M4 plateau standard deviation $\sigma_\omega$ is, by
-definition, the spread of $\omega$ across the plateau, which we
-take as an estimate of the fit-window systematic uncertainty inside
-the fit window. Across the six inverse variants it
-discriminates cleanly between configurations on which the
-two-mode NLS finds a stable minimum
-($\sigma_\omega/\omega \le 1\%$ for variants A, D, E) and
-configurations on which it does not
-($\sigma_\omega/\omega \approx 0.44$ for baseline and $0.34$ for C,
-undefined for B; see Table~\ref{tab:inv-summary}). A small
-$\sigma_\omega$ certifies the estimate; a large or undefined
-$\sigma_\omega$ rejects it.
-The 2-D plateau M5 generalises the same idea to the joint
-$(t_0,\tend)$ plane (Fig.~\ref{fig:fwd-plateau-m5}) and is needed
-when the upper edge of the simulation window approaches
-$t_{\mathrm{tail}}$, as in extensions to longer time domains.
+\paragraph{Why the curriculum fails here.}
+The first curriculum window reaches the lowest sub-domain RMSD
+recorded in this work ($5.2\times 10^{-4}$;
+Table~\ref{tab:cur-summary}), but the stitching error offsets
+the local gain and the 3-window and soft-overlap variants
+perform worse still (Appendix~\ref{sec:res-cur}). The greedy
+sampler already concentrates $0.3\,N_r$ of the collocation
+budget on the high-residual late-time band within a single
+network, capturing the benefit a curriculum would provide
+\citep{Krishnapriyan2021failure,Bengio2009curriculum} without
+the per-stitch interpolation cost; a curriculum should pay off
+only on domains too long for a single greedy network to cover.
 
-The forward PINN reaches $\omega$ accuracy $0.029\%$ on a
-noiseless setup; the best inverse variant reaches $0.30\%$ on the
-$1\%$-noise setup. The factor of ten gap is consistent with the
-information content of the two training setups. The forward problem
-is constrained by an exact analytic IC plus a known PDE on the full
-simulation domain, with no observational uncertainty; the inverse
-problem retains the PDE constraint but adds a data-fit term and a
-template-fit term, on $\Nobs = 500$ samples
-restricted to $\xq = 10\,M$ and corrupted at the percent level.
-A first-principles Cram\'er--Rao bound on $(M,\omega,\tau)$ given
-$N_{\mathrm{obs}}$, $\sigma_{\mathrm{noise}}$ and the ringdown
-SNR would settle the question of whether the residual
-$0.30\%$ is dominated by training systematics or by intrinsic
-information loss, and is a natural quantitative follow-up
-of this work.
+\paragraph{The plateau as a quality flag.}
+The plateau standard deviation $\sigma_\omega$ estimates the
+fit-window systematic and simultaneously acts as a validity
+flag: across the six inverse variants it separates stable
+two-mode fits ($\sigma_\omega/\omega \le 1\%$; A, D, E) from
+failed ones ($\approx 0.44$ baseline, $0.34$ C, undefined B;
+Table~\ref{tab:inv-summary}) --- a small $\sigma_\omega$
+certifies the estimate, a large or undefined one rejects it. M5
+generalises the scan to the joint $(t_0,\tend)$ plane and
+becomes necessary when the window edge approaches
+$t_{\mathrm{tail}}$.
 
-Translating variant D into observer units fixes the precision of
-the inverse pipeline relative to current detector capabilities.
-For a
-Schwarzschild remnant of mass $M = 65\,M_\odot$, comparable to the
-final-mass scale of GW150914 \citep{LIGO2016ringdown}, the
-fundamental $\ell{=}m{=}2$ frequency
-$f_{220} = M\omega_0 / (2\pi M_{\mathrm s})
-\approx 186\,\mathrm{Hz}$ and the damping time
-$\tau_0 \approx 3.60\,\mathrm{ms}$ follow from the Leaver values
-$M\omega_0 = 0.3737$ and $\tau_0/M = 11.241$ used throughout this
-paper, with $M_{\mathrm s} = M\,(GM_\odot/c^3)
-\approx 3.20\times 10^{-4}\,\mathrm{s}$. The $0.30\%$
-fractional uncertainty on $\omega$ achieved by variant D maps to
-$\sigma_{f_{220}} \approx 0.56\,\mathrm{Hz}$, and the $1.6\%$
-uncertainty on $\tau$ maps to
-$\sigma_{\tau_0} \approx 58\,\mu\mathrm{s}$. Both are at least an
-order of magnitude smaller than the statistical uncertainties on
-$(f_{220},\tau_{220})$ reported for GW150914-class events at
-ringdown signal-to-noise $\rho_{\mathrm{ring}} \sim 8$--$10$
-\citep{LIGO2016ringdown,Isi2019tests}, so on a single event the
-inverse-PINN precision floor is well below the data-statistical
-floor; the implication is that, at current sensitivities, the
-limiting uncertainty on a single-event spectroscopy test will
-remain the data noise rather than the network systematics. This balance is
-expected to invert at the per-mille statistical sensitivities
-forecast for next-generation detectors \citep{Berti2007ringdown},
-at which point the forward--inverse precision gap will become
-a quantitative limiting factor.
+\paragraph{Forward--inverse precision gap.}
+The forward PINN reaches $0.029\%$ in $\omega$ on a noiseless
+setup; the best inverse variant reaches $0.30\%$ under $1\%$
+noise on $\Nobs = 500$ single-observer samples. The
+factor-of-ten gap is consistent with the information content of
+the two setups; a Cram\'er--Rao bound on $(M,\omega,\tau)$
+would settle whether the residual $0.30\%$ is training
+systematics or intrinsic information loss.
 
-Six limitations of this study fall into two groups, three
-scope choices and three substantive. The scope choices are the fixed Schwarzschild background, the
-single-channel quadrupole wavefunction $\Phi(\xq,t)$, and the
-single noise realisation per variant. Each lifts to a known
-extension. Kerr follows by substituting the Teukolsky operator for the
-Zerilli operator, multi-channel by training one head per
-harmonic, and the statistical scope by running the inverse
-pipeline at $\ge 30$ noise seeds and reporting the seed-to-seed
-standard deviation alongside the plateau $\sigma_\omega$. The
-substantive limitations are the
-$A_{\mathrm{ring}}$--$\tau$ degeneracy itself, which the
-reporting convention works around but does not remove and which
-is a property of any single-mode template; the marginal benefit
-of the two-mode template (variant E), whose additional learnable
-parameters slightly improve $\tau$ but penalise $M$ and $\omega$,
-leaving the choice of $\lambda_{\mathrm{ring}}$ and the relative
-weighting of overtone modes without a quantitative criterion; and the
-ill-conditioning of ESPRIT (M3) on a $\Phi_\theta(\xq,t)$ whose
-dominant component is already a clean damped sinusoid, which
-prevents M3 from contributing to the primary numbers and which
-we report in Appendix~\ref{app:esprit} only.
+\paragraph{Detector-unit translation.}
+For a GW150914-class Schwarzschild remnant
+($M = 65\,M_\odot$) the Leaver values used throughout
+correspond to $f_{220} \approx 186\,\mathrm{Hz}$ and
+$\tau_0 \approx 3.60\,\mathrm{ms}$, and variant D's fractional
+uncertainties map to
+$\sigma_{f_{220}} \approx 0.56\,\mathrm{Hz}$ and
+$\sigma_{\tau_0} \approx 58\,\mu\mathrm{s}$ --- at least an
+order of magnitude below the statistical uncertainties reported
+at ringdown signal-to-noise $\rho_{\mathrm{ring}} \sim 8$--$10$
+\citep{LIGO2016ringdown,Isi2019tests}. At current sensitivities
+the limiting uncertainty is therefore the data noise rather
+than the network systematics; the balance inverts at the
+per-mille sensitivities forecast for next-generation detectors
+\citep{Berti2007ringdown}.
 
-A related scope point concerns the overtone itself.
-The M4 template of Eq.~\eqref{eq:two-mode} fits the fundamental
-and the first overtone simultaneously, and we credit this
-two-mode structure for the sub-percent fundamental-mode accuracy
-quoted in Sec.~\ref{sec:res-fwd} (the Giesler-style mechanism: the
-overtone slot absorbs $n=1$ contamination that would otherwise
-bias a single-mode template; see \citet{Giesler2019overtones}).
-Reporting $(M\omega_1,\tau_1/M)$ as a separate result, however,
-is not warranted in the present setup: applied across all
-forward, inverse and curriculum variants, the M4 plateau-mean
-overtone recovers $M\omega_1$ no better than $\sim\!20\%$ in
-the most favourable window choice, regardless of estimator
-hyperparameters. The proximate cause is that our
-Gaussian wave-packet initial data of Sec.~\ref{sec:fwd-problem}
-excites $n=1$ at far lower amplitude than the
-numerical-relativity merger remnants on which the Giesler
-recipe was demonstrated. Reproducing Giesler-style overtone
-resolution would therefore require initial data
-chosen to excite higher overtones (or a binary-merger-conditioned
-training distribution), which is a natural target for
-follow-up work and is outside the scope of the present
-methods-paper benchmark. The currently active controversy over
-whether the GW150914 overtone constitutes a genuine detection
-\citep{Cotesta2022overtones,Isi2021priors} provides additional
-motivation for treating quoted overtone parameters with care.
+\paragraph{Limitations.}
+Three scope choices --- the fixed Schwarzschild background, the
+single quadrupole channel $\Phi(\xq,t)$, and the single noise
+realisation per variant --- lift to known extensions: the
+Teukolsky operator, one head per harmonic, and $\ge 30$ noise
+seeds with a seed-to-seed standard deviation reported alongside
+$\sigma_\omega$. Three limitations are substantive: the
+$A_{\mathrm{ring}}$--$\tau$ degeneracy, a property of any
+single-mode template that the reporting convention works around
+but does not remove; the marginal benefit of the two-mode
+template (variant E), which slightly improves $\tau$ but
+penalises $M$ and $\omega$; and the ill-conditioning of ESPRIT
+on a nearly clean damped sinusoid, which excludes M3 from the
+primary numbers (Appendix~\ref{app:esprit}).
 
-A natural next step is to recast the inverse problem as a
-Bayesian posterior over $(M,\omega,\tau)$ with the trained PINN
-as the forward operator, following \citet{Isi2021priors}: this
-would produce posterior credible
-intervals on the primary parameters that combine the
-network-systematic uncertainty (which the plateau diagnostic
-estimates) with the data-statistical uncertainty (which the
-deterministic point estimate does not). Combined with a
-Cram\'er--Rao baseline, such a posterior would close the loop
-between the deterministic plateau methodology developed here and
-the probabilistic framework that gravitational-wave
-ringdown analyses ultimately need. On the training-dynamics
-side, the static loss-weight vector
-$\boldsymbol{\lambda}=(100,100,100,1,100,1,1)$ inherited from
-\citet{Patel2024pinn} could be replaced by the learning-rate
-annealing of \citet{Wang2021gradientpath}, by the
-NTK-eigenvalue-based weighting of \citet{Wang2022ntk}, by the
-per-collocation-point soft-attention weights of
-\citet{McClenny2023sapinn}, or by the causal
-time-weighting of \citet{Wang2022causal}, the latter being
-particularly natural for the time-domain ringdown setting in
-which the network must resolve the early-time pulse before the
-late-time decay can be trusted; and the soft Sommerfeld boundary
-enforcement of Sec.~\ref{sec:fwd-pinn} could be replaced by the
-hard output-transform construction of \citet{Luna2022teukolskypinn}.
+A related scope point concerns the overtone. The two-mode M4
+template is credited for the sub-percent fundamental-mode
+accuracy (the overtone term absorbs $n=1$ contamination;
+\citealt{Giesler2019overtones}), but reporting
+$(M\omega_1,\tau_1/M)$ as a separate result is not warranted:
+our Gaussian initial data excite $n=1$ far more weakly than the
+numerical-relativity remnants on which the Giesler prescription
+was demonstrated, and the plateau-mean overtone recovers
+$M\omega_1$ no better than $\sim\!20\%$. Overtone-exciting
+initial data are a natural follow-up, given the active
+controversy over the GW150914 overtone
+\citep{Cotesta2022overtones,Isi2021priors}.
 
-The Fourier neural operator surrogate of
-Sec.~\ref{sec:res-fno} differs from the three PINN modalities
-in the unit of work that the network amortises. Each PINN
-trains on one Zerilli problem and feeds its converged field
-into the post-hoc QNM extractors. The FNO trains once on
-$1{,}000$ initial-data draws and then predicts the full
-spacetime field for any in-distribution draw with a single
-forward pass, after which the same extractors of
-Sec.~\ref{sec:qnm-methods} apply unchanged. On the canonical
-BH the v4 FNO recovers $\omega$ to $0.11\%$ and $\tau$ to
-$0.10\%$, a factor of $\sim\!6$ in $\omega$ and $\sim\!20$ in
-$\tau$ larger than the FD reference's own extraction error
-($0.019\%$ and $0.005\%$ respectively); the residual gap is
-set by the bulk $9.30\times 10^{-4}$ field RMSD of the
-surrogate, not by the M4 algorithm. On the $100$-BH
-in-distribution population the FNO and the FD reference are
-statistically indistinguishable at median $\omega$ error
-$0.343\%$ versus $0.335\%$ and median $\tau$ error $0.940\%$
-versus $0.661\%$, separated by less than the binomial standard
-error on $n \approx 60$ valid draws. At the larger observer
-position $\xq = 10\,M$ neither source returns a valid M4
-plateau, locating the extraction failure in the joint
-window--observer geometry rather than in the surrogate. The
-five modalities therefore sit at distinct points on a
-precision--amortisation plane. The forward PINN reaches
-$0.04\%$ in $\omega$ at the cost of one bespoke L-BFGS run per
-BH, the inverse PINN reaches $0.30\%$ while simultaneously
-recovering $M$, the curriculum PINN improves the per-window
-error on the earliest sub-domain by $\sim\!37\%$ without
-improving the global extraction, the end-to-end FNO reaches
-$0.34\%$ on the population median with a single forward pass
-per BH, and the hybrid coarse-FD + neural-residual surrogate
-matches the FD reference's own M4 plateau floor at the
-$\xq = 2\,M$ observer at a smaller per-event inference cost
-than the end-to-end FNO and with a network almost two orders of
-magnitude smaller.
-The end-to-end FNO matches the inverse-PINN observation-noise
-floor of $1\%$ Gaussian noise at a per-BH cost two to three
-orders of magnitude smaller than any per-BH PINN.
+\paragraph{Amortised surrogates.}
+The two surrogates change the unit of work the network
+amortises: each PINN trains on one Zerilli problem, whereas the
+FNO trains once and serves any in-distribution draw in a single
+forward pass, with population extraction statistically
+indistinguishable from the FD reference's own ($0.343\%$ versus
+$0.335\%$ median $\omega$ error; Sec.~\ref{sec:res-fno}) --- at
+the population level the surrogate is not the accuracy
+bottleneck. The hybrid's gain is structural: the coarse-prior
+error correlates strongly with the prior gradient, so the
+parameter-free gate routes network capacity onto the wavefronts
+where the prior fails, cutting the population field MSE by
+$\sim\!79\times$ while protecting the regions the classical
+solve already resolves (Sec.~\ref{sec:res-hyb}); the field gain
+does not become a median QNM gain at $\xq = 2\,M$ because the
+coarse-up baseline is already at the M4 plateau floor there.
 
-The hybrid coarse-FD + neural-residual surrogate of
-Sec.~\ref{sec:hyb-method} occupies a third position distinct
-from both the per-BH PINNs and the end-to-end FNO. The classical
-coarse-FD solve on $(\Delta x,\Delta t)_{\mathrm{c}} = (0.8,0.4)\,M$
-at refinement ratio $k = 4$ --- one sixty-fourth of the fine-FD
-cost --- carries the wave propagation, and the 2-D FNO
-$\mathcal{H}_{\theta}$ predicts only the discretisation residual
-of this deliberately weak prior, trained from a label-free
-Richardson extrapolation of two coarse solves rather than from
-the fine-FD field and gated to the under-resolved wavefronts by
-a parameter-free gradient gate. This lets a $1.13\times 10^{6}$
-parameter network (almost two orders of magnitude smaller than the
-end-to-end FNO of Sec.~\ref{sec:fno-method}) cut the canonical-BH
-bulk-field RMSD from $6.95\times 10^{-3}$ on the coarse-up
-baseline to $6.85\times 10^{-4}$, and the population MSE across
-the 100-BH test set by a factor of $\sim\!79$. The gain is
-structural rather than incidental: the coarse-prior error is
-strongly correlated with the prior gradient (log--log Pearson
-$r = 0.917$), so the gradient gate routes the network's capacity
-onto the wavefronts where the prior fails --- a $12\times$ error
-reduction in the top gradient decile --- while holding its
-residual speckle in the smooth interior and causal exterior to
-the $10^{-6}$ level, three orders of magnitude below the
-correction. The QNM-extraction story at the observer
-$\xq = 2\,M$ is the
-opposite of the field story. All three sources --- hybrid,
-coarse-up baseline, and fine FD reference --- hit the same M4
-plateau floor on the canonical BH and on the median of the
-100-BH population (median $|\Delta\omega/\omega| \approx 0.05\%$
-on both hybrid and baseline, against $0.014\%$ on the fine FD
-reference), so the hybrid
-is not the median winner and shows no QNM benefit at this
-observer; the off-floor outliers in the population are
-ill-conditioned single-window fits that appear on the fine FD
-reference as well, not a hybrid effect. The hybrid surrogate
-therefore sits at the inference-fastest, smallest-network corner
-of the precision--amortisation plane, and its field-RMSD gain
-over the coarse-up baseline does not translate into a median QNM
-gain at this observer because the coarse-up extraction is
-already at the M4 plateau floor.
+The FNO ablation (Table~\ref{tab:fno-versions},
+Appendix~\ref{app:supp-fno}) adds a transferable observation:
+the bulk-field RMSD is not monotone with the QNM accuracy, and
+only the two QNM-targeted loss terms of
+Sec.~\ref{sec:fno-method} convert a good field surrogate into a
+good spectroscopy surrogate --- the figure of merit is the
+estimator accuracy on the slice the post-processing pipeline
+consumes. Learning the inverse operator
+$\mathcal{G}^{-1}_{\theta}\colon \Phi(\xq,t) \mapsto M$ on the
+same distribution is a natural extension, with the plateau
+diagnostic carrying over as a population-level systematic
+estimate on $M$.
 
-The v4 FNO ablation of Sec.~\ref{sec:res-fno} also yields a
-methodological observation transferable to the operator-learning
-literature on hyperbolic PDEs. The bulk-field RMSD across the
-three versions of the surrogate (Table~\ref{tab:fno-versions})
-is not monotone with the QNM extraction accuracy. The v2
-configuration with the shortest training window has the lowest
-bulk RMSD but the worst QNM fit, and the v4 configuration has
-a slightly higher bulk RMSD than v3 but two orders of magnitude
-better canonical-BH QNM accuracy. The two new v4 loss terms are
-what convert v3 into v4. They are direct $L^{2}$ supervision on
-the 1-D observer slice $\Phi(\xq,t)$ that the QNM extractor
-reads, and a ramp-weighted field $L^{2}$ that puts $\sim 50\times$
-more pressure on the ringdown tail than on the prompt pulse.
-They make plain that the figure of merit for an
-operator surrogate trained for ringdown spectroscopy is not the
-gridwise RMSD but the downstream estimator accuracy on the slice
-that the post-processing pipeline consumes. A natural extension
-is to fold the inverse problem of Sec.~\ref{sec:res-inv} into
-the operator setting itself: a network that learns the inverse
-operator $\mathcal{G}^{-1}_{\theta}\colon \Phi(\xq,t) \mapsto M$
-on the same training distribution would amortise the per-event
-inverse PINN training cost in the same way that the v4 forward
-FNO amortises the per-event forward PINN training cost, and the
-plateau diagnostic of Sec.~\ref{sec:plateau} would carry over
-to give an a-posteriori estimate of the population-level
-systematic uncertainty on $M$.
+\paragraph{Methodological outlook.}
+Recasting the inverse problem as a Bayesian posterior over
+$(M,\omega,\tau)$ with the trained PINN as the forward operator
+\citep{Isi2021priors} would combine the network-systematic
+uncertainty (which the plateau diagnostic estimates) with the
+data-statistical uncertainty that a point estimate lacks; a
+Cram\'er--Rao baseline completes it. On the training side, the
+static loss weights could be replaced by adaptive
+\citep{Wang2021gradientpath,Wang2022ntk,McClenny2023sapinn} or
+causal time-weighting \citep{Wang2022causal} schemes ---
+natural for ringdown, where the early-time pulse must be
+resolved before the late-time decay can be trusted --- and the
+soft Sommerfeld boundaries enforced hard via an output
+transform \citep{Luna2022teukolskypinn}.

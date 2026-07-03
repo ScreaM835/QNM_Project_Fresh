@@ -56,6 +56,8 @@ from kerr.scripts.kv3_qnm import (
 )
 from kerr.src.mol_rk4 import rk4_step_state
 from kerr.src.qnm_kerr_reference import kerr_qnm
+from kerr.src.fd_stencils import d1_4
+from kerr.src.dissipation import ko_dissipation_6
 
 # --- Sweep box (locked by the C.0 spot-check) --------------------------------
 SPIN_RANGE: Tuple[float, float] = (0.0, 0.95)
@@ -65,6 +67,15 @@ W_RANGE: Tuple[float, float] = (1.0, 1.5)
 # --- Grids (nest exactly) -----------------------------------------------------
 FINE_N: int = 801
 COARSE_N: Dict[int, int] = {2: 401, 4: 201}
+
+# --- Per-grid spatial discretisation order ------------------------------------
+# Maps grid key ``k`` (1 = fine, else the coarse refinement factor) to the FD
+# order used by ``evolve_full_field`` (2 = central + KO-4, 4 = central-4 + KO-6).
+# Empty default => every grid uses order 2 (backward compatible). Mutated
+# pre-fork by the build script (same pattern as ``COARSE_N``) to evolve, e.g.,
+# the Richardson target rungs at order 4 while the headroom-bearing prior stays
+# order 2. ``GRID_ORDER.get(k, 2)`` is read per grid inside the worker.
+GRID_ORDER: Dict[int, int] = {}
 
 # --- Stored space-time window -------------------------------------------------
 # T_STORE reaches B.9's plateau-scan end (14 * tau_ref, clamped to 220) for every
@@ -125,13 +136,18 @@ def canonical_tau(t_store: float = T_STORE, dt_store: float = DT_STORE) -> np.nd
     return np.arange(n_rec + 1, dtype=np.float64) * dt_store
 
 
-def _rhs_closure(op):
-    """The B.9 RHS: Teukolsky + Kreiss-Oliger on the two auxiliary fields."""
+def _rhs_closure(op, d1=d1_central, ko=ko_dissipation):
+    """The B.9 RHS: Teukolsky + Kreiss-Oliger on the two auxiliary fields.
+
+    ``d1``/``ko`` select the spatial discretisation order: the defaults are the
+    2nd-order central stencil + 4th-difference KO; pass ``d1_4`` + ``ko_dissipation_6``
+    for the 4th-order variant.
+    """
 
     def rhs_fn(s):
-        dPsi, dU, dW = rhs_teuk(s, op, d1_central)
-        dU = dU + ko_dissipation(s[1], SIGMA_KO)
-        dW = dW + ko_dissipation(s[2], SIGMA_KO)
+        dPsi, dU, dW = rhs_teuk(s, op, d1)
+        dU = dU + ko(s[1], SIGMA_KO)
+        dW = dW + ko(s[2], SIGMA_KO)
         return dPsi, dU, dW
 
     return rhs_fn
@@ -145,6 +161,7 @@ def evolve_full_field(
     t_store: float = T_STORE,
     dt_store: float = DT_STORE,
     amp: float = ID_AMP,
+    order: int = 2,
 ):
     """Evolve one sample and record the **full complex field** ``psi(tau, sigma)``.
 
@@ -153,6 +170,12 @@ def evolve_full_field(
     pick ``record_every = ceil(dt_store / dt_cfl)`` and shrink ``dt`` to
     ``dt_store / record_every <= dt_cfl`` (still CFL-stable, exactly as B.9
     shrinks ``dt`` to make ``n_steps`` integer).
+
+    ``order`` selects the spatial discretisation: 2 (default, 2nd-order central
+    + 4th-difference KO) or 4 (4th-order central + 6th-difference KO). The CFL
+    formula is unchanged: at safety 0.4 the step sits well inside the RK4
+    stability limit for both stencils (the 4th-order symbol is only ~1.37x the
+    2nd-order one).
 
     Returns ``(tau, psi, op, info)`` with ``psi`` of shape ``(Ntau, N)`` complex.
     """
@@ -163,14 +186,21 @@ def evolve_full_field(
         omega_ref=omega_ref, include_potential=True,
     )
 
+    if order == 2:
+        d1, ko = d1_central, ko_dissipation
+    elif order == 4:
+        d1, ko = d1_4, ko_dissipation_6
+    else:
+        raise ValueError(f"order must be 2 or 4, got {order}")
+
     dt_cfl = cfl_dt(op, safety=SAFETY)
     record_every = int(np.ceil(dt_store / dt_cfl))
     dt = dt_store / record_every                 # <= dt_cfl
     n_rec = int(round(t_store / dt_store))
     n_steps = n_rec * record_every
 
-    state = state_from_psi(make_initial_pulse(amp, r0, w), op, d1_central)
-    rhs_fn = _rhs_closure(op)
+    state = state_from_psi(make_initial_pulse(amp, r0, w), op, d1)
+    rhs_fn = _rhs_closure(op, d1=d1, ko=ko)
 
     rec = np.empty((n_rec + 1, N), dtype=np.complex128)
     rec[0] = state[0]
@@ -211,7 +241,8 @@ def _evolve_one(task):
     scri: Dict[int, int] = {}
     finite = True
     for k, Nk in grid_N.items():
-        _t, rec, op, info = evolve_full_field(a, Nk, r0, w, t_store, dt_store)
+        _t, rec, op, info = evolve_full_field(
+            a, Nk, r0, w, t_store, dt_store, order=GRID_ORDER.get(k, 2))
         re[k] = rec.real.astype(np.float32)
         im[k] = rec.imag.astype(np.float32)
         sig[k] = op.sigma.astype(np.float64)
