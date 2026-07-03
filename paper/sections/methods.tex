@@ -5,31 +5,31 @@
 
 We state the FD reference (Sec.~\ref{sec:fwd-problem}), the
 forward (Sec.~\ref{sec:fwd-pinn}) and inverse
-(Sec.~\ref{sec:inv-pinn}) PINNs, the two amortised surrogates
-(Secs.~\ref{sec:fno-method} and~\ref{sec:hyb-method}), the five
+(Sec.~\ref{sec:inv-pinn}) PINNs, the hybrid surrogate
+(Sec.~\ref{sec:hyb-method}), the five
 extraction methods M1--M5 (Sec.~\ref{sec:qnm-methods}), the
 plateau criterion (Sec.~\ref{sec:plateau}), and the reporting
 convention (Sec.~\ref{sec:reporting}). M4 and M5 are the new
 estimators. Table~\ref{tab:train-config} collects the training
-configuration of the four networks.
+configuration of the three networks.
 
 \begin{table}[!htbp]
 \centering
-\caption{Training configuration of the four networks. The two
-surrogates train with weight decay $10^{-6}$ and gradient
+\caption{Training configuration of the three networks. The
+hybrid surrogate trains with weight decay $10^{-6}$ and gradient
 clipping at unit norm; all learning rates are $10^{-3}$.}
 \label{tab:train-config}
 \small
 \setlength{\tabcolsep}{5pt}
-\begin{tabular}{@{}lcccc@{}}
+\begin{tabular}{@{}lccc@{}}
 \toprule
- & Forward PINN & Inverse PINN & FNO & Hybrid FNO \\
+ & Forward PINN & Inverse PINN & Hybrid FNO \\
 \midrule
-Parameters & $4{,}521$ & $4{,}521 + 5$ & $7.8\times 10^{7}$ & $1.13\times 10^{6}$ \\
-Optimiser  & Adam${\to}$L-BFGS & Adam${\to}$L-BFGS & Adam & Adam \\
-Budget     & $10^{4} + 3{\times}10^{4}$ it. & $10^{4} + 1.5{\times}10^{4}$ it. & $300$ ep. & $100$ ep. \\
-Batch size & full & full & $4$ & $8$ \\
-Precision  & \texttt{float64} & \texttt{float64} & \texttt{float32} & \texttt{float32} \\
+Parameters & $4{,}521$ & $4{,}521 + 5$ & $1.13\times 10^{6}$ \\
+Optimiser  & Adam${\to}$L-BFGS & Adam${\to}$L-BFGS & Adam \\
+Budget     & $10^{4} + 3{\times}10^{4}$ it. & $10^{4} + 1.5{\times}10^{4}$ it. & $100$ ep. \\
+Batch size & full & full & $8$ \\
+Precision  & \texttt{float64} & \texttt{float64} & \texttt{float32} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -650,7 +650,7 @@ E          & $18$ & $100$ & $1000$ & two modes \\
 \end{tabular}
 \end{table}
 
-The value $\tring = 18\,M$ (variants A, D, E) sits at the upper
+The value $\tring = 18\,M$ (variants A, D, E) sits just above the upper
 edge of the forward M5 plateau: overtone contamination is
 negligible there ($e^{-18/\tau_1} \approx 7\times 10^{-3}$)
 while the fundamental retains
@@ -677,277 +677,27 @@ and the convention of Sec.~\ref{sec:reporting} therefore quotes
 the wide window.
 
 % --------------------------------------------------------------
-\subsection{Fourier neural operator surrogate}
-\label{sec:fno-method}
+\subsection{Hybrid coarse-FD + neural-residual surrogate}
+\label{sec:hyb-method}
 
 Each PINN above solves a \emph{single} Zerilli instance,
 parametrised by one mass $M$ and one Gaussian pulse
 $(x_{0},\sigma)$; a new pulse or mass requires a fresh
-$\mathcal{O}(10^{4})$-iteration run. The Fourier neural operator
-(FNO) \citep{Li2021fno,Kovachki2023neuralop} instead trains once
-on $1{,}000$ $(M,x_{0},\sigma)$ draws and predicts $\Phi(x,t)$
-for an unseen draw with one forward pass, producing the same
-observer series on which the extractors and reporting
-convention of Secs.~\ref{sec:qnm-methods}--\ref{sec:reporting}
-operate unchanged. The architecture and
-loss pipeline are summarised in Fig.~\ref{fig:fno-arch}, and
-the configuration of both surrogates in
-Table~\ref{tab:surrogate-config}.
-
-\begin{table}[!htbp]
-\centering
-\caption{Configuration of the two surrogates: the end-to-end
-FNO of Sec.~\ref{sec:fno-method} and the hybrid residual
-operator of Sec.~\ref{sec:hyb-method}. Optimiser settings are
-listed in Table~\ref{tab:train-config}; the FNO loss weights
-are the deployed
-$(\lambda_{f},\lambda_{H^{1}},\lambda_{\mathrm{ring}},
-\lambda_{\mathrm{obs}},\lambda_{\mathrm{tw}},
-\lambda_{\mathrm{pde}})$ of Eq.~\eqref{eq:fno-loss}.}
-\label{tab:surrogate-config}
-\small
-\setlength{\tabcolsep}{5pt}
-\begin{tabular}{@{}lcc@{}}
-\toprule
- & FNO & Hybrid FNO \\
-\midrule
-Domain $x/M \times t/M$ & $[-50,150]\times[0,100]$ & $[-50,150]\times[0,50]$ \\
-Grid $N_{x}\times N_{t}$ (fine) & $401\times 401$ & $1001\times 501$ \\
-Coarse grids & --- & $k{=}4$ prior; $k{=}2$ label only \\
-Input channels & $4$ & $5$ \\
-Hidden channels $h$ & $96$ & $32$ \\
-Fourier modes $(K_{t},K_{x})$ & $(64,64)$ & $(16,32)$ \\
-Domain padding & $0.10$ & $0.10$ \\
-Parameters & $7.8\times 10^{7}$ & $1.13\times 10^{6}$ \\
-$M$ & $\mathrm{Unif}[0.8,1.2]$ & $\mathrm{Unif}[0.8,1.2]$ \\
-$x_{0}/M$ & $\mathrm{Unif}[-10,30]$ & $\mathrm{Unif}[2,6]$ \\
-$\sigma/M$ & $\mathrm{Unif}[3,8]$ & $\mathrm{Unif}[3,7]$ \\
-Split (seed $1234$) & $1000/100/100$ & $1000/100/100$ \\
-Loss & Eq.~\eqref{eq:fno-loss}, $(1,0.20,10,5,1,0.05)$ & Eq.~\eqref{eq:hyb-loss} \\
-Observer $\xq$ & $2\,M$ & $2\,M$ \\
-Canonical BH $(M,x_{0},\sigma)$ & $(1,4,5)$ & $(1,4,5)$ \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{figure}[!htbp]
-\centering
-\resizebox{0.68\textwidth}{!}{%
-\begin{tikzpicture}[
-  every node/.style={font=\small},
-  inp/.style={rectangle, draw, fill=blue!10, rounded corners=2pt,
-              minimum height=7mm, minimum width=88mm, inner sep=3pt,
-              align=center, font=\small},
-  stack/.style={rectangle, draw=none, fill=none,
-                inner sep=2pt, align=center, font=\small},
-  stackbg/.style={rectangle, draw, fill=blue!5, rounded corners=3pt,
-                  inner sep=4pt},
-  sconv/.style={rectangle, draw, fill=gray!16, rounded corners=2pt,
-                minimum height=9mm, minimum width=96mm, inner sep=3pt,
-                align=center, font=\small},
-  sconvhdr/.style={rectangle, draw=none, fill=none,
-                   inner sep=2pt, align=center},
-  sconvbg/.style={rectangle, draw, fill=gray!18, rounded corners=3pt,
-                  inner sep=5pt},
-  outn/.style={rectangle, draw, fill=orange!22, rounded corners=2pt,
-               minimum height=8mm, minimum width=68mm, inner sep=3pt,
-               align=center, font=\small},
-  loss/.style={rectangle, draw, fill=green!12, rounded corners=2pt,
-               minimum height=6mm, minimum width=88mm, inner sep=2pt,
-               align=center, font=\footnotesize},
-  lossbg/.style={rectangle, draw, fill=green!5, rounded corners=3pt,
-                 inner sep=4pt},
-  ltot/.style={rectangle, draw, fill=green!28, rounded corners=2pt,
-               minimum height=9mm, minimum width=68mm, inner sep=3pt,
-               align=center, font=\small},
-  arr/.style={->, >=stealth, thick, black!75},
-  arrm/.style={->, >=stealth, thin, gray!75},
-  arrt/.style={->, >=stealth, thick, gray!55!black, dashed},
-]
-  % ============ four-channel input stack ============
-  \node[stack] (stackhdr) {%
-    \textbf{four-channel input on fine grid}\;
-    $X\in\mathbb{R}^{4\times N_{t}\times N_{x}}$};
-  \node[inp, below=2mm of stackhdr]
-        (c0) {ch~0: $\Phi(x,0)$ broadcast in $t$};
-  \node[inp, below=1mm of c0]
-        (c1) {ch~1: $\partial_{t}\Phi(x,0)$ broadcast in $t$};
-  \node[inp, below=1mm of c1]
-        (c2) {ch~2: $V_{\ell}(x;M)$ broadcast in $t$};
-  \node[inp, below=1mm of c2]
-        (c3) {ch~3: $M$ broadcast over $(x,t)$};
-  \begin{scope}[on background layer]
-    \node[stackbg, fit=(stackhdr)(c0)(c3)] (stackbg) {};
-  \end{scope}
-
-  % ============ FNO operator ============
-  \node[sconvhdr, below=8mm of stackbg.south] (sconvhdrn) {%
-    \begin{minipage}{96mm}
-      \centering
-      \textbf{neural solution operator $\mathcal{G}_{\theta}$ --- four-layer 2-D FNO}\\[1mm]
-      hidden channels $h=96$,\;
-      Fourier modes $(K_{t},K_{x})=(64,64)$
-    \end{minipage}};
-  \node[sconv, below=3mm of sconvhdrn]
-        (lift)  {lift $1{\times}1$ conv: $4{\to}96$ channels};
-  \node[sconv, below=2mm of lift]
-        (sb)    {$L=4 \times$ spectral block\\
-                 $v^{(\ell+1)}=\mathrm{GELU}\bigl(
-                  \mathcal{F}^{-1}[R^{(\ell)}{\odot}\mathcal{F}v^{(\ell)}]
-                  + W^{(\ell)}v^{(\ell)}\bigr)$};
-  \node[sconv, below=2mm of sb]
-        (proj)  {projection $1{\times}1$ conv: $96{\to}1$ channel};
-  \draw[arr] (lift) -- (sb);
-  \draw[arr] (sb) -- (proj);
-  \begin{scope}[on background layer]
-    \node[sconvbg, fit=(sconvhdrn)(lift)(proj)] (fnoall) {};
-  \end{scope}
-
-  \draw[arr] (stackbg.south) -- (fnoall.north);
-
-  % ============ output field ============
-  \node[outn, below=8mm of fnoall.south, fill=orange!45]
-        (phi) {$\Phi_{\theta}(x,t)$ --- predicted field on $(N_{t}{\times}N_{x})$ fine grid};
-  \draw[arr] (fnoall.south) -- (phi.north);
-
-    % ============ six loss terms (training only) ============
-    \node[stack, below=8mm of phi] (losshdr) {%
-      \textbf{six weighted loss terms}\\[-0.5mm]
-      training only};
-    \node[loss, below=2mm of losshdr] (lf)
-      {$\mathcal{L}_{\mathrm{field}}$ --- relative $L^{2}$ on $\Phi$};
-    \node[loss, below=1mm of lf] (lh1)
-      {$\mathcal{L}_{H^{1}}$ --- gradients $(\partial_{t}\Phi,\partial_{x}\Phi)$};
-    \node[loss, below=1mm of lh1] (lring)
-      {$\mathcal{L}_{\mathrm{ring}}$ --- ringdown window $t\ge\tring$};
-    \node[loss, below=1mm of lring] (lobs)
-      {$\mathcal{L}_{\mathrm{obs}}$ --- observer column $x=\xq$};
-    \node[loss, below=1mm of lobs] (ltw)
-      {$\mathcal{L}_{\mathrm{tw}}$ --- time-window ramp $w(t)$};
-    \node[loss, below=1mm of ltw] (lpde)
-      {$\mathcal{L}_{\mathrm{pde}}$ --- FD residual of the wave eq.};
-    \begin{scope}[on background layer]
-      \node[lossbg, fit=(losshdr)(lf)(lpde)] (lossall) {};
-    \end{scope}
-
-    \draw[arrt] (phi.south) -- (lossall.north);
-
-    % aggregator below the loss stack
-    \node[ltot, below=8mm of lossall.south]
-        (lt) {$\mathcal{L}_{\mathrm{FNO}}
-              =\sum_{k} \lambda_{k}\,\mathcal{L}_{k}$
-              \quad (Eq.~\eqref{eq:fno-loss})};
-    \draw[arrt] (lossall.south) -- (lt.north);
-\end{tikzpicture}%
-}
-\caption{FNO surrogate architecture used in this work. The
-four-channel input stack
-$(\Phi(x,0), \partial_{t}\Phi(x,0), V_{\ell}(x;M), M)$ is lifted
-to $96$ channels by a $1{\times}1$ convolution and passed through
-four spectral-convolution blocks, each retaining
-$64{\times}64$ Fourier modes along $(x,t)$ and combined with a
-$1{\times}1$ skip convolution and a GELU nonlinearity, before a
-$1{\times}1$ projection back to the single output channel
-$\Phi_{\theta}(x,t)$. The output field feeds six weighted loss
-terms summed into $\mathcal{L}_{\mathrm{FNO}}$
-(Eq.~\eqref{eq:fno-loss}), of which $\mathcal{L}_{\mathrm{obs}}$
-and $\mathcal{L}_{\mathrm{tw}}$ are the QNM-targeted terms
-introduced in the final training configuration (see the
-ablation in Appendix~\ref{app:supp-fno}). The total parameter count is
-$\sim\!7.8\times 10^{7}$.}
-\label{fig:fno-arch}
-\end{figure}
-
-\paragraph{Operator and discretisation.} We learn the parametric
-solution operator
-\begin{equation}
-  \mathcal{G}_{\theta}\colon\;
-  \bigl(\Phi(\cdot,0),\,\partial_{t}\Phi(\cdot,0),\,
-        V_{\ell}(\cdot\,;M),\,M\bigr)
-  \;\longmapsto\;
-  \Phi(x,t),
-  \label{eq:fno-operator}
-\end{equation}
-discretised on a uniform $401\times 401$ grid
-($\Delta x = 0.5\,M$, $\Delta t = 0.25\,M$) covering
-$x \in [-50,150]\,M$, $t \in [0,100]\,M$. The four input
-channels --- $\Phi(x,0)$, the outgoing velocity
-$\partial_{t}\Phi(x,0) = -\partial_{x}\Phi(x,0)$,
-$V_{\ell}(x;M)$ of Eq.~\eqref{eq:V-zerilli} and the broadcast
-mass $M$ --- are stacked as in Fig.~\ref{fig:fno-arch}; the
-output is the single-channel field on the same grid, with
-target fields from the RK4 solver of Appendix~\ref{app:fd} at
-the same resolution.
-
-\paragraph{Architecture.} A four-layer 2-D FNO with the
-configuration of Table~\ref{tab:surrogate-config} (GELU
-activations, grid positional embeddings). The FNO's
-discretisation invariance
-\citep{Li2021fno,Kovachki2023neuralop} is exercised in
-Appendix~\ref{app:supp-fno} on grids from $201^{2}$ to $801^{2}$
-over the same physical box; we prefer the FNO over DeepONet
-\citep{Lu2021deeponet} because its spectral parameterisation
-exploits our regular-grid inputs directly and carries this
-invariance.
-
-\paragraph{Loss.} The training loss combines six terms,
-\begin{equation}
-  \mathcal{L}_{\mathrm{FNO}}
-  = \lambda_{f}\,\mathcal{L}_{\mathrm{field}}
-  + \lambda_{H^{1}}\,\mathcal{L}_{H^{1}}
-  + \lambda_{\mathrm{ring}}\,\mathcal{L}_{\mathrm{ring}}
-  + \lambda_{\mathrm{obs}}\,\mathcal{L}_{\mathrm{obs}}
-  + \lambda_{\mathrm{tw}}\,\mathcal{L}_{\mathrm{tw}}
-  + \lambda_{\mathrm{pde}}\,\mathcal{L}_{\mathrm{pde}},
-  \label{eq:fno-loss}
-\end{equation}
-with $\mathcal{L}_{\mathrm{field}}$ the relative $L^{2}$ field
-error, $\mathcal{L}_{H^{1}}$ its $H^{1}$ analogue on
-$(\partial_{t}\Phi,\partial_{x}\Phi)$,
-$\mathcal{L}_{\mathrm{ring}}$ the field $L^{2}$ on
-$t \ge \tring = 18\,M$, $\mathcal{L}_{\mathrm{obs}}$ the 1-D
-$L^{2}$ on the observer slice $x = \xq$ that the QNM extractors
-read, $\mathcal{L}_{\mathrm{tw}}$ the field $L^{2}$ under the
-ramp $w(t) = 1 + \beta\,\mathrm{ramp}(t;\,10\,M,\,15\,M)$ with
-$\beta = 50$, and $\mathcal{L}_{\mathrm{pde}}$ the central-FD
-Zerilli residual on the output grid. The deployed weights are
-$(\lambda_{f},\lambda_{H^{1}},\lambda_{\mathrm{ring}},
-  \lambda_{\mathrm{obs}},\lambda_{\mathrm{tw}},
-  \lambda_{\mathrm{pde}})
-  = (1,\,0.20,\,10,\,5,\,1,\,0.05)$;
-prior configurations differ by one or two terms, and the
-ablation of Appendix~\ref{app:supp-fno}
-(Table~\ref{tab:fno-versions}) isolates
-$\mathcal{L}_{\mathrm{obs}}$ and $\mathcal{L}_{\mathrm{tw}}$ as
-the QNM-critical additions.
-
-\paragraph{Optimiser.} Training uses Adam only
-(Table~\ref{tab:train-config}); the schedule is standard for
-FNOs \citep{Li2021fno,Kovachki2023neuralop}, and L-BFGS on
-$\sim\!7.8\times 10^{7}$ parameters is prohibitive on a single
-A100.
-
-\paragraph{Observer location.} All FNO numbers are reported at
-$\xq = 2\,M$ rather than the PINNs' $10\,M$: within the
-$[10,100]\,M$ extraction window the ringdown at $10\,M$ falls
-below the field-error floor of the FD reference itself, so M4
-returns no plateau for either source, while at $2\,M$ it
-validates on both (observer sweep in
-Appendix~\ref{app:supp-xq}). Since $(\omega,\tau)$ are
-observer-independent, the choice affects only the conditioning
-of the fit.
-
-% --------------------------------------------------------------
-\subsection{Hybrid coarse-FD + neural-residual surrogate}
-\label{sec:hyb-method}
-
-Where the FNO of Sec.~\ref{sec:fno-method} commits the network
-to learning the entire wave-propagation operator, the hybrid
-keeps a cheap classical solver for the propagation and asks the
-network only for what that solver cannot resolve: it runs a
-single coarse-grid FD solve, upsamples it to the fine grid, and
-trains a small 2-D FNO to predict the pointwise discretisation
-residual estimated by a label-free Richardson extrapolation of
+$\mathcal{O}(10^{4})$-iteration run. A neural operator
+(Sec.~\ref{sec:bg-fno}) removes this per-instance cost: trained
+once over a family of problems, it predicts $\Phi(x,t)$ for an
+unseen $(M,x_{0},\sigma)$ draw in a single forward pass. A
+purely data-driven operator, however, must learn the entire
+wave-propagation structure from data, and learned corrections
+to cheap classical solvers have been found to outperform such
+surrogates at matched cost
+\citep{Um2020solverloop,Kochkov2021mlcfd}. The hybrid surrogate
+adopts this design: it runs a single coarse-grid FD solve to
+carry the wave propagation, upsamples it to the fine grid, and
+trains a small 2-D FNO --- the residual operator
+$\mathcal{H}_{\theta}$, $1.13\times 10^{6}$ parameters --- to
+predict the pointwise discretisation residual, estimated
+label-free by Richardson extrapolation of
 two coarse solves. The network is never shown the fine-grid
 field in its loss, and a parameter-free gradient gate confines
 the correction to the under-resolved wavefronts, handing the
@@ -955,7 +705,38 @@ smooth interior and causal exterior back to the prior. The
 extractors and reporting convention of
 Secs.~\ref{sec:qnm-methods}--\ref{sec:reporting} apply
 unchanged; the pipeline is summarised in
-Fig.~\ref{fig:hyb-arch}.
+Fig.~\ref{fig:hyb-arch}, and its configuration in
+Table~\ref{tab:surrogate-config}.
+
+\begin{table}[!htbp]
+\centering
+\caption{Configuration of the hybrid surrogate. Optimiser
+settings are listed in Table~\ref{tab:train-config}.}
+\label{tab:surrogate-config}
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{@{}lc@{}}
+\toprule
+ & Hybrid FNO \\
+\midrule
+Domain $x/M \times t/M$ & $[-50,150]\times[0,50]$ \\
+Grid $N_{x}\times N_{t}$ (fine) & $1001\times 501$ \\
+Coarse grids & $k{=}4$ prior; $k{=}2$ label only \\
+Input channels & $5$ \\
+Hidden channels $h$ & $32$ \\
+Fourier modes $(K_{t},K_{x})$ & $(16,32)$ \\
+Domain padding & $0.10$ \\
+Parameters & $1.13\times 10^{6}$ \\
+$M$ & $\mathrm{Unif}[0.8,1.2]$ \\
+$x_{0}/M$ & $\mathrm{Unif}[2,6]$ \\
+$\sigma/M$ & $\mathrm{Unif}[3,7]$ \\
+Split (seed $1234$) & $1000/100/100$ \\
+Loss & Eq.~\eqref{eq:hyb-loss} \\
+Observer $\xq$ & $10\,M$ \\
+Canonical BH $(M,x_{0},\sigma)$ & $(1,4,5)$ \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \begin{figure}[!htbp]
 \centering
@@ -1292,9 +1073,8 @@ periodic wraparound, and positional $(x, t)$ encodings break
 translation equivariance to distinguish the source region from
 the wave zones. The total parameter count is $1.13\times 10^{6}$ under the
 \texttt{neuraloperator} factorised parametrisation
-\citep{Kovachki2023neuralop} --- almost two orders of magnitude
-below the end-to-end FNO (Table~\ref{tab:surrogate-config}):
-the residual target has narrower spectral
+\citep{Kovachki2023neuralop} --- small because the residual
+target has narrower spectral
 support than the full field, since the wave-propagation
 operator already lives in the upsampled prior.
 
@@ -1329,17 +1109,15 @@ Sec.~\ref{sec:res-hyb}.
 split and canonical BH are listed in
 Table~\ref{tab:surrogate-config}; the fine, $k = 4$ and $k = 2$
 solves are precomputed and cached per triple. The
-$(x_{0}, \sigma)$ box is contracted relative to the FNO's to
-keep the prompt burst inside the shorter $t \in [0, 50]\,M$
-hybrid window --- the only intentional difference between the
-two surrogates' distributions.
+$(x_{0}, \sigma)$ box is chosen to keep the prompt burst inside
+the $t \in [0, 50]\,M$ window.
 
 \paragraph{Observer location.} Hybrid numbers are reported at
-$\xq = 2\,M$, matching the FNO of Sec.~\ref{sec:fno-method} for
-direct comparability; since the coarse-up baseline already sits
-at the extractor floor there (Sec.~\ref{sec:res-hyb}),
-the hybrid's value is reported through the global field-error
-reduction rather than the median QNM.
+$\xq = 10\,M$, the PINNs' observer, so every model in this
+report is compared at a single observer position; the
+dependence of extraction accuracy on $\xq$, and its
+window-geometry origin, are quantified in
+Sec.~\ref{sec:res-hyb}.
 
 % --------------------------------------------------------------
 \subsection{QNM extraction methods}
@@ -1347,11 +1125,9 @@ reduction rather than the median QNM.
 
 Once any of the five models has produced a field, the QNM
 parameters $(\omega,\tau)$ are extracted post-hoc from the time
-series $\Phi(\xq,t)$ at the model's observer position
-($\xq = 10\,M$ for the PINNs, $\xq = 2\,M$ for the surrogates).
-The scan grids below are quoted for the PINN window
-$[10,50]\,M$; on the surrogate windows the same procedures apply
-with the block-width rule $w = \lfloor N/2\rfloor$ unchanged. We
+series $\Phi(\xq,t)$ at the common observer position
+$\xq = 10\,M$ and window $[10,50]\,M$, used by every model in
+this report. We
 apply five methods: M1--M3 mirror standard numerical-relativity
 practice; M4--M5 are the plateau-based estimators that
 constitute our methodological contribution, relying on the
@@ -1391,8 +1167,9 @@ Method 3 (M3) is ESPRIT subspace decomposition
 \citep{Roy1989esprit}, applied to the Hilbert-analytic signal.
 It is ill-conditioned on the PINN waveforms at $\xq = 10\,M$
 (model order $K = 6$; Appendix~\ref{app:esprit}) and is not used
-for primary values; on the surrogate fields at $\xq = 2\,M$ it
-is well-conditioned and is quoted in the corresponding tables.
+for primary values; on the hybrid-pipeline fields it is
+numerically well-conditioned and is quoted in the corresponding
+tables.
 
 Method 4 (M4) is two-mode NLS with a start-time plateau scan,
 following the Schwarzschild $\ell=m=2$ overtone-aware

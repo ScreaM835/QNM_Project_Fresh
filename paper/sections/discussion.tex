@@ -52,7 +52,13 @@ Table~\ref{tab:inv-summary}) --- a small $\sigma_\omega$
 certifies the estimate, a large or undefined one rejects it. M5
 generalises the scan to the joint $(t_0,\tend)$ plane and
 becomes necessary when the window edge approaches
-$t_{\mathrm{tail}}$.
+$t_{\mathrm{tail}}$. The observer sweep of Sec.~\ref{sec:res-hyb}
+supplies the failure mechanism: when the window--observer
+geometry leaves too little ringdown inside the window, no block
+of fits is stationary and the flag correctly withholds the
+estimate; the doubled-evolution control shows the same
+observers validate once the window is re-aligned in retarded
+time.
 
 \paragraph{Forward--inverse precision gap.}
 The forward PINN reaches $0.029\%$ in $\omega$ on a noiseless
@@ -108,32 +114,17 @@ controversy over the GW150914 overtone
 \citep{Cotesta2022overtones,Isi2021priors}.
 
 \paragraph{Amortised surrogates.}
-Each PINN must be trained anew for every black hole; the FNO
-trains once and then serves any in-distribution draw in a
-single forward pass, with population extraction statistically
-indistinguishable from the FD reference's own
-(Sec.~\ref{sec:res-fno}) --- at the population level the
-surrogate is not the accuracy bottleneck. The hybrid's gain is structural: the coarse-prior
+Each PINN must be trained anew for every black hole; the hybrid
+trains once and then serves any in-distribution draw at the
+cost of one coarse solve plus one forward pass. Its gain is structural: the coarse-prior
 error correlates strongly with the prior gradient, so the
 parameter-free gate routes network capacity onto the wavefronts
 where the prior fails, cutting the population field MSE by
-$\sim\!79\times$ while protecting the regions the classical
+$\sim\!82\times$ while protecting the regions the classical
 solve already resolves (Sec.~\ref{sec:res-hyb}); the field gain
-does not become a median QNM gain at $\xq = 2\,M$ because the
-coarse-up baseline is already at the extractor floor there.
-
-The FNO ablation (Table~\ref{tab:fno-versions},
-Appendix~\ref{app:supp-fno}) adds an observation that
-transfers beyond this problem: a more accurate field does not
-imply a more accurate QNM. The configuration with the lowest
-field RMSD is the worst at extraction, while the deployed
-configuration accepts a $\sim\!25\%$ higher RMSD and extracts
-$\omega$ two orders of magnitude more accurately --- its two
-additional loss terms weight exactly the data the extractor
-reads, the observer slice and the ringdown window. A surrogate
-built for spectroscopy should be trained and judged on the
-observer time series, not the average field error. Learning
-the inverse operator
+does not become a median QNM gain because the
+coarse-up baseline already sits at the extractor floor at the
+common observer. Learning the inverse operator
 $\mathcal{G}^{-1}_{\theta}\colon \Phi(\xq,t) \mapsto M$ on the
 same distribution is a natural extension, with the plateau
 diagnostic carrying over as a population-level systematic

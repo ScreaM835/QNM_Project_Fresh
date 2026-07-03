@@ -1,0 +1,190 @@
+% Executive Summary — separate deliverable (max 1,000 words per handbook).
+% Standalone document; compile with pdflatex executive_summary.tex
+\documentclass[10pt,twocolumn]{article}
+\usepackage[margin=2.0cm,columnsep=0.8cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage[font=footnotesize,labelfont=bf]{caption}
+\usepackage{titlesec}
+\titleformat{\section}{\normalsize\bfseries}{}{0pt}{}
+\titlespacing{\section}{0pt}{0.9em}{0.35em}
+
+\title{\large\bfseries A UNIFIED DEEP-LEARNING FRAMEWORK FOR SCHWARZSCHILD
+QUASI-NORMAL-MODE EXTRACTION\\[0.3em]
+\normalsize\scshape Executive Summary}
+\author{\small Jonathan Chung \quad$|$\quad MPhil Data Intensive Science
+\quad$|$\quad University of Cambridge}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Motivation \& Scientific Justification}
+
+The ringdown of a perturbed black hole is a superposition of damped
+sinusoids --- quasi-normal modes (QNMs) --- whose frequencies and
+damping times are fixed entirely by the black hole's mass and spin
+[1]. Measuring them from gravitational-wave data and comparing
+against the predictions of general relativity is among the cleanest
+strong-field tests available, and has been an observational
+programme since the ringdown analysis of GW150914 [2]. The precision
+of such tests rests on two computational ingredients: the accuracy
+of the underlying waveform solution, and the reliability of reading
+the QNM parameters off it. The second receives surprisingly little
+scrutiny --- the damped-sinusoid template is valid only inside a
+finite time window, and the choice of window biases the recovered
+parameters in ways most analyses do not quantify.
+
+Machine-learning solvers promise to relieve the first bottleneck.
+Physics-informed neural networks (PINNs) solve differential
+equations by minimising the equation residual directly; the only
+prior PINN treatment of the time-domain Schwarzschild problem,
+however, reports a $28\%$ relative waveform error that dominates its
+QNM error budget, with a fit window fixed by hand [5]. This project
+benchmarks what PINNs and neural surrogates can deliver for QNM
+extraction --- on the Schwarzschild $\ell = 2$ master equations,
+where exact reference values are known from Leaver's
+continued-fraction method [3] --- and builds an extraction protocol
+that quantifies its own fit-window systematic.
+
+\section{Methodology}
+
+Four models are evaluated under one fixed protocol. (i) A
+\emph{reproduction} PINN, architecture-matched to the prior study
+[5], establishes a trustworthy baseline. (ii) An \emph{enhanced
+forward} PINN doubles the quasi-Newton optimisation budget and adds
+residual-greedy sampling, which concentrates training points where
+the equation residual is currently largest. (iii) An \emph{inverse}
+PINN embeds a ringdown template with five learnable scalars and
+recovers the black-hole mass jointly with the waveform from $500$
+observations at $1\%$ noise. (iv) A \emph{hybrid surrogate} runs a
+coarse finite-difference solve at $1/64$ of the reference cost and
+trains a small Fourier neural operator [6] ($1.1$ million
+parameters) to predict its discretisation error, following the
+solver-correction strand of the machine-learning literature [7, 8];
+the training target is built label-free by Richardson extrapolation
+of two coarse solves, and a parameter-free gate confines the
+correction to the under-resolved wavefronts.
+
+Extraction is deliberately model-agnostic: every model produces the
+same observer time series (Figure~1), from which five estimators
+recover the frequency and damping time $(\omega, \tau)$. The
+methodological contribution is a \emph{plateau scan}
+(Figure~2): the fit window is swept systematically (one edge or
+both), and the contiguous block of windows over which the recovered
+values are stationary supplies the estimate, its window systematic
+$\sigma_\omega$, and a validity flag --- if no plateau exists, the
+estimate is rejected rather than silently biased.
+
+\begin{figure}[!tb]
+\centering
+\includegraphics[width=\columnwidth]{../outputs/hybrid/fno_sw_gate_s1em3/figs/hybrid_ringdown_xq10.png}
+\caption{Ringdown waveform at the observer for the benchmark
+configuration, on linear (top) and logarithmic (bottom) scales: the
+hybrid surrogate (dashed) overlaid on the fine finite-difference
+reference (solid) and the $64\times$-cheaper coarse baseline
+(dotted). The QNM parameters are extracted from such time series.}
+\label{fig:es-ringdown}
+\end{figure}
+
+\begin{figure}[!tb]
+\centering
+\includegraphics[width=\columnwidth]{../outputs/hybrid/fno_sw_gate_s1em3/figs/hybrid_plateau_m4_xq10.png}
+\caption{The plateau scan underlying the extraction protocol:
+recovered frequency (left) and damping time (right) as the
+fit-window start time is swept, for the hybrid surrogate's benchmark
+waveform. Red markers form the contiguous plateau block that
+supplies the estimate and its window systematic; the dotted line
+marks the exact continued-fraction reference value.}
+\label{fig:es-plateau}
+\end{figure}
+
+\section{Key Findings}
+
+The reproduction reduces the prior study's waveform error by an
+order of magnitude on both of its benchmark potentials (relative
+$L^{2}$ error $1.30\%$ versus $28.06\%$, and $2.67\%$ versus
+$23.59\%$). The enhanced forward PINN reaches $0.58\%$, from which
+the plateau estimator recovers the fundamental frequency to
+$0.029\%$ and the damping time to $2.65\%$; an error budget shows
+the frequency measurement is limited by the window systematic, not
+by the field solution. The inverse PINN recovers the black-hole
+mass to $0.34\%$ under $1\%$ observation noise --- after isolating,
+analytically and empirically, an amplitude--damping-time degeneracy
+of the embedded template that would otherwise bias the damping time
+by ten to twenty percent. The hybrid surrogate cuts the mean-squared
+waveform error by a factor of $82$ relative to its coarse input at
+$1/64$ of the reference cost, with no fine simulation anywhere in
+its training loss; its QNM extraction is statistically
+indistinguishable from that of the expensive reference across a
+$100$-black-hole test population. Finally, an observer-position
+sweep with a doubled-evolution control shows that apparent
+extraction failures far from the black hole are artefacts of window
+geometry, not physics: re-aligning the fit window in retarded time
+restores the frequency accuracy at the most distant observer from
+$5.6\%$ to $0.14\%$.
+
+\section{Recommendation \& Next Steps}
+
+Three follow-ups are scoped. First, the lift from Schwarzschild to
+rotating (Kerr) black holes --- the astrophysically relevant case
+--- for which each component here (solver, extraction protocol,
+hybrid design) was chosen to carry over. Second, wrapping the
+deterministic inverse estimate in a Bayesian posterior, so that
+data noise and network systematics enter a single uncertainty
+budget, with a Cram\'er--Rao bound establishing how close the
+$0.34\%$ mass estimate sits to the information-theoretic limit.
+Third, learning the inverse map directly --- from observed waveform
+to source parameters --- across the hybrid's training population,
+with the plateau diagnostic carrying over as a population-level
+quality flag.
+
+\section{Research Impact \& Conclusion}
+
+The plateau estimator and its validity flag apply to any
+time-domain ringdown analysis, machine-learning-based or not: they
+replace a hand-tuned window choice with a reproducible procedure
+that reports its own systematic uncertainty, directly relevant as
+next-generation detectors push ringdown spectroscopy towards
+per-mille precision [4]. The hybrid result carries a broader design
+lesson for scientific computing: keeping a cheap classical solver
+responsible for the physics and learning only its discretisation
+error delivered reference-quality waveforms at a fraction of the
+cost. Every result, figure and table in the report regenerates from
+the accompanying code repository.
+
+\begin{thebibliography}{9}
+\footnotesize
+\bibitem{v70} C. V. Vishveshwara. Scattering of gravitational
+radiation by a Schwarzschild black-hole. \emph{Nature}, volume 227,
+1970.
+\bibitem{ligo16} LIGO Scientific Collaboration and Virgo
+Collaboration. Tests of general relativity with GW150914.
+\emph{Physical Review Letters}, volume 116, 2016.
+\bibitem{leaver85} E. W. Leaver. An analytic representation for the
+quasi-normal modes of Kerr black holes. \emph{Proceedings of the
+Royal Society of London A}, volume 402, 1985.
+\bibitem{berti09} E. Berti, V. Cardoso, and A. O. Starinets.
+Quasinormal modes of black holes and black branes. \emph{Classical
+and Quantum Gravity}, volume 26, 2009.
+\bibitem{patel24} N. Patel, A. Aykutalp, and P. Laguna. Calculating
+quasi-normal modes of Schwarzschild black holes with physics
+informed neural networks. \emph{arXiv:2401.01440}, 2024.
+\bibitem{li21} Z. Li, N. Kovachki, K. Azizzadenesheli, B. Liu,
+K. Bhattacharya, A. Stuart, and A. Anandkumar. Fourier neural
+operator for parametric partial differential equations.
+\emph{International Conference on Learning Representations}, 2021.
+\bibitem{um20} K. Um, R. Brand, Y. Fei, P. Holl, and N. Thuerey.
+Solver-in-the-loop: learning from differentiable physics to
+interact with iterative PDE-solvers. \emph{Advances in Neural
+Information Processing Systems}, volume 33, 2020.
+\bibitem{kochkov21} D. Kochkov, J. A. Smith, A. Alieva, Q. Wang,
+M. P. Brenner, and S. Hoyer. Machine learning-accelerated
+computational fluid dynamics. \emph{Proceedings of the National
+Academy of Sciences}, volume 118, 2021.
+\end{thebibliography}
+
+\end{document}

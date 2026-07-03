@@ -87,9 +87,9 @@ Schwarzschild Quasi-Normal-Mode Extraction}
 Time-domain quasi-normal-mode (QNM) extraction is limited by the
 accuracy of the underlying field solution and by fit-window
 systematics that are rarely quantified. We benchmark
-physics-informed neural networks (PINNs), a Fourier neural
-operator (FNO), and a hybrid surrogate that learns the residual
-of a coarse finite-difference (FD) solve, on the Schwarzschild
+physics-informed neural networks (PINNs) and a hybrid surrogate
+that trains a small Fourier neural operator (FNO) to correct a
+coarse finite-difference (FD) solve, on the Schwarzschild
 $\ell = 2$ master equations against Leaver's continued-fraction
 values. A faithful, architecture-matched reproduction of the
 most closely comparable prior study --- the only previous
@@ -103,13 +103,13 @@ estimator that quantifies the fit-window systematic and flags
 its own validity. An inverse PINN jointly recovers the
 black-hole mass to $0.34\%$ from noisy observations, after
 isolating an amplitude--damping-time degeneracy of the embedded
-ringdown template. The FNO, trained once over $1{,}000$
-initial-data draws, matches the FD reference's own extraction
-floor at a single forward pass per black hole, and the hybrid
-surrogate reduces the population mean-squared field error by a
-factor of $79$ at one sixty-fourth of the fine-solve cost. The
+ringdown template. The hybrid surrogate, trained once over
+$1{,}000$ initial-data draws, serves any new draw at the cost of
+one coarse solve plus one forward pass, reducing the population
+mean-squared field error by a factor of $82$ at one
+sixty-fourth of the fine-solve cost. The
 plateau estimator, the degeneracy diagnosis and the
-amortisation trade-offs are designed to carry over to Kerr.
+solver-correction design are designed to carry over to Kerr.
 \end{abstract}
 
 % =====================================================================
@@ -152,7 +152,7 @@ fixed by hand; and no prior PINN study recovers the black-hole
 mass and a ringdown template jointly from noisy observations.
 
 We address both points on the Schwarzschild $\ell = 2$ master
-equations, evaluating five models under a single extraction
+equations, evaluating four models under a single extraction
 protocol. The architecture-matched reproduction of
 \citet{Patel2024pinn} reduces their reported field errors by an
 order of magnitude on both isospectral potentials; the
@@ -168,16 +168,16 @@ amplitude--damping-time degeneracy; a six-variant ablation
 identifies the configuration that also recovers $\omega$ to
 $0.30\%$ and $\tau$ to $1.6\%$. (A curriculum-learning
 extension of the forward problem does not improve the global
-extraction, Appendix~\ref{sec:res-cur}.) An
-FNO surrogate trained once on $1{,}000$ initial-data draws
-predicts the field for an unseen draw in a single forward pass
-and matches the FD reference's own extraction floor. Finally, a
+extraction, Appendix~\ref{sec:res-cur}.) Finally, a
 hybrid surrogate runs a $1/64$-cost coarse FD solve and trains
 a small FNO on a label-free, Richardson-extrapolated estimate
 of its discretisation error, confined to the under-resolved
 wavefronts by a parameter-free gradient gate; it cuts the
-population field MSE by $79\times$ while no fine-grid field
-enters its training loss.
+population field MSE by $82\times$ while no fine-grid field
+enters its training loss, and an observer-position sweep with a
+doubled-evolution control traces far-observer extraction
+failures to window--observer geometry rather than to the
+surrogate or the physics.
 
 A remark on scope. This is a controlled extraction benchmark
 against known continued-fraction reference values, not an
@@ -191,7 +191,7 @@ proximity of any extracted value to the known answer.
 
 The remainder of this section reviews the perturbation problem,
 time-domain extraction, and the prior machine-learning
-literature. Section~\ref{sec:methods} states the five models
+literature. Section~\ref{sec:methods} states the four models
 and the extraction protocol, Sec.~\ref{sec:results} reports
 their results, Sec.~\ref{sec:discussion} discusses them, and
 Sec.~\ref{sec:conclusion} concludes; hyperparameter tables and
@@ -224,12 +224,10 @@ validity flag.
   \node[model, below=2.5mm of m1] (m2) {enhanced forward PINN (Sec.~\ref{sec:res-fwd})};
   \node[model, below=2.5mm of m2] (m3) {inverse PINN $+$ learnable
         $(M,\omega,\tau,A_{\mathrm{ring}},\phi)$ (Sec.~\ref{sec:res-inv})};
-  \node[model, below=2.5mm of m3] (m4) {FNO surrogate, trained once on
-        $10^{3}$ draws (Sec.~\ref{sec:res-fno})};
-  \node[model, below=2.5mm of m4] (m5) {hybrid coarse-FD $+$ gated FNO
-        residual (Sec.~\ref{sec:res-hyb})};
-  \node[mid, right=13mm of m3] (ser) {observer series\\ $\Phi(\xq, t)$};
-  \foreach \m in {m1,m2,m3,m4,m5}
+  \node[model, below=2.5mm of m3] (m5) {hybrid coarse-FD $+$ gated FNO
+        residual, trained once on $10^{3}$ draws (Sec.~\ref{sec:res-hyb})};
+  \node[mid, right=13mm of m3.north east] (ser) {observer series\\ $\Phi(\xq, t)$};
+  \foreach \m in {m1,m2,m3,m5}
     \draw[arr] (\m.east) -- (ser.west);
   \node[proto, right=13mm of ser] (prot)
         {extraction protocol\\
@@ -243,7 +241,7 @@ validity flag.
   \draw[arr] (prot) -- (out);
 \end{tikzpicture}%
 }
-\caption{The unified framework. Each of the five models (left)
+\caption{The unified framework. Each of the four models (left)
 produces the observer time series $\Phi(\xq,t)$; the inverse
 PINN additionally carries five learnable scalars. A single
 extraction protocol --- the five estimators M1--M5, the plateau
@@ -662,11 +660,7 @@ Operator learning spans the Burgers, Darcy and Navier--Stokes
 benchmarks
 \citep{Li2021fno,Lu2021deeponet,Kovachki2023neuralop} but, to
 our knowledge, has not been applied to the time-domain
-black-hole perturbation problem; Sec.~\ref{sec:fno-method}
-closes that gap with an FNO surrogate for the Schwarzschild
-$\ell = 2$ Zerilli equation, trained over a $1{,}000$-draw
-population and fed into the same post-hoc extraction pipeline
-as the PINNs.
+black-hole perturbation problem.
 
 A third strand keeps a classical solver in the loop and learns
 only a correction to it: solver-in-the-loop training
@@ -675,7 +669,8 @@ under-resolved fluid solvers \citep{Kochkov2021mlcfd} show that
 a small network correcting a cheap classical solve can match a
 much finer classical solution at a fraction of its cost. The
 hybrid surrogate of Sec.~\ref{sec:hyb-method} belongs to this
-strand, with two distinctions: its training target is built
+strand, carrying the FNO of \citet{Li2021fno} as its residual
+operator, with two distinctions: its training target is built
 label-free by classical Richardson extrapolation
 \citep{Richardson1911} of two coarse solves, so no fine-grid
 field enters the loss, and a parameter-free gradient gate
@@ -694,10 +689,9 @@ wavefronts.
 % =====================================================================
 \section{Conclusion}\label{sec:conclusion}
 
-We applied five models --- a faithful-reproduction and an
-enhanced forward PINN, an inverse PINN, an end-to-end Fourier
-neural operator (FNO), and a hybrid coarse-FD +
-neural-residual surrogate --- to the Schwarzschild $\ell = 2$
+We applied four models --- a faithful-reproduction and an
+enhanced forward PINN, an inverse PINN, and a hybrid coarse-FD
++ neural-residual surrogate --- to the Schwarzschild $\ell = 2$
 master equations, under a single post-hoc extraction protocol
 benchmarked against Leaver's continued-fraction values. The
 architecture-matched reproduction of \citet{Patel2024pinn}
@@ -720,20 +714,20 @@ the converged field bypasses it, and the best of six ablation
 variants recovers $M$ to $0.34\%$, $\omega$ to $0.30\%$ and
 $\tau$ to $1.6\%$ under $1\%$ observation noise.
 
-The two surrogates amortise what the PINNs pay per black hole.
-The FNO, trained once on $1{,}000$ draws, matches the FD
-reference's own extraction across a $100$-BH population
-($0.343\%$ versus $0.335\%$ median $\omega$ error) at one
-forward pass per draw; its design ablation shows that the
-figure of merit for a ringdown surrogate is the estimator
-accuracy on the observer slice, not the bulk RMSD. The hybrid
-surrogate runs a $1/64$-cost coarse solve and repairs its
-discretisation error with a small gated network trained on a
-label-free Richardson target, cutting the population field MSE
-by $79\times$; at $\xq = 2\,M$ the coarse solve alone already
-measures the QNM as accurately as the extractor allows, so the
-hybrid's contribution is field accuracy, not a better
-frequency.
+The hybrid surrogate amortises what the PINNs pay per black
+hole: trained once on $1{,}000$ draws, it runs a $1/64$-cost
+coarse solve and repairs its discretisation error with a small
+gated network trained on a label-free Richardson target,
+serving any new draw at one coarse solve plus one forward pass
+and cutting the population field MSE by $82\times$. At the
+common observer the coarse solve alone already measures the
+QNM as accurately as the extractor allows, so the hybrid's
+contribution is field accuracy, not a better frequency. An
+observer-position sweep with a doubled-evolution control shows
+that far-observer extraction failures are window-geometry
+artefacts: re-aligning the fit window in retarded time restores
+$0.14\%$ frequency accuracy at $\xq = 20\,M$ where the fixed
+window fails at $5.6\%$.
 
 Follow-up directions --- a
 Cram\'er--Rao bound on the inverse noise floor, a Bayesian

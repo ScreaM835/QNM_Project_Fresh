@@ -299,7 +299,7 @@ def fig_pointwise_error_baseline():
     cbar.set_label(r"$|\Phi_{\mathrm{FD\,fine}} - \Phi_{\mathrm{coarse\!-\!up}}|$"
                    f"  (shared log scale, max={vmax:.2e})")
     ax.set_xlabel(r"$x_* / M$"); ax.set_ylabel("t / M")
-    ax.set_title(r"Baseline (coarse FD + cubic upsample) pointwise error")
+    ax.set_title(r"Baseline (coarse FD + quintic upsample) pointwise error")
     fig.tight_layout()
     out = OUT_DIR / "hybrid_pointwise_error_baseline.png"
     fig.savefig(out, dpi=200); plt.close(fig)
@@ -395,7 +395,7 @@ def fig_grad_vs_error():
         "hybrid_over_prior": float(fe_e / (pe_e + 1e-30)),
     }
 
-     report = {
+    report = {
         "field_canonical": {
             "rl2_prior": float(c["rl2_baseline"]),
             "rl2_hybrid": float(c["rl2_hybrid"]),
@@ -677,7 +677,7 @@ def fig_pop_scatter():
             f"med Hyb={np.nanmedian(vals_h):.3g}%  med Base={np.nanmedian(vals_b):.3g}%",
             fontsize=9)
         plt.colorbar(sc, ax=ax, label=r"BH mass $M$")
-    fig.suptitle(r"Hybrid vs baseline (coarse FD + cubic upsample), M4 on "
+    fig.suptitle(r"Hybrid vs baseline (coarse FD + quintic upsample), M4 on "
                  r"100-BH test set at $x_q=2\,M$, $t\in[10,50]\,M$",
                  fontsize=10)
     fig.tight_layout(rect=(0, 0, 1, 0.96))
