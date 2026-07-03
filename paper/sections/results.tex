@@ -68,18 +68,17 @@ Sec. & Model & Evaluation & Field RMSD & RL2 [\%]
 \subsection{Faithful reproduction of the prior-work baseline}
 \label{sec:res-repro}
 
-This section establishes that our pipeline reproduces the
-prior-work baseline before any change is introduced --- it
-does, improving on the published field errors by an order of
-magnitude. All extensions are measured against
-\citet{Patel2024pinn}, the
-only previous time-domain PINN treatment of these $\ell = 2$
-master equations. We therefore first train the forward PINN at
-their exact settings (Table~\ref{tab:fwd-hyper}: uniform
-collocation resampling, their loss weights and optimiser
-budget) --- i.e.\ without the enhancements of
-Sec.~\ref{sec:res-fwd} --- on both the even-parity (Zerilli)
-and odd-parity (Regge--Wheeler) potentials.
+We first establish that the pipeline reproduces the prior-work
+baseline of \citet{Patel2024pinn} --- the only previous
+time-domain PINN treatment of these $\ell = 2$ master
+equations --- before any methodological change is introduced;
+it does, improving on the published field errors by an order
+of magnitude. The forward PINN is trained at their exact
+settings (Table~\ref{tab:fwd-hyper}: uniform collocation
+resampling, their loss weights and optimiser budget), i.e.\
+without the enhancements of Sec.~\ref{sec:res-fwd}, on both
+the even-parity (Zerilli) and odd-parity (Regge--Wheeler)
+potentials.
 
 \paragraph{Field accuracy.} At matched settings the
 reproduction reaches $\mathrm{RL2} = 1.30\%$
@@ -216,9 +215,9 @@ the remainder of this paper reports on the Zerilli equation.
 \subsection{Enhanced forward PINN}
 \label{sec:res-fwd}
 
-This section asks how far the forward field error can be
-driven down at fixed architecture, and what QNM accuracy that
-buys. Starting from the faithful reproduction of
+How far can the forward field error be driven down at fixed
+architecture, and what QNM accuracy does that buy? Starting
+from the faithful reproduction of
 Sec.~\ref{sec:res-repro}, the enhanced forward PINN doubles the
 L-BFGS budget and replaces uniform resampling with the
 residual-greedy sampling of Sec.~\ref{sec:fwd-pinn}, all other
@@ -364,14 +363,26 @@ the bias of the plateau mean from the Leaver value.}
 \end{figure}
 
 Two points stand out. The M4 plateau estimate reaches
-$0.029\%$ in $\omega$ --- an order of magnitude tighter than
-any single-window method, with
-$\sigma_\omega \sim 2\times 10^{-4}$ comparable to the residual
-bias --- while M2 on the M4 plateau window sharpens $\omega$
-but degrades $\tau$, motivating the asymmetric reporting
-convention of Sec.~\ref{sec:reporting}. M3 returns frequencies
-at machine-precision amplitudes and is quoted in
-Appendix~\ref{app:esprit} only.
+$0.029\%$ in $\omega$, an order of magnitude tighter than any
+single-window method, while M2 on the M4 plateau window
+sharpens $\omega$ but degrades $\tau$, motivating the
+asymmetric reporting convention of Sec.~\ref{sec:reporting}.
+M3 returns frequencies at machine-precision amplitudes and is
+quoted in Appendix~\ref{app:esprit} only.
+
+\paragraph{Error budget.} The three measured contributions to
+the frequency error rank as follows: the M4 bias against the
+Leaver value is $1.1\times 10^{-4}$ in $M\omega$ ($0.029\%$);
+the fit-window systematic is $\sigma_\omega = 2\times 10^{-4}$
+($0.054\%$; a lower bound, Sec.~\ref{sec:plateau}); and the
+extractor floor measured on the FD reference is
+$7\times 10^{-5}$ ($0.019\%$, at the surrogate observer of
+Sec.~\ref{sec:res-fno}). The frequency measurement is therefore
+window-limited, not field- or extractor-limited. For the
+damping time the ordering reverses: the plateau scatter is
+$\sigma_\tau/\tau \approx 0.2\%$ against a $2.65\%$ bias, so
+$\tau$ is limited by the field solution and template mismatch
+rather than by the window choice.
 
 A curriculum-learning alternative to the greedy sampler ---
 sequential temporal windows with numerical-IC transfer ---
@@ -385,10 +396,10 @@ neither the full-domain error nor the extraction
 \subsection{Inverse PINN}
 \label{sec:res-inv}
 
-This section asks whether the black-hole mass can be recovered
-jointly with the ringdown template from noisy observations of
-the field --- it can, to $0.34\%$. The inverse PINN is the
-forward network of
+The inverse problem asks whether the black-hole mass can be
+recovered jointly with the ringdown template from noisy
+observations of the field; it can, to $0.34\%$. The inverse
+PINN is the forward network of
 Sec.~\ref{sec:res-fwd} with three additions: the mass $M$ is
 promoted from a fixed constant to a trainable scalar, a data
 loss anchors the network to $\Nobs = 500$ noisy samples of the
@@ -495,8 +506,9 @@ The five extraction methods are applied to
 $\Phi_\theta(\xq{=}10\,M,t)$ from variant D exactly as for the
 forward PINN: the ringdown is shown in
 Fig.~\ref{fig:inv-ringdown}, the per-method numbers in
-Table~\ref{tab:inv-qnm}, and the plateau diagnostics in
-Figs.~\ref{fig:inv-plateau-m4} and~\ref{fig:inv-plateau-m5};
+Table~\ref{tab:inv-qnm}, and the M4 plateau diagnostic in
+Fig.~\ref{fig:inv-plateau-m4} (the M5 counterpart is shown in
+Appendix~\ref{app:plots}, Fig.~\ref{fig:m5-grid});
 M3 is omitted for the same ill-conditioning as on the forward
 problem (Appendix~\ref{app:esprit}).
 
@@ -552,18 +564,6 @@ range.}
 \label{fig:inv-plateau-m4}
 \end{figure}
 
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=0.85\textwidth,keepaspectratio]{../outputs/qnm/zerilli_l2_inverse_qnm_combo/pinn_method5_2d_heatmap.png}
-\caption{M5 plateau diagnostic for the inverse PINN, variant D.
-Format identical to Fig.~\ref{fig:fwd-plateau-m5}: heatmap of the
-absolute deviation of the M2 estimate from the plateau median on
-the $(t_0,\tend)$ grid (capped at $5\%$); the contiguous plateau
-rectangle is outlined in red, in the same
-$(t_0,\tend)$ corner as the forward run.}
-\label{fig:inv-plateau-m5}
-\end{figure}
-
 The cross-method picture for variant D mirrors the forward run:
 M4 and M5 yield mutually consistent $\omega$ estimates at the
 $0.30\%$ level with plateau standard deviations
@@ -600,14 +600,13 @@ the physical decay rate.
 \subsection{Fourier neural operator surrogate}
 \label{sec:res-fno}
 
-This section asks whether one network, trained once, can
-replace per-black-hole training without losing extraction
-accuracy --- at the population level, it can. The FNO surrogate
-of Sec.~\ref{sec:fno-method} trains once on
+We now turn from per-black-hole training to amortisation. The
+FNO surrogate of Sec.~\ref{sec:fno-method} trains once on
 $1{,}000$ $(M,x_{0},\sigma)$ triples and then predicts
-$\Phi(x,t)$ for an unseen draw with a single forward pass, in
-contrast to the PINNs, which solve one Zerilli problem at a
-time. It is evaluated in two settings: the \emph{canonical}
+$\Phi(x,t)$ for an unseen draw with a single forward pass; the
+question is whether the amortisation costs extraction
+accuracy, and at the population level it does not. It is
+evaluated in two settings: the \emph{canonical}
 draw $(M,x_{0},\sigma) = (1,4,5)$, the same single-BH benchmark
 used for the PINNs, and a $100$-BH in-distribution
 \emph{population}, the regime in which per-BH PINN training is
@@ -675,12 +674,6 @@ tracking a decade below.}
 \label{fig:fno-loss}
 \end{figure}
 
-\paragraph{QNM extraction on the canonical BH.}
-Table~\ref{tab:fno-canonical} compares the five extractors on
-the FNO field and the FD reference field, both applied to the
-observer slice $\Phi(\xq{=}2,t)$ of
-Fig.~\ref{fig:fno-ringdown-xq2}. The plateau estimators are the cleanest at this
-
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.85\textwidth]{../outputs/qnm/fno_xq2_comparison/figs_v4/fno_v4_ringdown_xq2.png}
@@ -695,12 +688,14 @@ Table~\ref{tab:fno-canonical} is applied to this time series.}
 
 \paragraph{QNM extraction on the canonical BH.}
 Table~\ref{tab:fno-canonical} compares the five extractors on
-the FNO field and the FD reference field, both at
-$\xq = 2\,M$. The plateau estimators are the cleanest at this
+the FNO field and the FD reference field, both applied to the
+observer slice $\Phi(\xq{=}2,t)$ of
+Fig.~\ref{fig:fno-ringdown-xq2}. The plateau estimators are the cleanest at this
 observer: M4 recovers $\omega$ to $0.114\%$ and $\tau$ to
 $0.099\%$, with M5 confirming both values on the independent
-2-D window scan (Figs.~\ref{fig:fno-plateau-m4-xq2}
-and~\ref{fig:fno-plateau-m5-xq2}). The plateau in-block scatter
+2-D window scan (Fig.~\ref{fig:fno-plateau-m4-xq2}; the M5
+scan is shown in Appendix~\ref{app:supp},
+Fig.~\ref{fig:fno-plateau-m5-xq2}). The plateau in-block scatter
 ($\sigma_{\omega} = 6.4\times 10^{-5}$) is below the residual
 bias, so the quoted error is a true offset set by the
 $9.30\times 10^{-4}$ bulk field residual rather than fit
@@ -759,24 +754,6 @@ block selected by Algorithm~\ref{alg:m4}; the dashed red line
 is the plateau mean and the dotted black line is the Leaver
 value.}
 \label{fig:fno-plateau-m4-xq2}
-\end{figure}
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=0.85\textwidth,keepaspectratio]{../outputs/qnm/fno_xq2_comparison/figs_v4/fno_v4_plateau_m5_xq2.png}
-\caption{M5 2-D plateau diagnostic for the FNO prediction at
-$\xq = 2\,M$ on the canonical BH. Heatmap of the 2-mode NLS
-fit on the $(t_0,t_{\mathrm{end}})$ grid, plotted on a shared
-linear colour scale ($\omega M \in [0.30,0.50]$,
-$\tau/M \in [5,20]$); white cells are windows in which the fit
-failed. Left: $\omega M$. Right: $\tau/M$. The red rectangle
-outlines the contiguous plateau block selected by the procedure
-of Sec.~\ref{sec:plateau}, covering
-$t_0\in[13.3,20.0]\,M$ and $t_{\mathrm{end}}\in[64,88]\,M$, and
-returning $M\omega = 0.3733$ ($0.115\%$ from Leaver) and
-$\tau/M = 11.25$ ($0.098\%$ from Leaver), in agreement with
-the M4 entry of Table~\ref{tab:fno-canonical}.}
-\label{fig:fno-plateau-m5-xq2}
 \end{figure}
 
 \paragraph{Observer position.} The operator models extract at
@@ -861,10 +838,12 @@ per-BH PINN training at $N_{\mathrm{BH}} \approx 7$.
 \subsection{Hybrid coarse-FD + neural-residual surrogate}
 \label{sec:res-hyb}
 
-This section asks how much of the fine solver's accuracy can
-be recovered from a solve at $1/64$ of its cost. The hybrid
-surrogate of Sec.~\ref{sec:hyb-method} keeps a
-coarse-grid FD solve to carry the wave propagation and asks the
+The final model inverts the FNO's premise: instead of learning
+the whole solution operator, how much of the fine solver's
+accuracy can be recovered from a classical solve at $1/64$ of
+its cost? The hybrid surrogate of Sec.~\ref{sec:hyb-method}
+keeps a coarse-grid FD solve to carry the wave propagation and
+asks the
 network only
 for the pointwise residual against the fine-grid solution of
 the same problem. It is evaluated in the same two settings as
@@ -988,7 +967,8 @@ Fig.~\ref{fig:hyb-ringdown-xq2}, recover the fundamental mode
 to the extractor floor: M4 gives $\omega = 0.37353$,
 $\tau = 11.25\,M$ ($0.045\%$ and $0.083\%$ error), confirmed by
 M5 ($0.049\%$, $0.125\%$) on the independent 2-D scan
-(Figs.~\ref{fig:hyb-plateau-m4} and~\ref{fig:hyb-plateau-m5}).
+(Fig.~\ref{fig:hyb-plateau-m4}; the M5 scan is shown in
+Appendix~\ref{app:supp}, Fig.~\ref{fig:hyb-plateau-m5}).
 Table~\ref{tab:hyb-canonical} extends the comparison to the
 population medians: the plateau estimators return $\omega$ to
 better than $0.06\%$ on all three sources ($0.049\%$ hybrid,
@@ -1049,22 +1029,6 @@ form the canonical M4 estimate. Black
 dotted lines mark the Leaver reference values $\omega = 0.3737$
 and $\tau = 11.241\,M$.}
 \label{fig:hyb-plateau-m4}
-\end{figure}
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=0.95\textwidth]{../outputs/hybrid/fno_sw_gate_s1em3/figs/hybrid_plateau_m5_xq2.png}
-\caption{M5 2-D plateau scan on the hybrid prediction at the
-canonical BH and $\xq = 2\,M$. Heatmaps of the fitted
-$\omega$ (left) and $\tau$ (right) over an $8 \times 5$ grid in
-$(t_{0}, \tend)$ with $t_{0} \in [10, 18]\,M$ and
-$\tend \in [40, 50]\,M$, on the shared colour scales
-$\omega \in [0.30, 0.50]$ and $\tau \in [5, 20]\,M$. The red
-rectangle marks the identified plateau block
-($t_{0} \in [12.3, 15.7]\,M$,
-$\tend \in [47.5, 50]\,M$). White cells are NLS fits that
-failed to converge.}
-\label{fig:hyb-plateau-m5}
 \end{figure}
 
 \paragraph{Population QNM scatter.} In the per-BH scatter of

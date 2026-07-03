@@ -784,7 +784,7 @@ Canonical BH $(M,x_{0},\sigma)$ & $(1,4,5)$ & $(1,4,5)$ \\
   \node[sconvhdr, below=8mm of stackbg.south] (sconvhdrn) {%
     \begin{minipage}{96mm}
       \centering
-      \textbf{neural solution operator $\mathcal{G}_{\theta}$ â€” four-layer 2-D FNO}\\[1mm]
+      \textbf{neural solution operator $\mathcal{G}_{\theta}$ --- four-layer 2-D FNO}\\[1mm]
       hidden channels $h=96$,\;
       Fourier modes $(K_{t},K_{x})=(64,64)$
     \end{minipage}};
@@ -807,7 +807,7 @@ Canonical BH $(M,x_{0},\sigma)$ & $(1,4,5)$ & $(1,4,5)$ \\
 
   % ============ output field ============
   \node[outn, below=8mm of fnoall.south, fill=orange!45]
-        (phi) {$\Phi_{\theta}(x,t)$ â€” predicted field on $(N_{t}{\times}N_{x})$ fine grid};
+        (phi) {$\Phi_{\theta}(x,t)$ --- predicted field on $(N_{t}{\times}N_{x})$ fine grid};
   \draw[arr] (fnoall.south) -- (phi.north);
 
     % ============ six loss terms (training only) ============
@@ -815,17 +815,17 @@ Canonical BH $(M,x_{0},\sigma)$ & $(1,4,5)$ & $(1,4,5)$ \\
       \textbf{six weighted loss terms}\\[-0.5mm]
       training only};
     \node[loss, below=2mm of losshdr] (lf)
-      {$\mathcal{L}_{\mathrm{field}}$ â€” relative $L^{2}$ on $\Phi$};
+      {$\mathcal{L}_{\mathrm{field}}$ --- relative $L^{2}$ on $\Phi$};
     \node[loss, below=1mm of lf] (lh1)
-      {$\mathcal{L}_{H^{1}}$ â€” gradients $(\partial_{t}\Phi,\partial_{x}\Phi)$};
+      {$\mathcal{L}_{H^{1}}$ --- gradients $(\partial_{t}\Phi,\partial_{x}\Phi)$};
     \node[loss, below=1mm of lh1] (lring)
-      {$\mathcal{L}_{\mathrm{ring}}$ â€” ringdown window $t\ge\tring$};
+      {$\mathcal{L}_{\mathrm{ring}}$ --- ringdown window $t\ge\tring$};
     \node[loss, below=1mm of lring] (lobs)
-      {$\mathcal{L}_{\mathrm{obs}}$ â€” observer column $x=\xq$};
+      {$\mathcal{L}_{\mathrm{obs}}$ --- observer column $x=\xq$};
     \node[loss, below=1mm of lobs] (ltw)
-      {$\mathcal{L}_{\mathrm{tw}}$ â€” time-window ramp $w(t)$};
+      {$\mathcal{L}_{\mathrm{tw}}$ --- time-window ramp $w(t)$};
     \node[loss, below=1mm of ltw] (lpde)
-      {$\mathcal{L}_{\mathrm{pde}}$ â€” FD residual of the wave eq.};
+      {$\mathcal{L}_{\mathrm{pde}}$ --- FD residual of the wave eq.};
     \begin{scope}[on background layer]
       \node[lossbg, fit=(losshdr)(lf)(lpde)] (lossall) {};
     \end{scope}
@@ -1016,7 +1016,7 @@ Fig.~\ref{fig:hyb-arch}.
     \textbf{five-channel input on fine grid}\;
     $X\in\mathbb{R}^{5\times N_{t}\times N_{x}}$};
   \node[inp, below=2mm of stackhdr]
-        (c0) {ch~0: $\mathcal{U}\Phi^{\mathrm{c}}(x,t)$ â€” quintic-upsampled $k{=}4$ prior};
+        (c0) {ch~0: $\mathcal{U}\Phi^{\mathrm{c}}(x,t)$ --- quintic-upsampled $k{=}4$ prior};
   \node[inp, below=1mm of c0]
         (c1) {ch~1: $\Phi^{\mathrm{c}}(x,0)$ broadcast in $t$};
   \node[inp, below=1mm of c1]
@@ -1036,7 +1036,7 @@ Fig.~\ref{fig:hyb-arch}.
   \node[fnoblock, below=8mm of stackbg.south] (fnohdr) {%
     \begin{minipage}{96mm}
       \centering
-      \textbf{neural residual operator $\mathcal{H}_{\theta}$ â€” four-layer 2-D FNO}\\[1mm]
+      \textbf{neural residual operator $\mathcal{H}_{\theta}$ --- four-layer 2-D FNO}\\[1mm]
       hidden channels $h=32$,\;
       Fourier modes $(K_{t},K_{x})=(16,32)$,\;
       domain padding $0.10$
@@ -1062,7 +1062,7 @@ Fig.~\ref{fig:hyb-arch}.
 
   % ============ output residual + reconstruction ============
   \node[outn, below=8mm of fnoall.south]
-        (delta) {$g\,\delta\Phi_{\theta}(x,t)$ â€” gated residual\\
+        (delta) {$g\,\delta\Phi_{\theta}(x,t)$ --- gated residual\\
                  $g=|\nabla\mathcal{U}\Phi^{\mathrm{c}}|/
                  (|\nabla\mathcal{U}\Phi^{\mathrm{c}}|+s),\;s{=}10^{-3}$\\
                  (Eq.~\eqref{eq:hyb-gate})};
@@ -1555,7 +1555,11 @@ for it. Definition~\ref{def:plateau} captures the criterion
 adopted in M4 and M5; inside the plateau the recovered
 $(\omega,\tau)$ are stationary in the window edges, and their
 variation across it estimates the fit-window systematic
-uncertainty.
+uncertainty. Because the block is chosen precisely to minimise
+this scatter, $\sigma_\omega$ is by construction an optimistic
+estimate --- a lower bound on the window systematic; the spread
+across the full scan range, visible in the M4 diagnostics of
+Sec.~\ref{sec:results}, brackets it from above.
 
 For the Schwarzschild $\ell = 2$ fundamental at our parameters the
 four relevant timescales are summarised by

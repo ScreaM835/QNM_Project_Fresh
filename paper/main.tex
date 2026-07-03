@@ -155,10 +155,8 @@ We address both points on the Schwarzschild $\ell = 2$ master
 equations, evaluating five models under a single extraction
 protocol. The architecture-matched reproduction of
 \citet{Patel2024pinn} reduces their reported field errors by an
-order of magnitude on both isospectral potentials
-($28.06\% \to 1.30\%$ Zerilli, $23.59\% \to 2.67\%$
-Regge--Wheeler); the extensions below are reported on the
-Zerilli equation. An enhanced forward PINN --- doubled L-BFGS
+order of magnitude on both isospectral potentials; the
+extensions below are reported on the Zerilli equation. An enhanced forward PINN --- doubled L-BFGS
 budget and residual-greedy adaptive sampling --- reaches
 $0.58\%$ relative field error, from which a new plateau-scan
 estimator that reports its own fit-window systematic recovers
@@ -198,6 +196,64 @@ and the extraction protocol, Sec.~\ref{sec:results} reports
 their results, Sec.~\ref{sec:discussion} discusses them, and
 Sec.~\ref{sec:conclusion} concludes; hyperparameter tables and
 supporting scans are collected in the appendices.
+Figure~\ref{fig:framework} summarises the framework: each model
+produces the same observer time series, which a single
+extraction protocol converts into $(\omega,\tau)$ with a
+validity flag.
+
+\begin{figure}[!htbp]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+  font=\small,
+  model/.style={rectangle, rounded corners=3pt, draw, fill=orange!12,
+                minimum height=9mm, minimum width=56mm, align=center,
+                font=\footnotesize},
+  mid/.style={rectangle, rounded corners=3pt, draw, fill=blue!10,
+              minimum height=12mm, minimum width=26mm, align=center,
+              font=\footnotesize},
+  proto/.style={rectangle, rounded corners=3pt, draw, fill=green!12,
+                minimum height=26mm, minimum width=44mm, align=center,
+                font=\footnotesize},
+  outb/.style={rectangle, rounded corners=3pt, draw, fill=green!25,
+               minimum height=12mm, minimum width=32mm, align=center,
+               font=\footnotesize},
+  arr/.style={->, >=stealth, thick},
+]
+  \node[model] (m1) {reproduction PINN (Sec.~\ref{sec:res-repro})};
+  \node[model, below=2.5mm of m1] (m2) {enhanced forward PINN (Sec.~\ref{sec:res-fwd})};
+  \node[model, below=2.5mm of m2] (m3) {inverse PINN $+$ learnable
+        $(M,\omega,\tau,A_{\mathrm{ring}},\phi)$ (Sec.~\ref{sec:res-inv})};
+  \node[model, below=2.5mm of m3] (m4) {FNO surrogate, trained once on
+        $10^{3}$ draws (Sec.~\ref{sec:res-fno})};
+  \node[model, below=2.5mm of m4] (m5) {hybrid coarse-FD $+$ gated FNO
+        residual (Sec.~\ref{sec:res-hyb})};
+  \node[mid, right=13mm of m3] (ser) {observer series\\ $\Phi(\xq, t)$};
+  \foreach \m in {m1,m2,m3,m4,m5}
+    \draw[arr] (\m.east) -- (ser.west);
+  \node[proto, right=13mm of ser] (prot)
+        {extraction protocol\\
+         (Secs.~\ref{sec:qnm-methods}--\ref{sec:reporting})\\[1.2mm]
+         estimators M1--M5\\
+         plateau criterion $\to \sigma_\omega$ flag\\
+         reporting convention};
+  \draw[arr] (ser) -- (prot);
+  \node[outb, right=13mm of prot] (out)
+        {$(\omega, \tau)$ [$+\,M$]\\ vs Leaver reference};
+  \draw[arr] (prot) -- (out);
+\end{tikzpicture}%
+}
+\caption{The unified framework. Each of the five models (left)
+produces the observer time series $\Phi(\xq,t)$; the inverse
+PINN additionally carries five learnable scalars. A single
+extraction protocol --- the five estimators M1--M5, the plateau
+validity criterion with its $\sigma_\omega$ flag, and the
+reporting convention --- converts every series into the primary
+$(\omega,\tau)$ estimate, plus the recovered mass $M$ for the
+inverse PINN, benchmarked against Leaver's continued-fraction
+values.}
+\label{fig:framework}
+\end{figure}
 
 \subsection{Schwarzschild QNMs and time-domain extraction}
 \label{sec:bg-zerilli}
@@ -351,8 +407,8 @@ complex spectrum \citep{Berti2009review,KonoplyaZhidenko2011},
   \label{eq:qnm-omega}
 \end{equation}
 ordered by overtone index $n = 0, 1, 2, \ldots$ in increasing
-imaginary part: the real part is the oscillation frequency, the
-imaginary part the damping rate.
+damping rate $1/\tau_n$: the real part $\omega_n^{R}$ is the
+oscillation frequency and $\tau_n$ the damping time.
 
 For Schwarzschild $\ell = 2$ the fundamental ($n = 0$) and
 first overtone ($n = 1$) are
@@ -382,7 +438,7 @@ tail \citep{Berti2009review}, a sum of damped sinusoids
 \begin{equation}
   \Phi(\xq, t) \;\approx\;
   \sum_{n} A_n\,\mathrm{e}^{-(t-t_0)/\tau_n}
-  \cos\bigl(\omega_n^{R}(t-t_0) + \phi_n\bigr),
+  \cos\bigl(\omega_n^{R}(t-t_0) + \phi_n\bigr).
   \label{eq:qnm-template}
 \end{equation}
 Three families of methods recover $(\omega_n,\tau_n)$ from
@@ -524,9 +580,9 @@ conditions and sequential warm-starts in spin;
 \citet{Luna2024qnm} treat frequency-domain QNMs in modified
 gravity. The closest comparator is \citet{Patel2024pinn}, who
 solve the time-domain Zerilli and Regge--Wheeler equations with
-a fully-connected PINN, report $\mathrm{RL2} = 28.06\%$ field
-accuracy against an FD reference, and quote a single
-fixed-window M2 fit as the primary QNM estimate.
+a fully-connected PINN; their reported field error and single
+fixed-window fit are the two limitations identified at the
+start of the introduction.
 No prior PINN study recovers the mass jointly with a
 damped-sinusoid template, and none reports a fit-window
 systematic on the recovered $(\omega,\tau)$. Nor does any

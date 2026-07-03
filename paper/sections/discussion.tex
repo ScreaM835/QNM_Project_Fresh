@@ -4,12 +4,9 @@
 \section{Discussion}\label{sec:discussion}
 
 \paragraph{Relation to prior work.}
-Section~\ref{sec:res-repro} makes the comparison with
-\citet{Patel2024pinn} exact: at fully matched settings the
-reproduction reaches $1.30\%$/$2.67\%$ against their
-$28.06\%$/$23.59\%$, with damping-time errors symmetric across
-the isospectral pair where the prior study's are not; the
-further improvement to $\mathrm{RL2}=0.58\%$
+The reproduction of Sec.~\ref{sec:res-repro} makes the
+comparison with \citet{Patel2024pinn} exact; the further
+improvement to $\mathrm{RL2}=0.58\%$
 (Eq.~\eqref{eq:fwd-metrics}) is accounted for by the doubled
 L-BFGS budget and the greedy adaptive resampling of
 Sec.~\ref{sec:fwd-pinn}. The sub-permille eigenvalue PINN of
@@ -114,10 +111,9 @@ controversy over the GW150914 overtone
 Each PINN must be trained anew for every black hole; the FNO
 trains once and then serves any in-distribution draw in a
 single forward pass, with population extraction statistically
-indistinguishable from the FD reference's own ($0.343\%$ versus
-$0.335\%$ median $\omega$ error; Sec.~\ref{sec:res-fno}) --- at
-the population level the surrogate is not the accuracy
-bottleneck. The hybrid's gain is structural: the coarse-prior
+indistinguishable from the FD reference's own
+(Sec.~\ref{sec:res-fno}) --- at the population level the
+surrogate is not the accuracy bottleneck. The hybrid's gain is structural: the coarse-prior
 error correlates strongly with the prior gradient, so the
 parameter-free gate routes network capacity onto the wavefronts
 where the prior fails, cutting the population field MSE by
