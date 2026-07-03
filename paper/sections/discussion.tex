@@ -111,10 +111,9 @@ controversy over the GW150914 overtone
 \citep{Cotesta2022overtones,Isi2021priors}.
 
 \paragraph{Amortised surrogates.}
-The two surrogates change the unit of work the network
-amortises: each PINN trains on one Zerilli problem, whereas the
-FNO trains once and serves any in-distribution draw in a single
-forward pass, with population extraction statistically
+Each PINN must be trained anew for every black hole; the FNO
+trains once and then serves any in-distribution draw in a
+single forward pass, with population extraction statistically
 indistinguishable from the FD reference's own ($0.343\%$ versus
 $0.335\%$ median $\omega$ error; Sec.~\ref{sec:res-fno}) --- at
 the population level the surrogate is not the accuracy
@@ -125,16 +124,20 @@ where the prior fails, cutting the population field MSE by
 $\sim\!79\times$ while protecting the regions the classical
 solve already resolves (Sec.~\ref{sec:res-hyb}); the field gain
 does not become a median QNM gain at $\xq = 2\,M$ because the
-coarse-up baseline is already at the M4 plateau floor there.
+coarse-up baseline is already at the extractor floor there.
 
 The FNO ablation (Table~\ref{tab:fno-versions},
-Appendix~\ref{app:supp-fno}) adds a transferable observation:
-the bulk-field RMSD is not monotone with the QNM accuracy, and
-only the two QNM-targeted loss terms of
-Sec.~\ref{sec:fno-method} convert a good field surrogate into a
-good spectroscopy surrogate --- the figure of merit is the
-estimator accuracy on the slice the post-processing pipeline
-consumes. Learning the inverse operator
+Appendix~\ref{app:supp-fno}) adds an observation that
+transfers beyond this problem: a more accurate field does not
+imply a more accurate QNM. The configuration with the lowest
+field RMSD is the worst at extraction, while the deployed
+configuration accepts a $\sim\!25\%$ higher RMSD and extracts
+$\omega$ two orders of magnitude more accurately --- its two
+additional loss terms weight exactly the data the extractor
+reads, the observer slice and the ringdown window. A surrogate
+built for spectroscopy should be trained and judged on the
+observer time series, not the average field error. Learning
+the inverse operator
 $\mathcal{G}^{-1}_{\theta}\colon \Phi(\xq,t) \mapsto M$ on the
 same distribution is a natural extension, with the plateau
 diagnostic carrying over as a population-level systematic

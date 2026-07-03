@@ -493,8 +493,8 @@ a mesh-free PDE solver: a network $\Phi_\theta(x,t)$ is trained
 to minimise a weighted composite of mean-squared PDE,
 initial-condition and boundary-condition residuals on sampled
 collocation points, with all derivatives supplied exactly by
-automatic differentiation \citep{Baydin2018ad} and
-residual-weight balancing an active research area
+automatic differentiation \citep{Baydin2018ad}. How to balance
+the residual weights is an active research area
 \citep{Wang2021gradientpath,Wang2022ntk,McClenny2023sapinn};
 the concrete seven-term loss used in this work is
 Eq.~\eqref{eq:loss-fwd} of Sec.~\ref{sec:fwd-pinn}
@@ -528,10 +528,10 @@ a fully-connected PINN, report $\mathrm{RL2} = 28.06\%$ field
 accuracy against an FD reference, and quote a single
 fixed-window M2 fit as the primary QNM estimate.
 No prior PINN study recovers the mass jointly with a
-damped-sinusoid template, reports a fit-window systematic on
-the recovered $(\omega,\tau)$, analyses the
-amplitude--damping-time degeneracy of an embedded template, or
-ablates the template-loss hyperparameters;
+damped-sinusoid template, and none reports a fit-window
+systematic on the recovered $(\omega,\tau)$. Nor does any
+analyse the amplitude--damping-time degeneracy of an embedded
+template or ablate the template-loss hyperparameters;
 Secs.~\ref{sec:methods}--\ref{sec:res-inv} address all four
 gaps, through the forward and inverse pipelines summarised in
 Fig.~\ref{fig:bg-pipeline}.
@@ -674,9 +674,10 @@ accuracy on the observer slice, not the bulk RMSD. The hybrid
 surrogate runs a $1/64$-cost coarse solve and repairs its
 discretisation error with a small gated network trained on a
 label-free Richardson target, cutting the population field MSE
-by $79\times$; at $\xq = 2\,M$ neither it nor the coarse
-baseline is extraction-limited, both sitting at the M4 plateau
-floor that the fine reference also occupies.
+by $79\times$; at $\xq = 2\,M$ the coarse solve alone already
+measures the QNM as accurately as the extractor allows, so the
+hybrid's contribution is field accuracy, not a better
+frequency.
 
 Follow-up directions --- a
 Cram\'er--Rao bound on the inverse noise floor, a Bayesian

@@ -885,16 +885,10 @@ activations, grid positional embeddings). The FNO's
 discretisation invariance
 \citep{Li2021fno,Kovachki2023neuralop} is exercised in
 Appendix~\ref{app:supp-fno} on grids from $201^{2}$ to $801^{2}$
-over the same physical box.
-
-\paragraph{Why FNO and not DeepONet?} DeepONet
-\citep{Lu2021deeponet} commits at training time to a fixed
-sensor grid, whereas the FNO's spectral parameterisation
-exploits the regular-grid inputs directly through FFTs and
-carries the discretisation invariance above; the two are
-comparable in expressive power on benchmark PDEs
-\citep{Kovachki2023neuralop,Lu2021deeponet}, and we make the
-practical choice.
+over the same physical box; we prefer the FNO over DeepONet
+\citep{Lu2021deeponet} because its spectral parameterisation
+exploits our regular-grid inputs directly and carries this
+invariance.
 
 \paragraph{Loss.} The training loss combines six terms,
 \begin{equation}
@@ -1191,8 +1185,7 @@ on the under-resolved wavefronts, where the stencil dephases the
 high-wavenumber content of the prompt burst, and near zero
 elsewhere: a bounded repair task rather than full-field
 synthesis, whose spatial localisation the gate of
-Eq.~\eqref{eq:hyb-gate} exploits, in the weak-prior regime where
-the $k^{d+1}$ work saving of a coarse prior is largest.
+Eq.~\eqref{eq:hyb-gate} exploits.
 
 \paragraph{Upsample operator.} The operator $\mathcal{U}$ used
 in Eqs.~\eqref{eq:hyb-richardson}--\eqref{eq:hyb-residual} and as
@@ -1344,7 +1337,7 @@ two surrogates' distributions.
 \paragraph{Observer location.} Hybrid numbers are reported at
 $\xq = 2\,M$, matching the FNO of Sec.~\ref{sec:fno-method} for
 direct comparability; since the coarse-up baseline already sits
-at the plateau-extractor floor there (Sec.~\ref{sec:res-hyb}),
+at the extractor floor there (Sec.~\ref{sec:res-hyb}),
 the hybrid's value is reported through the global field-error
 reduction rather than the median QNM.
 

@@ -68,7 +68,11 @@ Sec. & Model & Evaluation & Field RMSD & RL2 [\%]
 \subsection{Faithful reproduction of the prior-work baseline}
 \label{sec:res-repro}
 
-All extensions are measured against \citet{Patel2024pinn}, the
+This section establishes that our pipeline reproduces the
+prior-work baseline before any change is introduced --- it
+does, improving on the published field errors by an order of
+magnitude. All extensions are measured against
+\citet{Patel2024pinn}, the
 only previous time-domain PINN treatment of these $\ell = 2$
 master equations. We therefore first train the forward PINN at
 their exact settings (Table~\ref{tab:fwd-hyper}: uniform
@@ -212,7 +216,9 @@ the remainder of this paper reports on the Zerilli equation.
 \subsection{Enhanced forward PINN}
 \label{sec:res-fwd}
 
-Starting from the faithful reproduction of
+This section asks how far the forward field error can be
+driven down at fixed architecture, and what QNM accuracy that
+buys. Starting from the faithful reproduction of
 Sec.~\ref{sec:res-repro}, the enhanced forward PINN doubles the
 L-BFGS budget and replaces uniform resampling with the
 residual-greedy sampling of Sec.~\ref{sec:fwd-pinn}, all other
@@ -379,7 +385,10 @@ neither the full-domain error nor the extraction
 \subsection{Inverse PINN}
 \label{sec:res-inv}
 
-The inverse PINN is the forward network of
+This section asks whether the black-hole mass can be recovered
+jointly with the ringdown template from noisy observations of
+the field --- it can, to $0.34\%$. The inverse PINN is the
+forward network of
 Sec.~\ref{sec:res-fwd} with three additions: the mass $M$ is
 promoted from a fixed constant to a trainable scalar, a data
 loss anchors the network to $\Nobs = 500$ noisy samples of the
@@ -591,7 +600,10 @@ the physical decay rate.
 \subsection{Fourier neural operator surrogate}
 \label{sec:res-fno}
 
-The FNO surrogate of Sec.~\ref{sec:fno-method} trains once on
+This section asks whether one network, trained once, can
+replace per-black-hole training without losing extraction
+accuracy --- at the population level, it can. The FNO surrogate
+of Sec.~\ref{sec:fno-method} trains once on
 $1{,}000$ $(M,x_{0},\sigma)$ triples and then predicts
 $\Phi(x,t)$ for an unseen draw with a single forward pass, in
 contrast to the PINNs, which solve one Zerilli problem at a
@@ -693,11 +705,15 @@ and~\ref{fig:fno-plateau-m5-xq2}). The plateau in-block scatter
 bias, so the quoted error is a true offset set by the
 $9.30\times 10^{-4}$ bulk field residual rather than fit
 scatter; the same extractor on the FD reference returns
-$0.019\%$ and $0.005\%$, the corresponding discretisation
-floor. M1/M2 saturate on both fields alike, yet return
-sub-percent errors on the shorter $[10,50]\,M$ hybrid window
-(Table~\ref{tab:hyb-canonical}): the saturation is a property
-of the joint window--observer geometry, not of the surrogate.
+$0.019\%$ and $0.005\%$ --- the \emph{extractor floor}, the
+accuracy at which the extraction method itself, applied to the
+exact reference field, bottoms out. M1 and M2 fail outright at
+this observer, returning $\sim\!100\%$ frequency errors on the
+FNO field and the FD reference alike, yet the same estimators
+reach sub-percent errors on the shorter $[10,50]\,M$ window
+used for the hybrid (Table~\ref{tab:hyb-canonical}): the
+failure is caused by the combination of window and observer
+position, not by the surrogate.
 
 \begin{table}[!htbp]
 \centering
@@ -845,7 +861,9 @@ per-BH PINN training at $N_{\mathrm{BH}} \approx 7$.
 \subsection{Hybrid coarse-FD + neural-residual surrogate}
 \label{sec:res-hyb}
 
-The hybrid surrogate of Sec.~\ref{sec:hyb-method} keeps a
+This section asks how much of the fine solver's accuracy can
+be recovered from a solve at $1/64$ of its cost. The hybrid
+surrogate of Sec.~\ref{sec:hyb-method} keeps a
 coarse-grid FD solve to carry the wave propagation and asks the
 network only
 for the pointwise residual against the fine-grid solution of
@@ -947,14 +965,6 @@ for the coarse-up baseline, a factor-of-$79$ reduction
 the whole training distribution rather than an artefact of the
 canonical draw.
 
-\paragraph{QNM extraction.} On the canonical draw the plateau
-estimators, read from the observer slice of
-Fig.~\ref{fig:hyb-ringdown-xq2}, recover the fundamental mode
-to the extractor floor: M4 gives $\omega = 0.37353$,
-$\tau = 11.25\,M$ ($0.045\%$ and $0.083\%$ error), confirmed by
-M5 ($0.049\%$, $0.125\%$) on the independent 2-D scan
-(Figs.~\ref{fig:hyb-plateau-m4} and~\ref{fig:hyb-plateau-m5}).
-
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.80\textwidth]{../outputs/hybrid/fno_sw_gate_s1em3/figs/hybrid_ringdown_xq2.png}
@@ -973,20 +983,22 @@ of the same three-way comparison.}
 \end{figure}
 
 \paragraph{QNM extraction.} On the canonical draw the plateau
-estimators recover the fundamental mode to the extractor
-floor: M4 gives $\omega = 0.37353$, $\tau = 11.25\,M$
-($0.045\%$ and $0.083\%$ error), confirmed by M5 ($0.049\%$,
-$0.125\%$) on the independent 2-D scan
+estimators, read from the observer slice of
+Fig.~\ref{fig:hyb-ringdown-xq2}, recover the fundamental mode
+to the extractor floor: M4 gives $\omega = 0.37353$,
+$\tau = 11.25\,M$ ($0.045\%$ and $0.083\%$ error), confirmed by
+M5 ($0.049\%$, $0.125\%$) on the independent 2-D scan
 (Figs.~\ref{fig:hyb-plateau-m4} and~\ref{fig:hyb-plateau-m5}).
 Table~\ref{tab:hyb-canonical} extends the comparison to the
 population medians: the plateau estimators return $\omega$ to
 better than $0.06\%$ on all three sources ($0.049\%$ hybrid,
-$0.051\%$ baseline, $0.014\%$ reference). The coarse prior
-thus already resolves the single-observer QNM to the extractor
-floor; the hybrid matches it in $\omega$ and sits marginally
-above in $\tau$ ($0.263\%$ versus $0.174\%$), within the
-extractor's own population scatter --- its demonstrated gain
-is the $79\times$ global-field improvement.
+$0.051\%$ baseline, $0.014\%$ reference). The coarse solve
+alone, therefore, already measures the single-observer QNM as
+accurately as the extractor allows; the hybrid matches it in
+$\omega$ and sits marginally above in $\tau$ ($0.263\%$ versus
+$0.174\%$), within the extractor's own population scatter ---
+its demonstrated gain is the $79\times$ field improvement, not
+a better frequency.
 
 \begin{table}[!htbp]
 \centering
@@ -1057,7 +1069,7 @@ failed to converge.}
 
 \paragraph{Population QNM scatter.} In the per-BH scatter of
 Fig.~\ref{fig:hyb-pop} the bulk of the population clusters at
-the joint extractor floor ($10^{-2}$--$10^{-1}\%$) with hybrid
+the extractor floor ($10^{-2}$--$10^{-1}\%$) with hybrid
 and baseline interleaved; the off-floor draws are
 ill-conditioned single-window fits that appear on the fine FD
 reference as well, reflecting the extractor rather than the
