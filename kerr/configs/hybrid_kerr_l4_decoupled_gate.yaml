@@ -1,0 +1,59 @@
+# Kerr hybrid FNO — ell=4 DECOUPLED + AMPLITUDE-GATED residual (tau fix, variant B).
+#
+# Identical to hybrid_kerr_l4_decoupled.yaml (same corpus, same FNO, same
+# label-free order-4 Richardson target, same scalar norm) EXCEPT the training
+# target is AMPLITUDE-GATED:
+#
+#   residual_gate: true  ->  the residual target (rich - prior) is multiplied by
+#   a gate g(tau) = clip( (rms_sigma|prior(tau)| / peak) / gate_floor, 0, 1 ).
+#   Where the prior amplitude is above gate_floor*peak the FNO gets the full
+#   correction (g=1); in the low-amplitude late ringdown it tapers to 0, so the
+#   FNO learns ~0 residual there and the hybrid REVERTS to the (clean) prior.
+#
+# Rationale (from the pilot pointwise-error diagnosis): the coarse prior's late
+# tail is naturally clean (smooth decay to ~0), but the scalar-norm FNO, trained
+# under an amplitude-weighted loss that gives the tail ~0 weight, dumps spurious
+# low-amplitude structure there and CORRUPTS the phase coherence that tau
+# extraction needs (cphase wins tau 69% on fine but only 12% on the hybrid).
+# Gating the residual keeps the prior tail -> expect tau ~ prior (~0.5% best)
+# instead of the ungated hybrid's ~2.3%, WITHOUT touching the main-ring field or
+# the high-spin Mw win. g is built from the prior only (no fine, no Leaver).
+#
+# A/B against hybrid_kerr_l4_decoupled.yaml (ungated). Shares the same corpus.
+
+seed: 1234
+
+data:
+  dir: kerr/outputs/phase_c_l4_decoupled
+  target_mode: richardson
+  prior_grid: k8
+  richardson_p: 4
+  norm_mode: scalar              # gate is orthogonal to the envelope tau fix
+  residual_gate: true            # variant B: gate the residual in the low-amp tail
+  gate_floor: 0.02               # full FNO correction above 2% of peak amplitude
+
+fno:
+  modes_tau: 64
+  modes_sigma: 24
+  hidden_channels: 48
+  n_layers: 4
+  domain_padding: [0.08, 0.08]
+  positional_embedding: grid
+
+train:
+  epochs: 200
+  lr: 1.0e-3
+  weight_decay: 1.0e-6
+  batch_size: 8
+  patience: 30
+
+acceptance:
+  field_rl2: 0.05
+  qnm_Mw: 0.01
+  qnm_tau: 0.05
+
+eval:
+  qnm_workers: 16
+
+logging:
+  out_dir: kerr/outputs/phase_c_l4_decoupled/fno_hybrid_kerr_gate

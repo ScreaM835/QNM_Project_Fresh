@@ -133,6 +133,8 @@ def assemble(
     richardson_p: int = 2,
     norm_mode: str = "scalar",
     envelope_floor: float = 1.0e-5,
+    residual_gate: bool = False,
+    gate_floor: float = 0.02,
 ) -> Dict[str, np.ndarray]:
     """Assemble normalised training tensors for one split (fast matrix path).
 
@@ -232,6 +234,18 @@ def assemble(
         else:
             y_re = fn_re[lo:hi] - prior_re
             y_im = fn_im[lo:hi] - prior_im
+
+        if residual_gate:
+            # Amplitude gate (variant B): keep the FNO correction only where the
+            # prior has appreciable amplitude and taper it to 0 in the low-amplitude
+            # tail, so the residual cannot corrupt the late ringdown that sets tau
+            # (the hybrid reverts to the clean prior there). g(tau) is built from
+            # the prior envelope only -- no fine, no Leaver, generalises.
+            w_g = np.sqrt(np.mean(prior_re ** 2 + prior_im ** 2, axis=2))     # (n, Ntau)
+            pk_g = np.maximum(w_g.max(axis=1, keepdims=True), 1e-30)          # (n, 1)
+            g = np.clip((w_g / pk_g) / max(gate_floor, 1e-12), 0.0, 1.0)[:, :, None]
+            y_re = y_re * g
+            y_im = y_im * g
 
         X[lo:hi, 0] = prior_re / sB
         X[lo:hi, 1] = prior_im / sB

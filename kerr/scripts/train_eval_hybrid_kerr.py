@@ -581,13 +581,16 @@ def main():
     richardson_p = int(cfg["data"].get("richardson_p", 2))
     norm_mode = cfg["data"].get("norm_mode", "scalar")  # "envelope" = per-time tau fix
     envelope_floor = float(cfg["data"].get("envelope_floor", 1.0e-5))
+    residual_gate = bool(cfg["data"].get("residual_gate", False))  # variant B: gate residual in low-amp tail
+    gate_floor = float(cfg["data"].get("gate_floor", 0.02))
     out_dir = cfg["logging"]["out_dir"]
     os.makedirs(out_dir, exist_ok=True)
 
     device = "cuda" if torch.cuda.is_available() and not args.smoke else "cpu"
     print(f"[KERR-HYBRID] device={device} target_mode={target_mode} "
           f"prior_grid={prior_grid or 'k4(coupled)'} richardson_p={richardson_p} "
-          f"norm_mode={norm_mode} out_dir={out_dir}", flush=True)
+          f"norm_mode={norm_mode} gate={residual_gate}{'' if not residual_gate else f'@{gate_floor}'} "
+          f"out_dir={out_dir}", flush=True)
 
     # ---- load splits ----
     t0 = time.time()
@@ -625,7 +628,8 @@ def main():
     t0 = time.time()
     _asm_kw = dict(W_prior=W_prior, prior_key=(prior_grid or "k8"),
                    richardson_p=richardson_p, norm_mode=norm_mode,
-                   envelope_floor=envelope_floor)
+                   envelope_floor=envelope_floor,
+                   residual_gate=residual_gate, gate_floor=gate_floor)
     asm_tr = assemble(tr, W_k4, W_k2, target_mode=target_mode, return_eval=False, **_asm_kw)
     asm_va = assemble(va, W_k4, W_k2, target_mode=target_mode, return_eval=False, **_asm_kw)
     asm_te = assemble(te, W_k4, W_k2, target_mode=target_mode, return_eval=True, **_asm_kw)
