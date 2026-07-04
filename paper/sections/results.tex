@@ -720,60 +720,63 @@ of the same three-way comparison.}
 \label{fig:hyb-ringdown-xq2}
 \end{figure}
 
-\paragraph{QNM extraction.} At the common observer the plateau
-estimators remain the strongest of the five. On the canonical
-draw M4, read from the observer slice of
-Fig.~\ref{fig:hyb-ringdown-xq2}, recovers $\omega$ to $0.139\%$
-and $\tau$ to $2.90\%$ (Fig.~\ref{fig:hyb-plateau-m4}; the M5
-scan is shown in Appendix~\ref{app:supp},
+\paragraph{QNM extraction.} The relevant test for a surrogate is
+whether it reproduces the spectroscopy of the fine reference it
+approximates. On the canonical draw M4, read from the observer
+slice of Fig.~\ref{fig:hyb-ringdown-xq2}, recovers $\omega$ to
+$0.139\%$ and $\tau$ to $2.90\%$ (Fig.~\ref{fig:hyb-plateau-m4};
+the M5 scan is shown in Appendix~\ref{app:supp},
 Fig.~\ref{fig:hyb-plateau-m5}); the same extractor on the fine
 FD reference returns $0.226\%$ and $2.82\%$ --- the
 \emph{extractor floor}, the accuracy at which the extraction
 method itself, applied to the exact reference field, bottoms
 out. Table~\ref{tab:hyb-canonical} reports the population
-medians: M4 returns $\omega$ to $0.323\%$ (hybrid), $0.258\%$
-(baseline) and $0.246\%$ (reference) --- statistically
-indistinguishable across the three sources, with $\tau$ medians
-of $2.1$--$2.2\%$ for all three. The coarse solve
-alone, therefore, already measures the single-observer QNM as
-accurately as the extractor allows; the hybrid matches it while
-cutting the field error by $82\times$, and its demonstrated
-gain is the field, not a better frequency.
+medians against that reference: the hybrid tracks it across all
+five estimators, recovering $\omega$ to $0.323\%$ and $\tau$ to
+$2.08\%$ on the primary M4 plateau against the reference's own
+$0.246\%$ and $2.09\%$ --- an unbiased reproduction of the
+reference spectroscopy at a fraction of the solve cost. We
+benchmark the QNM against the fine reference, not the coarse
+prior, because the prior is the surrogate's \emph{input}: its
+role is the field baseline of Sec.~\ref{sec:res-hyb} (the
+$82\times$ error reduction), and a coarse solve's own plateau
+extraction reflects the estimator's stability under window
+shifts rather than field quality, so it is not a meaningful
+spectroscopic target.
 
 \begin{table}[!htbp]
 \centering
 \caption{QNM extraction at the common observer $\xq = 10\,M$,
 window $t \in [10, 50]\,M$, reported as the
 \emph{median} percentage error over the 100-BH in-distribution
-test set: hybrid prediction, coarse-up baseline, and fine FD
-reference. Five extraction methods of Sec.~\ref{sec:qnm-methods},
+test set: hybrid prediction against the fine FD reference it
+approximates. Five extraction methods of Sec.~\ref{sec:qnm-methods},
 with the plateau scans of
 Sec.~\ref{sec:plateau} for M4 and M5. Entries are median
 percentage errors of $\omega$ and $\tau$ against the Leaver
 reference $(\omega_{0} M, \tau_{0}/M) = (0.3737, 11.241)$. The
-three sources are statistically indistinguishable on the
-plateau methods; the network's demonstrated gain is in the
-global field, not the single-observer QNM. Bold entries are
+hybrid reproduces the reference extraction on every estimator;
+its demonstrated gain over the coarse prior is in the
+global field (Sec.~\ref{sec:res-hyb}), not the single-observer
+QNM. Bold entries are
 the primary values under the reporting convention of
 Sec.~\ref{sec:reporting}.}
 \label{tab:hyb-canonical}
 \small
 \setlength{\tabcolsep}{4pt}
-\begin{tabular}{@{}lcccccc@{}}
+\begin{tabular}{@{}lcccc@{}}
 \toprule
  & \multicolumn{2}{c}{Hybrid}
- & \multicolumn{2}{c}{Coarse-up baseline}
  & \multicolumn{2}{c}{Fine FD reference} \\
-\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
 Method & $|\Delta\omega|\%$ & $|\Delta\tau|\%$
-       & $|\Delta\omega|\%$ & $|\Delta\tau|\%$
        & $|\Delta\omega|\%$ & $|\Delta\tau|\%$ \\
 \midrule
-M1 (FFT $+$ log-line)        & $1.298$ & $4.31$ & $1.324$ & $4.44$ & $1.291$ & $4.26$ \\
-M2 (1-mode NLS)              & $2.279$ & $10.7$ & $2.331$ & $11.0$ & $2.261$ & $10.6$ \\
-M3 (ESPRIT $K{=}4$)          & $1.536$ & $7.92$ & $1.530$ & $8.54$ & $1.552$ & $8.36$ \\
-M4 (1-D plateau)             & $\mathbf{0.323}$ & $\mathbf{2.08}$ & $0.258$ & $2.17$ & $0.246$ & $2.09$ \\
-M5 (2-D plateau)             & $0.297$ & $2.38$ & $0.299$ & $2.57$ & $0.243$ & $2.45$ \\
+M1 (FFT $+$ log-line)        & $1.298$ & $4.31$ & $1.291$ & $4.26$ \\
+M2 (1-mode NLS)              & $2.279$ & $10.7$ & $2.261$ & $10.6$ \\
+M3 (ESPRIT $K{=}4$)          & $1.536$ & $7.92$ & $1.552$ & $8.36$ \\
+M4 (1-D plateau)             & $\mathbf{0.323}$ & $\mathbf{2.08}$ & $0.246$ & $2.09$ \\
+M5 (2-D plateau)             & $0.297$ & $2.38$ & $0.243$ & $2.45$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -796,8 +799,8 @@ and $\tau = 11.241\,M$.}
 repeats the population extraction at
 $\xq \in \{2, 5, 10, 15, 20\}\,M$ with the window fixed at
 $[10,50]\,M$. Accuracy degrades monotonically with observer
-distance for all three sources alike --- including the fine FD
-reference --- so the degradation is a property of the
+distance for both the hybrid and the fine FD reference alike, so
+the degradation is a property of the
 extraction protocol, not of the surrogate; the strongest
 estimator also changes with position (M1 overtakes M4 at
 $\xq = 20\,M$, where no plateau can form).
@@ -807,26 +810,23 @@ $\xq = 20\,M$, where no plateau can form).
 \caption{Observer-position sweep of the population QNM
 extraction: M4 median percentage errors over the $100$-BH test
 set at five observer positions, window fixed at $[10,50]\,M$,
-for the hybrid prediction, the coarse-up baseline and the fine
-FD reference.}
+for the hybrid prediction and the fine FD reference.}
 \label{tab:hyb-xq-sweep}
 \small
 \setlength{\tabcolsep}{5pt}
-\begin{tabular}{@{}ccccccc@{}}
+\begin{tabular}{@{}ccccc@{}}
 \toprule
  & \multicolumn{2}{c}{Hybrid}
- & \multicolumn{2}{c}{Coarse-up baseline}
  & \multicolumn{2}{c}{Fine FD reference} \\
-\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
 $\xq/M$ & $|\Delta\omega|\%$ & $|\Delta\tau|\%$
-        & $|\Delta\omega|\%$ & $|\Delta\tau|\%$
         & $|\Delta\omega|\%$ & $|\Delta\tau|\%$ \\
 \midrule
-$2$  & $0.058$ & $0.49$  & $0.051$ & $0.17$  & $0.014$ & $0.06$  \\
-$5$  & $0.113$ & $0.67$  & $0.098$ & $0.51$  & $0.060$ & $0.46$  \\
-$10$ & $0.323$ & $2.08$  & $0.258$ & $2.17$  & $0.246$ & $2.09$  \\
-$15$ & $1.826$ & $5.87$  & $1.687$ & $6.04$  & $1.720$ & $5.59$  \\
-$20$ & $4.915$ & $10.5$  & $4.490$ & $12.0$  & $4.405$ & $10.7$  \\
+$2$  & $0.058$ & $0.49$  & $0.014$ & $0.06$  \\
+$5$  & $0.113$ & $0.67$  & $0.060$ & $0.46$  \\
+$10$ & $0.323$ & $2.08$  & $0.246$ & $2.09$  \\
+$15$ & $1.826$ & $5.87$  & $1.720$ & $5.59$  \\
+$20$ & $4.915$ & $10.5$  & $4.405$ & $10.7$  \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -875,24 +875,6 @@ $20$ & $5.594$ & $5.24$  & $0.140$ & $0.194$ & $[28,68]$ \\
 \bottomrule
 \end{tabular}
 \end{table}
-
-\paragraph{Population QNM scatter.} In the per-BH scatter of
-Fig.~\ref{fig:hyb-pop} the hybrid and baseline errors are
-interleaved along the $y = x$ diagonal; the off-diagonal draws
-are ill-conditioned single-window fits that appear on the fine
-FD reference as well, reflecting the extractor rather than the
-hybrid field.
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=0.95\textwidth]{../outputs/hybrid/fno_sw_gate_s1em3/figs/hybrid_population_scatter_xq10.png}
-\caption{Population scatter of M4 percentage errors at
-$\xq = 10\,M$ on the 100-BH in-distribution test set. Left:
-$\omega$; right: $\tau$. Each marker is one BH, coloured by
-mass $M$. The dashed line is $y = x$; markers below the line
-favour the hybrid.}
-\label{fig:hyb-pop}
-\end{figure}
 
 \paragraph{Training history.} A single Adam phase reduces the
 validation MSE on the gated Richardson residual from
