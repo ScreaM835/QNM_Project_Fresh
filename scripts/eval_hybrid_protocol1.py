@@ -229,6 +229,12 @@ def main() -> None:
                                 args.potential, args.ell, 1.0,
                                 args.t_start, args.t_end_m4)
 
+    canon_field = {k: float(c[k]) for k in
+                   ("rmsd_hybrid", "rmsd_baseline", "rl2_hybrid", "rl2_baseline")}
+    print(f"[P1] canonical field RMSD: hybrid={canon_field['rmsd_hybrid']:.3e}  "
+          f"baseline={canon_field['rmsd_baseline']:.3e}  "
+          f"rL2 hybrid={canon_field['rl2_hybrid']*100:.3f}%")
+
     def _print_table(title, getter):
         print(f"\n[P1] === {title} ===")
         print("method  | hybrid w%/tau%      | baseline w%/tau%    | fine w%/tau%")
@@ -255,7 +261,8 @@ def main() -> None:
            "protocol": "M4 1-D scan t0[10,25] fixed end; "
                        "M5 2-D scan t0[10,25] x te[30,domain-end] self-select",
            "population_medians": med,
-           "canonical": canon}
+           "canonical": canon,
+           "canonical_field": canon_field}
     out_path = os.path.join(out_dir, "eval", f"protocol1_xq10_{te_tag}.json")
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w") as fh:
