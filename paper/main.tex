@@ -716,10 +716,11 @@ hole: trained once on $1{,}000$ draws, it runs a $1/64$-cost
 coarse solve and repairs its discretisation error with a small
 gated network trained on a label-free Richardson target,
 serving any new draw at one coarse solve plus one forward pass
-and cutting the population field MSE by $82\times$. The hybrid
-reproduces the fine reference's single-observer spectroscopy
-without bias, so its contribution is field accuracy, not a
-sharper frequency.
+and cutting the population field MSE by $82\times$. At the
+common observer the hybrid tracks the fine reference's frequency
+to $0.15\%$; its damping time is limited by the network's
+late-ring residual rather than the estimator, so its
+contribution is field accuracy, not a sharper spectroscopy.
 
 Follow-up directions --- a
 Cram\'er--Rao bound on the inverse noise floor, a Bayesian

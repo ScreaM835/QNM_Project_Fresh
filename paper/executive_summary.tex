@@ -118,9 +118,11 @@ of the embedded template that would otherwise bias the damping time
 by ten to twenty percent. The hybrid surrogate cuts the mean-squared
 waveform error by a factor of $82$ relative to its coarse input at
 $1/64$ of the reference cost, with no fine simulation anywhere in
-its training loss; its QNM extraction is statistically
-indistinguishable from that of the expensive reference across a
-$100$-black-hole test population.
+its training loss; at the common observer it tracks the
+expensive reference's frequency to $0.15\%$ across a
+$100$-black-hole population, its damping-time error ($0.53\%$)
+set by the network's late-ring residual rather than the plateau
+estimator.
 
 \section{Recommendation \& Next Steps}
 

@@ -32,7 +32,8 @@ Sec.~\ref{sec:reporting} (M4 plateau estimator; inverse-PINN
 $\tau$ from M2 on the wide window); the reproduction rows
 quote M2, the damped-cosine estimator of
 \citet{Patel2024pinn}. All QNM errors are read at the common
-observer $\xq = 10\,M$ on the window $[10,50]\,M$.
+observer $\xq = 10\,M$ (window $[10,50]\,M$ for the PINN rows,
+$[10,100]\,M$ for the hybrid).
 Population-row QNM
 errors are medians over the $100$-BH test set; the hybrid
 population field entries are population means. For the reproduction rows
@@ -56,8 +57,8 @@ Sec. & Model & Evaluation & Field RMSD & RL2 [\%]
 \ref{sec:res-repro} & Reproduction (Regge--Wheeler) & canonical BH            & $3.77\times 10^{-3}$ & $2.67$  & $1.97$  & $1.56$  \\
 \ref{sec:res-fwd}   & Enhanced forward PINN        & canonical BH             & $8.17\times 10^{-4}$ & $0.58$  & $0.029$ & $2.65$  \\
 \ref{sec:res-inv}   & Inverse PINN                 & canonical BH, $1\%$ noise & ---                 & $3.0$   & $0.30$  & $1.6$   \\
-\ref{sec:res-hyb}   & Hybrid surrogate             & canonical BH             & $6.28\times 10^{-4}$ & $0.445$ & $0.139$ & $2.90$  \\
-\ref{sec:res-hyb}   & Hybrid surrogate             & $100$-BH population      & $9.68\times 10^{-4}$ & $0.648$ & $0.323$ & $2.08$  \\
+\ref{sec:res-hyb}   & Hybrid surrogate             & canonical BH             & $6.28\times 10^{-4}$ & $0.445$ & ---     & ---     \\
+\ref{sec:res-hyb}   & Hybrid surrogate             & $100$-BH population      & $9.68\times 10^{-4}$ & $0.648$ & $0.152$ & $0.528$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -610,9 +611,8 @@ Sobol test set (drawn from the hybrid's own training box,
 Sec.~\ref{sec:hyb-method}), at coarsening factor $k = 4$ with
 the label-free Richardson training target of
 Eqs.~\eqref{eq:hyb-richardson}--\eqref{eq:hyb-residual};
-extraction is at the common observer $\xq = 10\,M$, window
-$[10,50]\,M$, so the QNM numbers are directly comparable with
-the PINNs'. The $k = 4$ prior is deliberately weak ($4.93\%$ relative
+extraction is at the common observer $\xq = 10\,M$ shared with
+the PINNs, over the model's full $[10,100]\,M$ evolution. The $k = 4$ prior is deliberately weak ($4.93\%$ relative
 $L^{2}$ on the canonical draw), leaving a large but
 spatially-localised dispersion error for the gated network to
 repair.
@@ -722,32 +722,29 @@ of the same three-way comparison.}
 
 \paragraph{QNM extraction.} The relevant test for a surrogate is
 whether it reproduces the spectroscopy of the fine reference it
-approximates. On the canonical draw M4, read from the observer
-slice of Fig.~\ref{fig:hyb-ringdown-xq2}, recovers $\omega$ to
-$0.139\%$ and $\tau$ to $2.90\%$ (Fig.~\ref{fig:hyb-plateau-m4};
-the M5 scan is shown in Appendix~\ref{app:supp},
-Fig.~\ref{fig:hyb-plateau-m5}); the same extractor on the fine
-FD reference returns $0.226\%$ and $2.82\%$ --- the
-\emph{extractor floor}, the accuracy at which the extraction
-method itself, applied to the exact reference field, bottoms
-out. Table~\ref{tab:hyb-canonical} reports the population
-medians against that reference: the hybrid tracks it across all
-five estimators, recovering $\omega$ to $0.323\%$ and $\tau$ to
-$2.08\%$ on the primary M4 plateau against the reference's own
-$0.246\%$ and $2.09\%$ --- an unbiased reproduction of the
-reference spectroscopy at a fraction of the solve cost. We
-benchmark the QNM against the fine reference, not the coarse
-prior, because the prior is the surrogate's \emph{input}: its
-role is the field baseline of Sec.~\ref{sec:res-hyb} (the
-$82\times$ error reduction), and a coarse solve's own plateau
-extraction reflects the estimator's stability under window
-shifts rather than field quality, so it is not a meaningful
-spectroscopic target.
+approximates. Table~\ref{tab:hyb-canonical} reports the
+population-median extraction against that reference at the
+common observer over the model's full $[10,100]\,M$ evolution;
+the ringdown overlay is Fig.~\ref{fig:hyb-ringdown-xq2} and the
+M4/M5 plateau construction is illustrated in
+Figs.~\ref{fig:hyb-plateau-m4} and~\ref{fig:hyb-plateau-m5}. On
+the primary M4 plateau the hybrid recovers $\omega$ to $0.152\%$
+and $\tau$ to $0.528\%$, against the reference's own $0.064\%$
+and $0.092\%$ --- the \emph{extractor floor}, the accuracy the
+extraction method reaches on the exact field. The hybrid tracks
+the reference in frequency to within a tenth of a percentage
+point; its damping-time error, however, sits above that floor,
+because the network's residual leaves a small incoherent
+component in the late ring that the plateau fit cannot average
+out. The single canonical draw forms no stable M4 plateau
+across the full window, so the QNM is reported on the $100$-BH
+population; the coarse prior is the surrogate's field input
+(Sec.~\ref{sec:res-hyb}), not a spectroscopic benchmark.
 
 \begin{table}[!htbp]
 \centering
 \caption{QNM extraction at the common observer $\xq = 10\,M$,
-window $t \in [10, 50]\,M$, reported as the
+window $t \in [10, 100]\,M$, reported as the
 \emph{median} percentage error over the 100-BH in-distribution
 test set: hybrid prediction against the fine FD reference it
 approximates. Five extraction methods of Sec.~\ref{sec:qnm-methods},
@@ -755,10 +752,9 @@ with the plateau scans of
 Sec.~\ref{sec:plateau} for M4 and M5. Entries are median
 percentage errors of $\omega$ and $\tau$ against the Leaver
 reference $(\omega_{0} M, \tau_{0}/M) = (0.3737, 11.241)$. The
-hybrid reproduces the reference extraction on every estimator;
-its demonstrated gain over the coarse prior is in the
-global field (Sec.~\ref{sec:res-hyb}), not the single-observer
-QNM. Bold entries are
+hybrid tracks the reference in frequency; its damping-time
+error sits above the reference floor, limited by the residual
+in the late ring, not by the plateau estimator. Bold entries are
 the primary values under the reporting convention of
 Sec.~\ref{sec:reporting}.}
 \label{tab:hyb-canonical}
@@ -772,11 +768,11 @@ Sec.~\ref{sec:reporting}.}
 Method & $|\Delta\omega|\%$ & $|\Delta\tau|\%$
        & $|\Delta\omega|\%$ & $|\Delta\tau|\%$ \\
 \midrule
-M1 (FFT $+$ log-line)        & $1.298$ & $4.31$ & $1.291$ & $4.26$ \\
-M2 (1-mode NLS)              & $2.279$ & $10.7$ & $2.261$ & $10.6$ \\
-M3 (ESPRIT $K{=}4$)          & $1.536$ & $7.92$ & $1.552$ & $8.36$ \\
-M4 (1-D plateau)             & $\mathbf{0.323}$ & $\mathbf{2.08}$ & $0.246$ & $2.09$ \\
-M5 (2-D plateau)             & $0.297$ & $2.38$ & $0.243$ & $2.45$ \\
+M1 (FFT $+$ log-line)        & $0.423$ & $1.42$ & $0.421$ & $1.16$ \\
+M2 (1-mode NLS)              & $2.191$ & $10.3$ & $2.153$ & $10.3$ \\
+M3 (ESPRIT $K{=}4$)          & $1.468$ & $7.98$ & $1.444$ & $7.93$ \\
+M4 (1-D plateau)             & $\mathbf{0.152}$ & $\mathbf{0.528}$ & $0.064$ & $0.092$ \\
+M5 (2-D plateau)             & $0.250$ & $1.37$ & $0.138$ & $1.09$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -797,8 +793,9 @@ and $\tau = 11.241\,M$.}
 
 \paragraph{Training history.} A single Adam phase reduces the
 validation MSE on the gated Richardson residual from
-$9.0\times 10^{-5}$ to $3.9\times 10^{-7}$, with train and
-validation tracking together (Fig.~\ref{fig:hyb-loss}).
+$3.6\times 10^{-4}$ to $1.8\times 10^{-6}$ over $100$ epochs,
+with train and validation tracking together
+(Fig.~\ref{fig:hyb-loss}).
 
 \begin{figure}[!htbp]
 \centering
