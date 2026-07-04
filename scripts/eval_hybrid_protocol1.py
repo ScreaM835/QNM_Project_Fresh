@@ -65,18 +65,25 @@ def _safe(fn, *args, **kwargs) -> Dict[str, float]:
 
 
 def _protocol1(t: np.ndarray, y: np.ndarray, potential: str, ell: int,
-               M: float) -> Dict[str, Dict[str, float]]:
-    """M1-M5 with the printed (Algorithm-1) scan grids."""
+               M: float, t_start: float, t_end: float
+               ) -> Dict[str, Dict[str, float]]:
+    """M1-M5 with the printed (Algorithm-1) scan grids.
+
+    For the canonical window (t_start=10, t_end=50) the M4/M5 grids are exactly
+    Algorithm 1. A larger t_end (e.g. 80 for the t=100 corpus) keeps the same
+    t0 scan [10,25] but lets the fit reach further into the ringdown tail --
+    an explicitly-labelled extended-window variant, never the primary number.
+    """
     raw = {
-        "M1": _safe(qnm_method_1, t, y, T_START, T_END),
-        "M2": _safe(qnm_method_2, t, y, T_START, T_END),
-        "M3": _safe(qnm_method_3_esprit, t, y, T_START, T_END, K=4),
+        "M1": _safe(qnm_method_1, t, y, t_start, t_end),
+        "M2": _safe(qnm_method_2, t, y, t_start, t_end),
+        "M3": _safe(qnm_method_3_esprit, t, y, t_start, t_end, K=4),
         "M4": _safe(qnm_method_4_window_scan, t, y,
-                    t_start_min=10.0, t_start_max=25.0, t_end=50.0,
+                    t_start_min=10.0, t_start_max=25.0, t_end=t_end,
                     potential=potential, ell=ell),        # defaults: 16, w=8
         "M5": _safe(qnm_method_5_2d_scan, t, y,
                     t_start_min=10.0, t_start_max=25.0,
-                    t_end_min=30.0, t_end_max=50.0,
+                    t_end_min=30.0, t_end_max=t_end,
                     potential=potential, ell=ell),        # defaults: 10x6, 5x3
     }
     out: Dict[str, Dict[str, float]] = {}
@@ -92,18 +99,21 @@ def _protocol1(t: np.ndarray, y: np.ndarray, potential: str, ell: int,
 _WT: Dict[str, Any] = {}
 
 
-def _winit(t_fine, potential, ell) -> None:
+def _winit(t_fine, potential, ell, t_start, t_end) -> None:
     _WT["t"] = t_fine
     _WT["pot"] = potential
     _WT["ell"] = ell
+    _WT["t_start"] = t_start
+    _WT["t_end"] = t_end
 
 
 def _worker(task):
     i, M_i, y_hyb, y_base, y_fine = task
     t, pot, ell = _WT["t"], _WT["pot"], _WT["ell"]
+    ts, te = _WT["t_start"], _WT["t_end"]
     rec: Dict[str, Any] = {"i": i, "M": M_i}
     for tag, y in (("hyb", y_hyb), ("base", y_base), ("fine", y_fine)):
-        rec[tag] = _protocol1(t, y, pot, ell, M_i)
+        rec[tag] = _protocol1(t, y, pot, ell, M_i, ts, te)
     return rec
 
 
@@ -113,6 +123,10 @@ def main() -> None:
     ap.add_argument("--n", type=int, default=0)
     ap.add_argument("--ell", type=int, default=2)
     ap.add_argument("--potential", default="zerilli")
+    ap.add_argument("--t_start", type=float, default=10.0)
+    ap.add_argument("--t_end", type=float, default=50.0,
+                    help="fit-window end (default 50 = canonical Algorithm 1;"
+                         " use 80 for the extended t=100 corpus variant).")
     ap.add_argument("--procs", type=int, default=12,
                     help="worker processes for the extraction loop (default 12,"
                          " capped below cpu_count; thermal headroom on 24-core).")
@@ -160,7 +174,7 @@ def main() -> None:
     x_fine = grid.x_fine.astype(np.float64)
     ix = int(np.argmin(np.abs(x_fine - XQ)))
     ref = theory_ref(args.potential, args.ell)
-    print(f"[P1] xq={XQ:g}  window [{T_START:g},{T_END:g}]  "
+    print(f"[P1] xq={XQ:g}  window [{args.t_start:g},{args.t_end:g}]  "
           f"theory M*omega={ref['omega']:.4f} tau/M={ref['tau']:.4f}")
 
     P = test["P"][:n_eval]
@@ -175,7 +189,8 @@ def main() -> None:
     print(f"[P1] extracting {n_eval} samples x 3 sources on {nproc} processes ...")
     t0 = time.time()
     with mp.Pool(nproc, initializer=_winit,
-                 initargs=(t_fine, args.potential, args.ell)) as pool:
+                 initargs=(t_fine, args.potential, args.ell,
+                           args.t_start, args.t_end)) as pool:
         per_sample = pool.map(_worker, tasks, chunksize=1)
     per_sample.sort(key=lambda r: r["i"])
     print(f"[P1] extraction done in {time.time()-t0:.0f}s")
@@ -196,7 +211,8 @@ def main() -> None:
     med = {k: float(np.nanmedian(np.asarray(v, dtype=float)))
            for k, v in accum.items()}
 
-    print(f"\n[P1] === population medians, xq={XQ:g}, printed protocol ===")
+    print(f"\n[P1] === population medians, xq={XQ:g}, "
+          f"window [{args.t_start:g},{args.t_end:g}] ===")
     print("method  | hybrid w%/tau%      | baseline w%/tau%    | fine w%/tau%")
     for m in list(METHODS) + ["ORACLE"]:
         row = [f"{m:7s}"]
@@ -208,15 +224,17 @@ def main() -> None:
     print("(ORACLE = best across M1-M5 selected using the true answer; "
           "diagnostic bound, not a primary value.)")
 
-    out = {"n_eval": n_eval, "xq": XQ, "window": [T_START, T_END],
-           "protocol": "Algorithm-1 grids (M4 16 starts w=8 t0[10,25]; "
-                       "M5 10x6 t0[10,25] te[30,50])",
+    te_tag = f"te{args.t_end:g}"
+    out = {"n_eval": n_eval, "xq": XQ, "window": [args.t_start, args.t_end],
+           "protocol": f"Algorithm-1 grids (M4 16 starts w=8 t0[10,25]; "
+                       f"M5 10x6 t0[10,25] te[30,{args.t_end:g}])",
            "medians": med}
-    out_path = os.path.join(out_dir, "eval", "protocol1_xq10.json")
+    out_path = os.path.join(out_dir, "eval", f"protocol1_xq10_{te_tag}.json")
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w") as fh:
         json.dump(out, fh, indent=2)
-    ps_path = os.path.join(out_dir, "eval", "protocol1_xq10_per_sample.json")
+    ps_path = os.path.join(out_dir, "eval",
+                           f"protocol1_xq10_{te_tag}_per_sample.json")
     with open(ps_path, "w") as fh:
         json.dump(per_sample, fh, indent=2)
     print(f"\n[P1] wrote {out_path}")
