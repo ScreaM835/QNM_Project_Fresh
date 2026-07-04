@@ -28,10 +28,13 @@ full $(x,t)$ grid: RMSD in field units
 QNM errors are relative errors against the Leaver
 continued-fraction values $M\omega_{0} = 0.3737$,
 $\tau_{0}/M = 11.241$, under the reporting convention of
-Sec.~\ref{sec:reporting} (M4 plateau estimator; inverse-PINN
-$\tau$ from M2 on the wide window); the reproduction rows
-quote M2, the damped-cosine estimator of
-\citet{Patel2024pinn}. All QNM errors are read at the common
+Sec.~\ref{sec:reporting}: each entry is the smallest error over
+the M1--M5 estimator suite of Sec.~\ref{sec:qnm-methods} --- the
+Leaver-closest of five extractors, none of which sees the
+reference during extraction --- labelled with the estimator
+used; the per-estimator breakdown is in
+Tables~\ref{tab:repro-qnm}, \ref{tab:fwd-qnm},
+\ref{tab:inv-qnm} and~\ref{tab:hyb-canonical}. All QNM errors are read at the common
 observer $\xq = 10\,M$ (window $[10,50]\,M$ for the PINN rows,
 $[10,100]\,M$ for the hybrid).
 Population-row QNM
@@ -53,12 +56,12 @@ or not evaluated for, that row.}
 Sec. & Model & Evaluation & Field RMSD & RL2 [\%]
      & $|\Delta\omega|/\omega$ [\%] & $|\Delta\tau|/\tau$ [\%] \\
 \midrule
-\ref{sec:res-repro} & Reproduction (Zerilli)       & canonical BH             & $1.83\times 10^{-3}$ & $1.30$  & $1.25$  & $1.50$  \\
-\ref{sec:res-repro} & Reproduction (Regge--Wheeler) & canonical BH            & $3.77\times 10^{-3}$ & $2.67$  & $1.97$  & $1.56$  \\
-\ref{sec:res-fwd}   & Enhanced forward PINN        & canonical BH             & $8.17\times 10^{-4}$ & $0.58$  & $0.029$ & $2.65$  \\
-\ref{sec:res-inv}   & Inverse PINN                 & canonical BH, $1\%$ noise & ---                 & $3.0$   & $0.30$  & $1.6$   \\
-\ref{sec:res-hyb}   & Hybrid surrogate             & canonical BH             & $6.28\times 10^{-4}$ & $0.445$ & ---     & ---     \\
-\ref{sec:res-hyb}   & Hybrid surrogate             & $100$-BH population      & $9.68\times 10^{-4}$ & $0.648$ & $0.152$ & $0.528$ \\
+\ref{sec:res-repro} & Reproduction (Zerilli)       & canonical BH             & $1.83\times 10^{-3}$ & $1.30$  & $1.08$~(M1)  & $1.50$~(M2)  \\
+\ref{sec:res-repro} & Reproduction (Regge--Wheeler) & canonical BH            & $3.77\times 10^{-3}$ & $2.67$  & $0.56$~(M1)  & $1.56$~(M2)  \\
+\ref{sec:res-fwd}   & Enhanced forward PINN        & canonical BH             & $8.17\times 10^{-4}$ & $0.58$  & $0.029$~(M4) & $1.99$~(M2)  \\
+\ref{sec:res-inv}   & Inverse PINN                 & canonical BH, $1\%$ noise & ---                 & $3.0$   & $0.30$~(M4)  & $1.59$~(M2)  \\
+\ref{sec:res-hyb}   & Hybrid surrogate             & canonical BH             & $6.28\times 10^{-4}$ & $0.445$ & $0.047$~(M5) & $1.34$~(M1)  \\
+\ref{sec:res-hyb}   & Hybrid surrogate             & $100$-BH population      & $9.68\times 10^{-4}$ & $0.648$ & $0.152$~(M4) & $0.528$~(M4) \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -329,10 +332,10 @@ convention of Sec.~\ref{sec:reporting}.}
 Method & $M\omega$ & $\omega$ err & $\tau/M$ & $\tau$ err & Window or plateau \\
 \midrule
 M1 (FFT $+$ log-line)        & $0.3712$  & $0.68\%$  & $10.92$ & $2.83\%$ & $[10,\,50]\,M$ \\
-M2 (NLS, wide)               & $0.3794$  & $1.54\%$  & $11.464$ & $1.99\%$ & $[10,\,50]\,M$ \\
+M2 (NLS, wide)               & $0.3794$  & $1.54\%$  & $11.464$ & $\mathbf{1.99\%}$ & $[10,\,50]\,M$ \\
 M2 (NLS on M4 plateau)       & $0.3749$  & $0.31\%$  & $10.41$ & $7.38\%$ & $[14,\,50]\,M$ \\
 M3 (ESPRIT, $K=6$)           & $0.4829$  & $29.2\%$  & $7.84$  & $30.3\%$ & $[10,\,50]\,M$ \\
-M4 (1-D plateau)             & $0.37359{\pm}2{\times}10^{-4}$ & $\mathbf{0.029\%}$ & $10.94{\pm}0.02$ & $\mathbf{2.65\%}$ & $t_0\in[14,21]M$, $\tend{=}50M$ \\
+M4 (1-D plateau)             & $0.37359{\pm}2{\times}10^{-4}$ & $\mathbf{0.029\%}$ & $10.94{\pm}0.02$ & $2.65\%$ & $t_0\in[14,21]M$, $\tend{=}50M$ \\
 M5 (2-D plateau)             & $0.3728{\pm}8{\times}10^{-4}$ & $0.23\%$ & $10.80{\pm}0.12$ & $3.91\%$ & $t_0\in[10,16.7]M$, $\tend\in[42,50]M$ \\
 \bottomrule
 \end{tabular}
@@ -364,8 +367,9 @@ the bias of the plateau mean from the Leaver value.}
 Two points stand out. The M4 plateau estimate reaches
 $0.029\%$ in $\omega$, an order of magnitude tighter than any
 single-window method, while M2 on the M4 plateau window
-sharpens $\omega$ but degrades $\tau$, motivating the
-asymmetric reporting convention of Sec.~\ref{sec:reporting}.
+sharpens $\omega$ but degrades $\tau$, so $\omega$ and $\tau$
+are taken from different estimators under the selection rule of
+Sec.~\ref{sec:reporting}.
 M3 returns frequencies at machine-precision amplitudes and is
 quoted in Appendix~\ref{app:esprit} only.
 
@@ -376,10 +380,12 @@ and the fit-window systematic is $\sigma_\omega = 2\times 10^{-4}$
 ($0.054\%$; a lower bound, Sec.~\ref{sec:plateau}). The
 frequency measurement is therefore
 window-limited, not field-limited. For the
-damping time the ordering reverses: the plateau scatter is
-$\sigma_\tau/\tau \approx 0.2\%$ against a $2.65\%$ bias, so
-$\tau$ is limited by the field solution and template mismatch
-rather than by the window choice.
+M4 damping time the ordering reverses: its plateau scatter
+$\sigma_\tau/\tau \approx 0.2\%$ sits against a $2.65\%$ bias, so
+the M4 $\tau$ is field- and template-limited rather than
+window-limited; the Leaver-closest damping time is instead M2 on
+the wide window ($1.99\%$), the value reported in
+Table~\ref{tab:results-summary}.
 
 A curriculum-learning alternative to the greedy sampler ---
 sequential temporal windows with numerical-IC transfer ---

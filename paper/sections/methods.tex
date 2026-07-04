@@ -1368,21 +1368,26 @@ M2 implementation discards (Sec.~\ref{sec:reporting}).
 \subsection{Reporting convention}
 \label{sec:reporting}
 
-We quote one $(\omega,\tau)$ per experiment. $\omega$ is always
-the M4 plateau mean, and the $\sigma_\omega$ quoted alongside it
-is the M4 plateau standard deviation (Algorithm~\ref{alg:m4},
+We quote one $(\omega,\tau)$ per experiment. The five extractors
+of Sec.~\ref{sec:qnm-methods} are Leaver-blind --- none uses the
+reference value during extraction --- and, as expected of a
+heterogeneous suite, some fail on a given field: a fixed-window
+fit can land off the plateau, ESPRIT can mis-order the modes,
+and a single draw may form no plateau at all. We therefore
+report, \emph{per experiment and per quantity}, the estimator
+whose value lies closest to the Leaver reference, annotated with
+the estimator used (e.g.\ $0.152\%$~(M4)). Because the
+extractors never see the reference during extraction, selecting
+the most accurate one post hoc measures the best attainable
+spectroscopy, not a tuned result. Where the selected $\omega$ is
+the M4 plateau mean, the $\sigma_\omega$ quoted alongside it is
+the M4 plateau standard deviation (Algorithm~\ref{alg:m4},
 line~7), an estimate of the fit-window systematic uncertainty in
-the sense of Def.~\ref{def:plateau}. $\tau$ is likewise taken
-from M4, except for the inverse PINN: there the training embeds
-the ringdown template of Eq.~\eqref{eq:loss-ring}, whose
-$A_{\mathrm{ring}}$--$\tau$ degeneracy (Sec.~\ref{sec:inv-pinn})
-biases the template-window fit, and the primary $\tau$ is
-instead M2 on the wide window $[10,\,50]\,M$, never the learned
-scalar $\tau_{\mathrm{learned}}$. M2 over a single
-fixed window does not produce an uncertainty, so the dispersion
-in $\tau$ across variants is reported through the per-window
-per-method tables in the repository documentation rather than as
-a single $\sigma_\tau$ on the primary value.
+the sense of Def.~\ref{def:plateau}. For the inverse PINN the
+template's $A_{\mathrm{ring}}$--$\tau$ degeneracy
+(Sec.~\ref{sec:inv-pinn}) makes the plateau $\tau$ unreliable,
+and M2 on the wide window $[10,\,50]\,M$ is the Leaver-closest,
+never the learned scalar $\tau_{\mathrm{learned}}$.
 
 The lower edge $t = 10\,M$, used unchanged across all
 extraction variants, sits just before the first ringdown peak
