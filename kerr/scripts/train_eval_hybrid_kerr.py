@@ -491,14 +491,15 @@ def make_plots(hist, fields, out_dir):
     P = fields["P"]; aM = P[:, 0]
     ic = int(np.argmin(np.abs(aM - 0.7)))      # canonical mid-spin sample
 
-    # 1) loss history
-    plt.figure(figsize=(6, 4))
-    plt.semilogy(hist["train_mse"], label="train")
-    plt.semilogy(hist["val_mse"], label="val")
-    plt.axvline(hist["best_epoch"] - 1, color="k", ls="--", lw=0.8, label=f"best@{hist['best_epoch']}")
-    plt.xlabel("epoch"); plt.ylabel("normalised MSE"); plt.legend()
-    plt.title("Kerr hybrid training"); plt.tight_layout()
-    plt.savefig(os.path.join(figs, "hybrid_loss.png"), dpi=130); plt.close()
+    # 1) loss history (skipped when --eval-only has no training history)
+    if hist.get("train_mse"):
+        plt.figure(figsize=(6, 4))
+        plt.semilogy(hist["train_mse"], label="train")
+        plt.semilogy(hist["val_mse"], label="val")
+        plt.axvline(hist.get("best_epoch", 1) - 1, color="k", ls="--", lw=0.8, label=f"best@{hist.get('best_epoch', '?')}")
+        plt.xlabel("epoch"); plt.ylabel("normalised MSE"); plt.legend()
+        plt.title("Kerr hybrid training"); plt.tight_layout()
+        plt.savefig(os.path.join(figs, "hybrid_loss.png"), dpi=130); plt.close()
 
     # 2) pointwise |error| heatmaps prior vs hybrid (canonical), |psi| error
     def cmag_err(are, aim, bre, bim):
@@ -567,6 +568,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True)
     ap.add_argument("--smoke", action="store_true", help="tiny dry run on CPU")
+    ap.add_argument("--eval-only", action="store_true",
+                    help="load out_dir/model.pt and re-run eval/plots only (no training)")
     args = ap.parse_args()
 
     cfg = load_config(args.config)
@@ -641,9 +644,22 @@ def main():
         cfg["train"]["epochs"] = 2
         cfg["train"]["patience"] = 5
 
-    # ---- train ----
-    hist = train_model(model, asm_tr["X"], asm_tr["Y"], asm_va["X"], asm_va["Y"],
-                       cfg, device, out_dir)
+    # ---- train (or load a saved model, if --eval-only) ----
+    if args.eval_only:
+        ckpt = os.path.join(out_dir, "model.pt")
+        if not os.path.exists(ckpt):
+            raise SystemExit(f"[KERR-HYBRID] --eval-only needs {ckpt}; restore it from Drive first")
+        model.load_state_dict(torch.load(ckpt, map_location=device, weights_only=False))
+        model.eval()
+        print(f"[KERR-HYBRID] eval-only: loaded {ckpt}, skipping training", flush=True)
+        try:
+            with open(os.path.join(out_dir, "history.json")) as _fh:
+                hist = json.load(_fh)
+        except Exception:
+            hist = {"train_mse": [], "val_mse": [], "best_epoch": 0}
+    else:
+        hist = train_model(model, asm_tr["X"], asm_tr["Y"], asm_va["X"], asm_va["Y"],
+                           cfg, device, out_dir)
     del asm_tr, asm_va
 
     # ---- evaluate ----
