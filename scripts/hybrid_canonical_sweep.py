@@ -23,7 +23,7 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 
 import make_hybrid_paper_figs as mh          # noqa: E402
-from eval_hybrid_sw import _all_methods      # noqa: E402
+from eval_hybrid_protocol1 import _protocol1  # noqa: E402  (canonical Algorithm-1 grid)
 
 
 def main() -> None:
@@ -32,7 +32,9 @@ def main() -> None:
     ap.add_argument("--dataset-config", default="configs/hybrid_sw_dataset.yaml")
     ap.add_argument("--xq", type=float, nargs="+", default=[2.0, 5.0, 10.0, 15.0, 20.0])
     ap.add_argument("--t_start", type=float, default=10.0)
-    ap.add_argument("--t_end", type=float, default=50.0)
+    ap.add_argument("--t_end", type=float, default=50.0,
+                    help="M4 fixed fit-window end (50 = t=50 corpus; 100 = full "
+                         "t=100 domain). M5 always scans to the domain end.")
     args = ap.parse_args()
 
     mh.CONFIG = args.config
@@ -54,8 +56,8 @@ def main() -> None:
         key = f"xq{xq:g}"
         results[key] = {"x_actual": float(x[ix])}
         for label, field in sources.items():
-            res = _all_methods(t, field[:, ix], args.t_start, args.t_end,
-                               potential="zerilli", ell=2, M=1.0)
+            res = _protocol1(t, field[:, ix], "zerilli", 2, 1.0,
+                             args.t_start, args.t_end)
             results[key][label] = res
 
     # ---- print table -------------------------------------------------------
