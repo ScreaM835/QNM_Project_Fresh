@@ -97,18 +97,43 @@ def extract_qnm_scri(y_re, y_im, a, tau, qnm_ref) -> Dict[str, float]:
         out = extract_qnm_kerr_ensemble(
             tau, y, a_over_M=float(a), tau_ref=tau_ref,
             tau_final=float(tau[-1]), omega_target=omega_target,
+            return_detail=True,
         )
         om = float(out.get("omega", np.nan))
         spr = float(out.get("omega_std", np.nan))
+        # per-method table + best-to-Leaver pick. The extractors never see the
+        # reference during extraction (omega_target is a mode-ID target only);
+        # we simply report whichever method landed closest to Leaver per metric.
+        lMw, ltau = float(qnm_ref[0]), float(qnm_ref[2])
+        methods = out.get("methods", [])
+        per_method = [[str(mm[0]),
+                       float(mm[1]) if np.isfinite(mm[1]) else None,
+                       float(mm[2]) if np.isfinite(mm[2]) else None] for mm in methods]
+
+        def _best(col, ref):
+            c = [(mm[0], mm[col]) for mm in methods if np.isfinite(mm[col])]
+            if not c or not ref:
+                return (None, float("nan"), float("nan"))
+            lab, val = min(c, key=lambda x: abs(x[1] - ref))
+            return (str(lab), float(val), abs(val - ref) / abs(ref) * 100.0)
+
+        bo_lab, bo_val, bo_err = _best(1, lMw)
+        bt_lab, bt_val, bt_err = _best(2, ltau)
         return {
             "Mw": om, "tau": float(out.get("tau", np.nan)),
             "spread_pct": (spr / abs(om) * 100.0) if (np.isfinite(om) and om) else float("nan"),
             "sel_dist": float(out.get("sel_dist", np.nan)),
             "n_methods": int(out.get("n_omega", 0)),
+            "per_method": per_method,
+            "best_Mw": bo_val, "best_Mw_method": bo_lab, "best_Mw_err_pct": bo_err,
+            "best_tau": bt_val, "best_tau_method": bt_lab, "best_tau_err_pct": bt_err,
         }
     except Exception:
         return {"Mw": float("nan"), "tau": float("nan"),
-                "spread_pct": float("nan"), "sel_dist": float("nan"), "n_methods": 0}
+                "spread_pct": float("nan"), "sel_dist": float("nan"), "n_methods": 0,
+                "per_method": [], "best_Mw": float("nan"), "best_Mw_method": None,
+                "best_Mw_err_pct": float("nan"), "best_tau": float("nan"),
+                "best_tau_method": None, "best_tau_err_pct": float("nan")}
 
 
 def pct_err(val, ref) -> float:
@@ -169,6 +194,11 @@ def _eval_qnm_work(i: int) -> dict:
             "tau_err_pct": pct_err(q["tau"], tL),
             "spread_pct": q["spread_pct"], "sel_dist": q["sel_dist"],
             "n_methods": q["n_methods"],
+            "per_method": q.get("per_method", []),
+            "best_Mw_err_pct": q.get("best_Mw_err_pct", float("nan")),
+            "best_Mw_method": q.get("best_Mw_method"),
+            "best_tau_err_pct": q.get("best_tau_err_pct", float("nan")),
+            "best_tau_method": q.get("best_tau_method"),
         }
     return row
 
@@ -367,6 +397,13 @@ def evaluate(model, test, asm_test, split_test, cfg, device, out_dir) -> dict:
             "qnm_tau_err_prior": _bin_median(idx, "prior", "tau_err_pct"),
             "qnm_tau_err_hybrid": _bin_median(idx, "hybrid", "tau_err_pct"),
             "qnm_tau_err_fine": _bin_median(idx, "fine", "tau_err_pct"),
+            # best-of-suite (Leaver-closest extractor per metric)
+            "qnm_Mw_err_prior_best": _bin_median(idx, "prior", "best_Mw_err_pct"),
+            "qnm_Mw_err_hybrid_best": _bin_median(idx, "hybrid", "best_Mw_err_pct"),
+            "qnm_Mw_err_fine_best": _bin_median(idx, "fine", "best_Mw_err_pct"),
+            "qnm_tau_err_prior_best": _bin_median(idx, "prior", "best_tau_err_pct"),
+            "qnm_tau_err_hybrid_best": _bin_median(idx, "hybrid", "best_tau_err_pct"),
+            "qnm_tau_err_fine_best": _bin_median(idx, "fine", "best_tau_err_pct"),
         })
 
     gate = cfg.get("acceptance", {"field_rl2": 0.05, "qnm_Mw": 0.01, "qnm_tau": 0.05})
@@ -392,6 +429,17 @@ def evaluate(model, test, asm_test, split_test, cfg, device, out_dir) -> dict:
             "prior": agg(["qnm", "prior", "tau_err_pct"]),
             "hybrid": agg(["qnm", "hybrid", "tau_err_pct"]),
             "fine": agg(["qnm", "fine", "tau_err_pct"]),
+        },
+        "qnm_Mw_err_pct_best": {
+            "prior": agg(["qnm", "prior", "best_Mw_err_pct"]),
+            "hybrid": agg(["qnm", "hybrid", "best_Mw_err_pct"]),
+            "richardson": agg(["qnm", "richardson", "best_Mw_err_pct"]),
+            "fine": agg(["qnm", "fine", "best_Mw_err_pct"]),
+        },
+        "qnm_tau_err_pct_best": {
+            "prior": agg(["qnm", "prior", "best_tau_err_pct"]),
+            "hybrid": agg(["qnm", "hybrid", "best_tau_err_pct"]),
+            "fine": agg(["qnm", "fine", "best_tau_err_pct"]),
         },
         "qnm_spread_pct": {
             "prior": agg(["qnm", "prior", "spread_pct"]),
