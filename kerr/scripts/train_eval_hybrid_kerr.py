@@ -342,6 +342,11 @@ def evaluate(model, test, asm_test, split_test, cfg, device, out_dir) -> dict:
         return {"mean": float(np.nanmean(vals)), "median": float(np.nanmedian(vals)),
                 "max": float(np.nanmax(vals)), "p90": float(np.nanpercentile(vals, 90))}
 
+    def _bin_median(idx, src, key):
+        v = [rows[i]["qnm"][src][key] for i in idx]
+        v = [x for x in v if np.isfinite(x)]
+        return float(np.median(v)) if v else float("nan")
+
     aM = P[:, 0]
     spin_bins = [(0.0, 0.3), (0.3, 0.6), (0.6, 0.8), (0.8, 0.95)]
     by_spin = []
@@ -349,14 +354,19 @@ def evaluate(model, test, asm_test, split_test, cfg, device, out_dir) -> dict:
         m = (aM >= lo) & (aM < hi)
         if not m.any():
             continue
+        idx = np.where(m)[0]
         by_spin.append({
             "bin": [lo, hi], "n": int(m.sum()),
-            "field_rl2_prior": float(np.mean(fl_prior[m])),
-            "field_rl2_hybrid": float(np.mean(fl_hyb[m])),
-            "field_rl2_richardson": float(np.mean(fl_rich[m])),
-            "qnm_Mw_err_prior": float(np.nanmean([rows[i]["qnm"]["prior"]["Mw_err_pct"] for i in np.where(m)[0]])),
-            "qnm_Mw_err_hybrid": float(np.nanmean([rows[i]["qnm"]["hybrid"]["Mw_err_pct"] for i in np.where(m)[0]])),
-            "qnm_Mw_err_fine": float(np.nanmean([rows[i]["qnm"]["fine"]["Mw_err_pct"] for i in np.where(m)[0]])),
+            # per-bin MEDIANS (consistent with the overall report aggregation)
+            "field_rl2_prior": float(np.median(fl_prior[m])),
+            "field_rl2_hybrid": float(np.median(fl_hyb[m])),
+            "field_rl2_richardson": float(np.median(fl_rich[m])),
+            "qnm_Mw_err_prior": _bin_median(idx, "prior", "Mw_err_pct"),
+            "qnm_Mw_err_hybrid": _bin_median(idx, "hybrid", "Mw_err_pct"),
+            "qnm_Mw_err_fine": _bin_median(idx, "fine", "Mw_err_pct"),
+            "qnm_tau_err_prior": _bin_median(idx, "prior", "tau_err_pct"),
+            "qnm_tau_err_hybrid": _bin_median(idx, "hybrid", "tau_err_pct"),
+            "qnm_tau_err_fine": _bin_median(idx, "fine", "tau_err_pct"),
         })
 
     gate = cfg.get("acceptance", {"field_rl2": 0.05, "qnm_Mw": 0.01, "qnm_tau": 0.05})
@@ -488,6 +498,16 @@ def make_plots(hist, fields, out_dir):
     plt.xlabel("a/M"); plt.ylabel("M*omega error (%)"); plt.yscale("log"); plt.legend()
     plt.title("QNM accuracy vs spin (at scri)"); plt.tight_layout()
     plt.savefig(os.path.join(figs, "hybrid_qnm_vs_spin.png"), dpi=130); plt.close()
+
+    # 6) QNM tau error vs spin (the weak axis -- shown explicitly)
+    plt.figure(figsize=(6, 4))
+    for key, c, lab in (("prior", "C1", "prior"), ("hybrid", "C0", "hybrid"), ("fine", "k", "fine")):
+        ys = [r["qnm"][key]["tau_err_pct"] for r in rows]
+        plt.scatter(aM, ys, s=14, c=c, label=lab)
+    plt.axhline(5.0, color="r", ls="--", lw=0.8, label="5% gate")
+    plt.xlabel("a/M"); plt.ylabel("tau error (%)"); plt.yscale("log"); plt.legend()
+    plt.title("Damping-time accuracy vs spin (at scri)"); plt.tight_layout()
+    plt.savefig(os.path.join(figs, "hybrid_tau_vs_spin.png"), dpi=130); plt.close()
 
     print(f"  wrote figures to {figs}", flush=True)
 
