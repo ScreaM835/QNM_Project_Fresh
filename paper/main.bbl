@@ -1,4 +1,4 @@
-\begin{thebibliography}{48}
+\begin{thebibliography}{53}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
 \expandafter\ifx\csname urlstyle\endcsname\relax
@@ -12,13 +12,6 @@ Atilim~Gunes Baydin, Barak~A. Pearlmutter, Alexey~Andreyevich Radul, and
 \newblock Automatic differentiation in machine learning: a survey.
 \newblock \emph{Journal of Machine Learning Research}, 18\penalty0
   (153):\penalty0 1--43, 2018.
-
-\bibitem[Bengio et~al.(2009)Bengio, Louradour, Collobert, and
-  Weston]{Bengio2009curriculum}
-Yoshua Bengio, J{\'e}r{\^o}me Louradour, Ronan Collobert, and Jason Weston.
-\newblock Curriculum learning.
-\newblock In \emph{Proc.\ 26th Int.\ Conf.\ Machine Learning (ICML)}, pages
-  41--48, 2009.
 
 \bibitem[Berti et~al.(2007)Berti, Cardoso, Gonzalez, and
   Sperhake]{Berti2007prony}
@@ -71,6 +64,13 @@ Roberto Cotesta, Gregorio Carullo, Emanuele Berti, and Vitor Cardoso.
 Matthew Giesler, Maximiliano Isi, Mark~A. Scheel, and Saul~A. Teukolsky.
 \newblock Black hole ringdown: the importance of overtones.
 \newblock \emph{Phys. Rev. X}, 9:\penalty0 041060, 2019.
+
+\bibitem[Harms et~al.(2013)Harms, Bernuzzi, and Br\"ugmann]{Harms2013}
+Enno Harms, Sebastiano Bernuzzi, and Bernd Br\"ugmann.
+\newblock Numerical solution of the {$2+1$} {Teukolsky} equation on a
+  hyperboloidal and horizon-penetrating foliation of {Kerr} and application to
+  late-time decays.
+\newblock \emph{Class. Quantum Grav.}, 30:\penalty0 115013, 2013.
 
 \bibitem[Hua and Sarkar(1990)]{HuaSarkar1990}
 Y.~Hua and T.~K. Sarkar.
@@ -130,15 +130,6 @@ Nikola Kovachki, Zongyi Li, Burigede Liu, Kamyar Azizzadenesheli, Kaushik
   applications to {PDEs}.
 \newblock \emph{J.\ Mach.\ Learn.\ Res.}, 24\penalty0 (89):\penalty0 1--97,
   2023.
-
-\bibitem[Krishnapriyan et~al.(2021)Krishnapriyan, Gholami, Zhe, Kirby, and
-  Mahoney]{Krishnapriyan2021failure}
-Aditi Krishnapriyan, Amir Gholami, Shandian Zhe, Robert Kirby, and Michael~W.
-  Mahoney.
-\newblock Characterizing possible failure modes in physics-informed neural
-  networks.
-\newblock \emph{Adv.\ Neural Inf.\ Process.\ Syst.\ (NeurIPS)}, 34:\penalty0
-  26548--26560, 2021.
 
 \bibitem[Leaver(1985)]{Leaver1985}
 E.~W. Leaver.
@@ -218,6 +209,24 @@ Ali {\"O}vg{\"u}n, {\.I}zzet Sakall{\i}, and Halil Mutuk.
   network method.
 \newblock \emph{Int. J. Geom. Methods Mod. Phys.}, 18:\penalty0 2150154, 2021.
 
+\bibitem[Panosso~Macedo(2020)]{PanossoMacedo2020}
+Rodrigo Panosso~Macedo.
+\newblock Hyperboloidal framework for the {Kerr} spacetime.
+\newblock \emph{Class. Quantum Grav.}, 37:\penalty0 065019, 2020.
+
+\bibitem[Panosso~Macedo(2024)]{PanossoMacedo2024review}
+Rodrigo Panosso~Macedo.
+\newblock Hyperboloidal approach for static spherically symmetric spacetimes: a
+  didactical introduction and applications in black-hole physics.
+\newblock \emph{Phil. Trans. R. Soc. A}, 382:\penalty0 20230046, 2024.
+
+\bibitem[Panosso~Macedo et~al.(2018)Panosso~Macedo, Jaramillo, and
+  Ansorg]{PanossoMacedo2018}
+Rodrigo Panosso~Macedo, Jos\'e~Luis Jaramillo, and Marcus Ansorg.
+\newblock Hyperboloidal slicing approach to quasinormal mode expansions: The
+  {Reissner--Nordstr\"om} case.
+\newblock \emph{Phys. Rev. D}, 98:\penalty0 124005, 2018.
+
 \bibitem[Paszke et~al.(2019)Paszke, Gross, Massa, Lerer, Bradbury, Chanan,
   Killeen, Lin, Gimelshein, Antiga, Desmaison, K{\"o}pf, Yang, DeVito, Raison,
   Tejani, Chilamkurthy, Steiner, Fang, Bai, and Chintala]{Paszke2019pytorch}
@@ -270,6 +279,18 @@ B.~F. Schutz and C.~M. Will.
 \newblock Black hole normal modes: a semianalytic approach.
 \newblock \emph{Astrophys. J. Lett.}, 291:\penalty0 L33--L36, 1985.
 
+\bibitem[Stein(2019)]{Stein2019qnm}
+Leo~C. Stein.
+\newblock {qnm}: A {Python} package for calculating {Kerr} quasinormal modes,
+  separation constants, and spherical-spheroidal mixing coefficients.
+\newblock \emph{J. Open Source Softw.}, 4\penalty0 (42):\penalty0 1683, 2019.
+
+\bibitem[Teukolsky(1973)]{Teukolsky1973}
+Saul~A. Teukolsky.
+\newblock Perturbations of a rotating black hole. {I}. fundamental equations
+  for gravitational, electromagnetic, and neutrino-field perturbations.
+\newblock \emph{Astrophys. J.}, 185:\penalty0 635--648, 1973.
+
 \bibitem[Um et~al.(2020)Um, Brand, Fei, Holl, and Thuerey]{Um2020solverloop}
 Kiwon Um, Robert Brand, Yun Fei, Philipp Holl, and Nils Thuerey.
 \newblock Solver-in-the-loop: Learning from differentiable physics to interact
@@ -317,6 +338,11 @@ Jeremy Yu, Lu~Lu, Xuhui Meng, and George~Em Karniadakis.
   inverse {PDE} problems.
 \newblock \emph{Comput. Methods Appl. Mech. Engrg.}, 393:\penalty0 114823,
   2022.
+
+\bibitem[Zengino\u{g}lu(2011)]{Zenginoglu2011}
+Anil Zengino\u{g}lu.
+\newblock A geometric framework for black hole perturbations.
+\newblock \emph{Phys. Rev. D}, 83:\penalty0 127502, 2011.
 
 \bibitem[Zerilli(1970)]{Zerilli1970}
 F.~J. Zerilli.

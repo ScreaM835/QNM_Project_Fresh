@@ -53,11 +53,8 @@
 \newcommand{\Phiobs}{\Phi_{\mathrm{obs}}}
 \newcommand{\Phitheta}{\Phi_{\theta}}
 \newcommand{\xq}{x_{q}}
-\newcommand{\tring}{t_{\mathrm{ring}}^{\mathrm{min}}}
+\newcommand{\scri}{\mathcal{I}^{+}}
 \newcommand{\tend}{t_{\mathrm{end}}}
-\newcommand{\Nring}{N_{\mathrm{ring}}}
-\newcommand{\Nobs}{N_{\mathrm{obs}}}
-\newcommand{\Lring}{\mathcal{L}_{\mathrm{ring}}}
 \newcommand{\Lpde}{\mathcal{L}_{\mathrm{PDE}}}
 \newcommand{\Lic}{\mathcal{L}_{\mathrm{IC}}}
 \newcommand{\Lbc}{\mathcal{L}_{\mathrm{BC}}}
@@ -100,16 +97,16 @@ residual-greedy sampling and a doubled quasi-Newton budget then
 reach $0.58\%$ relative field error, from which the fundamental
 QNM frequency is recovered to $0.029\%$ using a new plateau-scan
 estimator that quantifies the fit-window systematic and flags
-its own validity. An inverse PINN jointly recovers the
-black-hole mass to $0.34\%$ from noisy observations, after
-isolating an amplitude--damping-time degeneracy of the embedded
-ringdown template. The hybrid surrogate, trained once over
+its own validity. The hybrid surrogate, trained once over
 $1{,}000$ initial-data draws, serves any new draw at the cost of
 one coarse solve plus one forward pass, reducing the population
 mean-squared field error by a factor of $82$ at one
-sixty-fourth of the fine-solve cost. The
-plateau estimator, the degeneracy diagnosis and the
-solver-correction design are designed to carry over to Kerr.
+sixty-fourth of the fine-solve cost. Finally, the same
+solver-correction design, retrained on the Teukolsky equation,
+carries the approach to rotating (Kerr) black holes: across
+spins $a/M \in [0, 0.95]$ it cuts the median field error by a
+factor of $77$ and recovers the near-extremal fundamental
+frequency to $0.38\%$.
 \end{abstract}
 
 % =====================================================================
@@ -148,11 +145,12 @@ Two limitations of the prior PINN-for-QNM literature
 \citet{Patel2024pinn}, the only prior PINN study of the
 time-domain Zerilli problem, report a $28.06\%$ relative field
 error that dominates their QNM error budget, with a fit window
-fixed by hand; and no prior PINN study recovers the black-hole
-mass and a ringdown template jointly from noisy observations.
+fixed by hand; and every PINN treatment retrains from scratch
+for each black hole, with no amortization across the parameter
+space.
 
 We address both points on the Schwarzschild $\ell = 2$ master
-equations, evaluating four models under a single extraction
+equations, evaluating three models under a single extraction
 protocol. The architecture-matched reproduction of
 \citet{Patel2024pinn} reduces their reported field errors by an
 order of magnitude on both isospectral potentials; the
@@ -160,21 +158,34 @@ extensions below are reported on the Zerilli equation. An enhanced forward PINN 
 budget and residual-greedy adaptive sampling --- reaches
 $0.58\%$ relative field error, from which a new plateau-scan
 estimator that reports its own fit-window systematic recovers
-the fundamental frequency to $0.029\%$. An inverse PINN with an
-embedded ringdown template jointly recovers the black-hole mass
-to $0.34\%$ from $500$ observations at $1\%$ noise, after an
-analytic and empirical isolation of the template's
-amplitude--damping-time degeneracy; a six-variant ablation
-identifies the configuration that also recovers $\omega$ to
-$0.30\%$ and $\tau$ to $1.6\%$. (A curriculum-learning
-extension of the forward problem does not improve the global
-extraction, Appendix~\ref{sec:res-cur}.) Finally, a
-hybrid surrogate runs a $1/64$-cost coarse FD solve and trains
-a small FNO on a label-free, Richardson-extrapolated estimate
-of its discretisation error, confined to the under-resolved
-wavefronts by a parameter-free gradient gate; it cuts the
-population field MSE by $82\times$ while no fine-grid field
-enters its training loss.
+the fundamental frequency to $0.029\%$. Finally, a
+hybrid surrogate, trained once across the initial-data
+distribution, corrects a $1/64$-cost coarse FD solve with a
+small FNO on a label-free, Richardson-extrapolated estimate of
+its discretisation error, confined to the under-resolved
+wavefronts by a parameter-free gradient gate; it then serves
+any new draw at one coarse solve plus one forward pass, cutting
+the population field MSE by $82\times$ with no fine-grid field
+in its training loss.
+
+The three models above all treat a Schwarzschild black hole,
+where the metric perturbation separates into the
+Regge--Wheeler and Zerilli wave equations. Astrophysical
+remnants rotate, and rotation couples the radial and angular
+sectors: the governing equation becomes the Teukolsky master
+equation \citep{Teukolsky1973}, whose spectrum depends on the
+spin. As a final test of whether the hybrid concept is tied to
+a particular geometry, we retrain the surrogate on a family of
+rotating (Kerr) black holes spanning dimensionless spins
+$a/M \in [0, 0.95]$. Prior neural-network treatments of the
+Kerr spectrum solve the frequency-domain eigenvalue problem
+for isolated modes \citep{Luna2022teukolskypinn,
+Cornell2022pinnqnm} and never produce a waveform; our
+surrogate instead emits the full time-domain ringdown at null
+infinity and, amortised once across spin, recovers the median
+field to $0.78\%$ (a $77\times$ reduction over the coarse
+prior) and the near-extremal fundamental frequency to
+$0.38\%$.
 
 A remark on scope. This is a controlled extraction benchmark
 against known continued-fraction reference values, not an
@@ -188,67 +199,52 @@ proximity of any extracted value to the known answer.
 
 The remainder of this section reviews the perturbation problem,
 time-domain extraction, and the prior machine-learning
-literature. Section~\ref{sec:methods} states the four models
-and the extraction protocol, Sec.~\ref{sec:results} reports
-their results, Sec.~\ref{sec:discussion} discusses them, and
+literature. Section~\ref{sec:methods} states the three
+Schwarzschild models and their generalisation to Kerr,
+together with the extraction protocol, Sec.~\ref{sec:results}
+reports their results, Sec.~\ref{sec:discussion} discusses
+them, and
 Sec.~\ref{sec:conclusion} concludes; hyperparameter tables and
 supporting scans are collected in the appendices.
-Figure~\ref{fig:framework} summarises the framework: each model
-produces the same observer time series, which a single
+Table~\ref{tab:framework} summarises the framework: each model
+produces an observer time series, which a single
 extraction protocol converts into $(\omega,\tau)$ with a
 validity flag.
 
-\begin{figure}[!htbp]
+\begin{table}[!htbp]
 \centering
-\resizebox{\textwidth}{!}{%
-\begin{tikzpicture}[
-  font=\small,
-  model/.style={rectangle, rounded corners=3pt, draw, fill=orange!12,
-                minimum height=9mm, minimum width=56mm, align=center,
-                font=\footnotesize},
-  mid/.style={rectangle, rounded corners=3pt, draw, fill=blue!10,
-              minimum height=12mm, minimum width=26mm, align=center,
-              font=\footnotesize},
-  proto/.style={rectangle, rounded corners=3pt, draw, fill=green!12,
-                minimum height=26mm, minimum width=44mm, align=center,
-                font=\footnotesize},
-  outb/.style={rectangle, rounded corners=3pt, draw, fill=green!25,
-               minimum height=12mm, minimum width=32mm, align=center,
-               font=\footnotesize},
-  arr/.style={->, >=stealth, thick},
-]
-  \node[model] (m1) {reproduction PINN (Sec.~\ref{sec:res-repro})};
-  \node[model, below=2.5mm of m1] (m2) {enhanced forward PINN (Sec.~\ref{sec:res-fwd})};
-  \node[model, below=2.5mm of m2] (m3) {inverse PINN $+$ learnable
-        $(M,\omega,\tau,A_{\mathrm{ring}},\phi)$ (Sec.~\ref{sec:res-inv})};
-  \node[model, below=2.5mm of m3] (m5) {hybrid coarse-FD $+$ gated FNO
-        residual, trained once on $10^{3}$ draws (Sec.~\ref{sec:res-hyb})};
-  \node[mid, right=13mm of m3.north east] (ser) {observer series\\ $\Phi(\xq, t)$};
-  \foreach \m in {m1,m2,m3,m5}
-    \draw[arr] (\m.east) -- (ser.west);
-  \node[proto, right=13mm of ser] (prot)
-        {extraction protocol\\
-         (Secs.~\ref{sec:qnm-methods}--\ref{sec:reporting})\\[1.2mm]
-         estimators M1--M5\\
-         plateau criterion $\to \sigma_\omega$ flag\\
-         reporting convention};
-  \draw[arr] (ser) -- (prot);
-  \node[outb, right=13mm of prot] (out)
-        {$(\omega, \tau)$ [$+\,M$]\\ vs Leaver reference};
-  \draw[arr] (prot) -- (out);
-\end{tikzpicture}%
-}
-\caption{The unified framework. Each of the four models (left)
-produces the observer time series $\Phi(\xq,t)$; the inverse
-PINN additionally carries five learnable scalars. A single
-extraction protocol --- the five estimators M1--M5, the plateau
-validity criterion with its $\sigma_\omega$ flag, and the
-reporting convention --- converts every series into the primary
-$(\omega,\tau)$ estimate, plus the recovered mass $M$ for the
-inverse PINN, benchmarked against Leaver's continued-fraction
-values.}
-\label{fig:framework}
-\end{figure}
+\caption{The unified framework. Every field-producing model
+feeds a single extraction protocol that returns the primary
+$(\omega,\tau)$ estimate with a validity flag, benchmarked
+against Leaver's continued-fraction values.}
+\label{tab:framework}
+\small
+\setlength{\tabcolsep}{6pt}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}p{0.23\textwidth}p{0.69\textwidth}@{}}
+\toprule
+Stage & Content \\
+\midrule
+Field-producing models &
+  (i)~reproduction PINN (Sec.~\ref{sec:res-repro});\;
+  (ii)~enhanced forward PINN (Sec.~\ref{sec:res-fwd});\;
+  (iii)~hybrid coarse-FD $+$ FNO residual, trained once on
+  $10^{3}$ draws (Sec.~\ref{sec:res-hyb});\;
+  (iv)~Kerr hybrid surrogate (Sec.~\ref{sec:res-kerr}) \\
+Observer series &
+  $\Phi(\xq, t)$ at $\xq = 10\,M$ (Schwarzschild);\;
+  $\Psi$ at null infinity $\scri$ (Kerr) \\
+Extraction protocol &
+  five estimators M1--M5 (Sec.~\ref{sec:qnm-methods});\;
+  plateau validity criterion $\to \sigma_\omega$ flag
+  (Sec.~\ref{sec:plateau});\;
+  reporting convention (Sec.~\ref{sec:reporting}) \\
+Primary estimate &
+  $(\omega, \tau)$ benchmarked against Leaver's
+  continued-fraction reference \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Schwarzschild QNMs and time-domain extraction}
 \label{sec:bg-zerilli}
@@ -578,64 +574,10 @@ solve the time-domain Zerilli and Regge--Wheeler equations with
 a fully-connected PINN; their reported field error and single
 fixed-window fit are the two limitations identified at the
 start of the introduction.
-No prior PINN study recovers the mass jointly with a
-damped-sinusoid template, and none reports a fit-window
-systematic on the recovered $(\omega,\tau)$. Nor does any
-analyse the amplitude--damping-time degeneracy of an embedded
-template or ablate the template-loss hyperparameters;
-Secs.~\ref{sec:methods}--\ref{sec:res-inv} address all four
-gaps, through the forward and inverse pipelines summarised in
-Fig.~\ref{fig:bg-pipeline}.
-
-\begin{figure}[!htbp]
-\centering
-\begin{tikzpicture}[
-  node distance=14mm and 16mm,
-  every node/.style={font=\small},
-  data/.style={cylinder, shape border rotate=90, draw, fill=blue!8,
-               minimum height=8mm, minimum width=22mm, aspect=0.3, inner sep=2pt,
-               font=\scriptsize},
-  proc/.style={rectangle, rounded corners=3pt, draw, fill=orange!12,
-               minimum height=8mm, minimum width=22mm, inner sep=3pt, align=center},
-  outn/.style={rectangle, draw, fill=green!12, minimum height=8mm,
-              minimum width=26mm, inner sep=3pt, align=center},
-  arr/.style={->, >=stealth, thick},
-]
-  % Forward track (top)
-  \node[data] (fd) {FD reference};
-  \node[proc, right=of fd] (fwd) {Forward PINN\\(Sec.~\ref{sec:fwd-pinn})};
-  \node[proc, right=of fwd] (m15a) {M1--M5\\estimators};
-  \node[outn, right=of m15a] (fwdout) {$(\omega,\tau)$ + plateau\\$\sigma_\omega$};
-  \draw[arr] (fd) -- (fwd);
-  \draw[arr] (fwd) -- node[above=1pt, font=\scriptsize] {$\Phi_\theta(\xq,t)$} (m15a);
-  \draw[arr] (m15a) -- (fwdout);
-
-  % Inverse track (bottom)
-  \node[data, below=18mm of fd] (obs) {$\Nobs{=}500$ noisy samples};
-  \node[proc, right=of obs] (inv) {Inverse PINN\\(Sec.~\ref{sec:inv-pinn})};
-  \node[proc, right=of inv] (m15b) {M1--M5\\estimators};
-  \node[outn, right=of m15b] (invout) {$(M,\omega,\tau)$ + plateau\\$\sigma_\omega$};
-  \draw[arr] (obs) -- (inv);
-  \draw[arr] (inv) -- node[above=1pt, font=\scriptsize] {$\Phi_\theta(\xq,t)$} (m15b);
-  \draw[arr] (m15b) -- (invout);
-
-  % Track labels
-  \node[font=\scriptsize\bfseries, gray!60!black, left=3mm of fd]  {Forward};
-  \node[font=\scriptsize\bfseries, gray!60!black, left=3mm of obs] {Inverse};
-\end{tikzpicture}
-\caption{Two-track structure of the pipeline. The forward PINN of
-Sec.~\ref{sec:fwd-pinn} is trained against an FD reference field
-and its converged solution is post-processed by the five
-estimators of Sec.~\ref{sec:qnm-methods} to recover
-$(\omega,\tau)$. The inverse PINN of Sec.~\ref{sec:inv-pinn} is
-trained against $\Nobs = 500$ noisy field samples and jointly
-recovers the black-hole mass $M$ together with a single-mode
-ringdown template; the same five estimators are then applied to
-the converged network field. Both tracks report the M4 plateau
-standard deviation $\sigma_\omega$ as a fit-window systematic
-uncertainty alongside the primary estimate.}
-\label{fig:bg-pipeline}
-\end{figure}
+No prior PINN study reports a fit-window systematic on the
+recovered $(\omega,\tau)$; the plateau criterion of
+Sec.~\ref{sec:reporting} supplies one and doubles as a
+deterministic validity flag.
 
 \subsection{Neural operators and prior operator-learning work}
 \label{sec:bg-fno}
@@ -686,8 +628,8 @@ wavefronts.
 % =====================================================================
 \section{Conclusion}\label{sec:conclusion}
 
-We applied four models --- a faithful-reproduction and an
-enhanced forward PINN, an inverse PINN, and a hybrid coarse-FD
+We applied three models --- a faithful-reproduction and an
+enhanced forward PINN, and a hybrid coarse-FD
 + neural-residual surrogate --- to the Schwarzschild $\ell = 2$
 master equations, under a single post-hoc extraction protocol
 benchmarked against Leaver's continued-fraction values. The
@@ -703,13 +645,7 @@ The main methodological contribution is the plateau-based
 extraction of Sec.~\ref{sec:plateau}: the plateau standard
 deviation $\sigma_\omega$ quantifies the fit-window systematic
 and doubles as a deterministic validity flag, so that no quoted
-number depends on a fixed-by-hand window. On the inverse
-problem the embedded template admits an
-$A_{\mathrm{ring}}$--$\tau$ degeneracy that biases the learned
-scalar by ten to twenty percent; quoting $\tau$ post-hoc from
-the converged field bypasses it, and the best of six ablation
-variants recovers $M$ to $0.34\%$, $\omega$ to $0.30\%$ and
-$\tau$ to $1.6\%$ under $1\%$ observation noise.
+number depends on a fixed-by-hand window.
 
 The hybrid surrogate amortises what the PINNs pay per black
 hole: trained once on $1{,}000$ draws, it runs a $1/64$-cost
@@ -722,10 +658,21 @@ to $0.15\%$; its damping time is limited by the network's
 late-ring residual rather than the estimator, so its
 contribution is field accuracy, not a sharper spectroscopy.
 
-Follow-up directions --- a
-Cram\'er--Rao bound on the inverse noise floor, a Bayesian
-posterior around the deterministic estimate, the lift to Kerr,
-and learning the inverse operator directly --- are set out in
+The hybrid concept proves geometry-agnostic. Retrained on
+rotating (Kerr) black holes through the Teukolsky equation
+across spins $a/M \in [0, 0.95]$, the same coarse-plus-residual
+operator --- evolved on a hyperboloidal slice and corrected
+with no fine-grid field in its loss --- cuts the median field
+error by $77\times$ and recovers the near-extremal fundamental
+frequency to $0.38\%$, an order of magnitude over the coarse
+prior, exactly where that prior fails fastest. This
+generalisation across a family of black holes is the structural
+advantage of an amortised operator over a per-instance PINN,
+which must be retrained from scratch for each spin.
+
+Follow-up directions --- a Bayesian
+posterior around the deterministic estimate and
+overtone-exciting initial data --- are set out in
 Sec.~\ref{sec:discussion}.
 
 % =====================================================================
@@ -742,24 +689,16 @@ regenerated by the scripts there.
 \appendix
 \section{Finite-difference reference solver}\label{app:fd}
 
-This appendix summarises the finite-difference (FD) reference
-solver; the complete specification, including every stencil and
-update formula, is provided in the repository documentation.
 Eq.~\eqref{eq:zerilli} is integrated in first-order-in-time
 form ($\Pi \equiv \partial_t\Phi$) on the grid of
-Sec.~\ref{sec:fwd-problem}: three-point centred
-second-derivative stencil in the interior, second-order
-one-sided closures at the endpoints, classical fourth-order
-Runge--Kutta time stepping, and Sommerfeld conditions imposed
-algebraically on $\Pi$ at every substage. The Courant factor
-$\nu = 0.5$ sits inside the RK4 stability bound
-$\nu \le \sqrt{2}$, and the earliest boundary reflection
-reaches the observer column at $t \ge 108\,M$, far outside
-$t_{\max} = 50\,M$; the full solve completes in under one
-minute on a single CPU core.
-
-% =====================================================================
-\input{sections/curriculum_appendix}
+Sec.~\ref{sec:fwd-problem} with the parameters of
+Table~\ref{tab:fwd-hyper}: three-point centred interior
+stencil, second-order one-sided closures, fourth-order
+Runge--Kutta stepping, and algebraically imposed Sommerfeld
+conditions. The Courant factor $\nu = 0.5$ is stable and the
+earliest boundary reflection ($t \ge 108\,M$) lies outside
+$t_{\max} = 50\,M$. The full stencil-level specification is in
+the repository documentation.
 
 % =====================================================================
 \input{sections/supplementary_appendix}
@@ -768,17 +707,12 @@ minute on a single CPU core.
 \section{Hyperparameter tables}\label{app:hyper}
 
 This appendix collects the full hyperparameter list for the
-forward PINN of Sec.~\ref{sec:fwd-pinn} and the six inverse
-variants of Sec.~\ref{sec:inv-pinn}.
+forward PINN of Sec.~\ref{sec:fwd-pinn}.
 
 \begin{table}[h!]
 \centering
-\caption{Architecture and training hyperparameters shared by the
-forward PINN
-and all six inverse PINN variants. The two pipelines differ only
-in the number of L-BFGS iterations ($30\,000$ forward, $15\,000$
-inverse) and in the inverse-specific settings listed below the
-table.}
+\caption{Architecture and training hyperparameters for the
+forward PINN of Sec.~\ref{sec:fwd-pinn}.}
 \label{tab:fwd-hyper}
 \small
 \begin{tabular}{lll}
@@ -808,8 +742,8 @@ Loss weights
   & $(100,100,100,1,100,1,1)$ \\
 Adam
   & learning rate, iterations        & $10^{-3},\;10\,000$ \\
-L-BFGS (forward / inverse)
-  & iterations                       & $30\,000$ / $15\,000$ \\
+L-BFGS
+  & iterations                       & $30\,000$ \\
 Adaptive sampling
   & method, period, candidates       & greedy, $1000$, $100\,000$ \\
   & greedy fraction $f$              & $0.3$ \\
@@ -821,27 +755,14 @@ QNM window
 \end{tabular}
 \end{table}
 
-The inverse variants add the template hyperparameters
-$(\tring, \lambda_{\mathrm{ring}}, \Nring)$ of
-Table~\ref{tab:variants}, with common initial guesses
-$M_{\mathrm{init}} = 0.8$,
-$(\omega, \tau, A_{\mathrm{ring}}, \phi)_{\mathrm{init}} =
-(0.30,\,8.0,\,0.5,\,0.0)$, data weight
-$\lambda_{\mathrm{data}} = 10$, and noisy-data setup
-$(N_{\mathrm{obs}}, \sigma_{\mathrm{noise}}) = (500,\,0.01)$.
-
 \section{ESPRIT (M3) results}\label{app:esprit}
 
 Applied to the forward-PINN observer series ($t\in[10,50]\,M$,
-model order $K = 6$), ESPRIT returns the decomposition of
-Table~\ref{tab:esprit-fwd}: the amplitude-selected component
-($k = 6$) lies roughly $30\%$ from the Leaver values while the
-component closest to the fundamental ($k = 5$, within $0.6\%$
-and $1.3\%$) is not selected, and all candidate amplitudes lie
-at least twenty orders of magnitude below the signal scale. On
-a field that is by construction a nearly clean damped sinusoid
-the subspace problem is ill-conditioned, and M3 is reported as
-a diagnostic only.
+model order $K = 6$), ESPRIT gives Table~\ref{tab:esprit-fwd}.
+On this near-clean damped sinusoid the subspace problem is
+ill-conditioned --- the two selection criteria disagree and the
+candidate amplitudes lie $>20$ orders of magnitude below the
+signal --- so M3 is reported as a diagnostic only.
 
 \begin{table}[h!]
 \centering
@@ -870,86 +791,19 @@ $5^{\dagger}$ & $0.376$    & $11.098$           & $2.3\times 10^{-41}$ \\
 \hline
 \end{tabular}
 \end{table}
-\section{Plateau plots and 2-D heatmaps}\label{app:plots}
-
-Figures~\ref{fig:m4-grid} and \ref{fig:m5-grid} show the M4 1-D
-plateau scans and the M5 2-D plateau heatmaps for the six inverse
-variants of Sec.~\ref{sec:inv-pinn}. The forward PINN versions of
-the same plots are shown in Figs.~\ref{fig:fwd-plateau-m4} and
-\ref{fig:fwd-plateau-m5} of the main text.
-
-\begin{figure}[p]
-\centering
-\begin{tabular}{cc}
-\includegraphics[width=0.46\textwidth]{../outputs/qnm/zerilli_l2_inverse_qnm/pinn_method4_stability.png} &
-\includegraphics[width=0.46\textwidth]{../outputs/qnm/zerilli_l2_inverse_qnm_tring18/pinn_method4_stability.png} \\
-Baseline & A \\[0.6em]
-\includegraphics[width=0.46\textwidth]{../outputs/qnm/zerilli_l2_inverse_qnm_lring100/pinn_method4_stability.png} &
-\includegraphics[width=0.46\textwidth]{../outputs/qnm/zerilli_l2_inverse_qnm_nring1000/pinn_method4_stability.png} \\
-B & C \\[0.6em]
-\includegraphics[width=0.46\textwidth]{../outputs/qnm/zerilli_l2_inverse_qnm_combo/pinn_method4_stability.png} &
-\includegraphics[width=0.46\textwidth]{../outputs/qnm/zerilli_l2_inverse_qnm_2mode/pinn_method4_stability.png} \\
-D & E \\
-\end{tabular}
-\caption{M4 (1-D plateau scan over the start time $t_0$) for the
-six inverse-PINN variants. Each panel
-is the per-variant version of Fig.~\ref{fig:fwd-plateau-m4}: the
-left subplot is $\omega(t_0)$ at $\tend=50\,M$ and
-the right subplot the residual standard deviation in the rolling
-window used to detect the plateau.}
-\label{fig:m4-grid}
-\end{figure}
-
-\begin{figure}[p]
-\centering
-\includegraphics[width=0.95\textwidth,keepaspectratio]{../outputs/qnm/zerilli_l2_inverse_qnm/pinn_method5_2d_heatmap.png}\\[0.4em]
-\textbf{Baseline}\\[0.6em]
-\includegraphics[width=0.95\textwidth,keepaspectratio]{../outputs/qnm/zerilli_l2_inverse_qnm_tring18/pinn_method5_2d_heatmap.png}\\[0.4em]
-\textbf{A}\\[0.6em]
-\includegraphics[width=0.95\textwidth,keepaspectratio]{../outputs/qnm/zerilli_l2_inverse_qnm_lring100/pinn_method5_2d_heatmap.png}\\[0.4em]
-\textbf{B}
-\caption{M5 (2-D plateau scan over $(t_0, \tend)$)
-heatmaps for the six inverse-PINN variants (Baseline, A, B; C, D,
-E continued in Fig.~\ref{fig:m5-grid} cont.). Each panel reports
-$\omega(t_0,\tend)$ (left) and
-$\tau(t_0,\tend)$ (right) on a shared colour scale
-matching Fig.~\ref{fig:fwd-plateau-m5}; the red rectangle marks
-the auto-detected plateau.}
-\label{fig:m5-grid}
-\end{figure}
-
-\begin{figure}[p]\ContinuedFloat
-\centering
-\includegraphics[width=0.95\textwidth,keepaspectratio]{../outputs/qnm/zerilli_l2_inverse_qnm_nring1000/pinn_method5_2d_heatmap.png}\\[0.4em]
-\textbf{C}\\[0.6em]
-\includegraphics[width=0.95\textwidth,keepaspectratio]{../outputs/qnm/zerilli_l2_inverse_qnm_combo/pinn_method5_2d_heatmap.png}\\[0.4em]
-\textbf{D}\\[0.6em]
-\includegraphics[width=0.95\textwidth,keepaspectratio]{../outputs/qnm/zerilli_l2_inverse_qnm_2mode/pinn_method5_2d_heatmap.png}\\[0.4em]
-\textbf{E}
-\caption{(continued) M5 2-D plateau scans for inverse variants
-C, D, E.}
-\end{figure}
-
-% =====================================================================
 \section{Principled choice of the gradient-gate scale}\label{app:gate-scale}
 
 The gate $g = \gamma/(\gamma + s)$, with
 $\gamma \equiv |\nabla\,\mathcal{U}\Phi^{\mathrm{c}}|$, has one
-free hyperparameter, the scale $s$. Because the gate is an
-inference-time multiplier, the field error at any $s$ follows
-from the single trained model by re-weighting the deployed
-correction, without retraining
-(Table~\ref{tab:gate-scale-sweep}): the smooth-cell and
-wavefront-cell criteria bracket a flat basin in which the
-global RMSD varies by less than $2\%$, and the deployed
-$s = 10^{-3}$ lies inside it, coinciding with the $68$th
-percentile of the prior-gradient distribution. This yields the
-label-free deployment rule
-$s \simeq Q_{0.68}(|\nabla\,\mathcal{U}\Phi^{\mathrm{c}}|)$ ---
-a function of the coarse prior alone, requiring neither the
-fine reference nor a retraining sweep. The re-gating identity,
-its derivation and its caveats are given in the repository
-documentation.
+free scale $s$. As an inference-time multiplier it is swept
+label-free from the single trained model
+(Table~\ref{tab:gate-scale-sweep}): the global RMSD varies by
+$<2\%$ across a flat basin that contains the deployed
+$s = 10^{-3}$, which coincides with the $68$th percentile of
+the prior-gradient distribution. This gives the label-free rule
+$s \simeq Q_{0.68}(|\nabla\,\mathcal{U}\Phi^{\mathrm{c}}|)$,
+a function of the coarse prior alone. The re-gating identity and
+its derivation are given in the repository documentation.
 
 \begin{table}[!htbp]
 \centering

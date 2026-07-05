@@ -15,40 +15,10 @@ comparable to a time-domain post-hoc fit; the hard boundary
 enforcement of \citet{Luna2022teukolskypinn} is a natural
 variant of our soft setup.
 
-\paragraph{Inverse problem and the template degeneracy.}
-The joint recovery of the black-hole mass and a ringdown
-template from noisy field observations has no precedent in the
-PINN-for-QNM literature. During L-BFGS the optimiser drifts
-along the amplitude--damping-time degeneracy of
-Eq.~\eqref{eq:loss-ring}, leaving the learned $\tau$ ten to
-twenty percent below the Leaver value while the network field
-retains the physical decay rate
-(Table~\ref{tab:tau-degeneracy}); the reporting convention of
-Sec.~\ref{sec:reporting} therefore quotes the post-hoc
-wide-window $\tau$, and the same convention should apply to any
-inverse PINN whose template loss admits a comparable
-degeneracy.
-
-\paragraph{Why the curriculum fails here.}
-The first curriculum window reaches the lowest sub-domain RMSD
-recorded in this work ($5.2\times 10^{-4}$;
-Table~\ref{tab:cur-summary}), but the stitching error offsets
-the local gain and the 3-window and soft-overlap variants
-perform worse still (Appendix~\ref{sec:res-cur}). The greedy
-sampler already concentrates $0.3\,N_r$ of the collocation
-budget on the high-residual late-time band within a single
-network, capturing the benefit a curriculum would provide
-\citep{Krishnapriyan2021failure,Bengio2009curriculum} without
-the per-stitch interpolation cost; a curriculum should pay off
-only on domains too long for a single greedy network to cover.
-
 \paragraph{The plateau as a quality flag.}
 The plateau standard deviation $\sigma_\omega$ estimates the
 fit-window systematic and simultaneously acts as a validity
-flag: across the six inverse variants it separates stable
-two-mode fits ($\sigma_\omega/\omega \le 1\%$; A, D, E) from
-failed ones ($\approx 0.44$ baseline, $0.34$ C, undefined B;
-Table~\ref{tab:inv-summary}) --- a small $\sigma_\omega$
+flag: a small $\sigma_\omega$
 certifies the estimate, a large or undefined one rejects it. M5
 generalises the scan to the joint $(t_0,\tend)$ plane and
 becomes necessary when the window edge approaches
@@ -56,23 +26,14 @@ $t_{\mathrm{tail}}$: when too little ringdown remains inside the
 window, no block of fits is stationary and the flag correctly
 withholds the estimate.
 
-\paragraph{Forward--inverse precision gap.}
-The forward PINN reaches $0.029\%$ in $\omega$ on a noiseless
-setup; the best inverse variant reaches $0.30\%$ under $1\%$
-noise on $\Nobs = 500$ single-observer samples. The
-factor-of-ten gap is consistent with the information content of
-the two setups; a Cram\'er--Rao bound on $(M,\omega,\tau)$
-would settle whether the residual $0.30\%$ is training
-systematics or intrinsic information loss.
-
 \paragraph{Detector-unit translation.}
 For a GW150914-class Schwarzschild remnant
 ($M = 65\,M_\odot$) the Leaver values used throughout
 correspond to $f_{220} \approx 186\,\mathrm{Hz}$ and
-$\tau_0 \approx 3.60\,\mathrm{ms}$, and variant D's fractional
-uncertainties map to
-$\sigma_{f_{220}} \approx 0.56\,\mathrm{Hz}$ and
-$\sigma_{\tau_0} \approx 58\,\mu\mathrm{s}$ --- at least an
+$\tau_0 \approx 3.60\,\mathrm{ms}$, and the enhanced forward
+PINN's fractional errors map to
+$\sigma_{f_{220}} \approx 0.05\,\mathrm{Hz}$ and
+$\sigma_{\tau_0} \approx 72\,\mu\mathrm{s}$ --- at least an
 order of magnitude below the statistical uncertainties reported
 at ringdown signal-to-noise $\rho_{\mathrm{ring}} \sim 8$--$10$
 \citep{LIGO2016ringdown,Isi2019tests}. At current sensitivities
@@ -82,17 +43,12 @@ per-mille sensitivities forecast for next-generation detectors
 \citep{Berti2007ringdown}.
 
 \paragraph{Limitations.}
-Three scope choices --- the fixed Schwarzschild background, the
-single quadrupole channel $\Phi(\xq,t)$, and the single noise
-realisation per variant --- lift to known extensions: the
-Teukolsky operator, one head per harmonic, and $\ge 30$ noise
-seeds with a seed-to-seed standard deviation reported alongside
-$\sigma_\omega$. Three limitations are substantive: the
-$A_{\mathrm{ring}}$--$\tau$ degeneracy, a property of any
-single-mode template that the reporting convention works around
-but does not remove; the marginal benefit of the two-mode
-template (variant E), which slightly improves $\tau$ but
-penalises $M$ and $\omega$; and the ill-conditioning of ESPRIT
+Of the two original scope choices, the fixed Schwarzschild
+background is lifted in Sec.~\ref{sec:res-kerr}, where the
+hybrid is retrained on rotating (Kerr) backgrounds via the
+Teukolsky operator; the single quadrupole channel
+$\Phi(\xq,t)$ lifts analogously to one head per harmonic. The
+substantive limitation is the ill-conditioning of ESPRIT
 on a nearly clean damped sinusoid, which excludes M3 from the
 primary numbers (Appendix~\ref{app:esprit}).
 
@@ -120,15 +76,30 @@ $\sim\!82\times$ while protecting the regions the classical
 solve already resolves (Sec.~\ref{sec:res-hyb}); the field gain
 does not become a median QNM gain because the
 coarse-up baseline already sits at the extractor floor at the
-common observer. Learning the inverse operator
-$\mathcal{G}^{-1}_{\theta}\colon \Phi(\xq,t) \mapsto M$ on the
-same distribution is a natural extension, with the plateau
-diagnostic carrying over as a population-level systematic
-estimate on $M$.
+common observer.
+
+\paragraph{Geometry-agnostic generalisation.}
+The Kerr experiment of Sec.~\ref{sec:res-kerr} shows that the
+hybrid is not tied to the Schwarzschild wave equation. The same
+coarse-plus-residual operator, retrained on the complex,
+hyperboloidal Teukolsky field across spins $a/M \in [0,0.95]$,
+cuts the median field error by $77\times$ and recovers the
+near-extremal fundamental frequency by an order of magnitude
+($4.71\%\to0.38\%$), precisely where the coarse prior fails
+fastest. This is the qualitative advantage of an amortised
+surrogate over a per-instance PINN: a PINN must be retrained
+from scratch for every spin, whereas the operator transfers
+across the parameter family at one coarse solve plus one
+forward pass. The damping time remains the harder channel on
+Kerr just as on Schwarzschild --- the residual correction,
+tuned to the field and its leading oscillation, does not
+sharpen the exponential envelope, so $\tau$ stays a fine-solve
+quantity. This is an intrinsic property of correcting a field
+rather than a decay rate, not a Kerr-specific artefact.
 
 \paragraph{Methodological outlook.}
-Recasting the inverse problem as a Bayesian posterior over
-$(M,\omega,\tau)$ with the trained PINN as the forward operator
+Recasting the point estimate as a Bayesian posterior over
+$(\omega,\tau)$ with the trained PINN as the forward operator
 \citep{Isi2021priors} would combine the network-systematic
 uncertainty (which the plateau diagnostic estimates) with the
 data-statistical uncertainty that a point estimate lacks; a

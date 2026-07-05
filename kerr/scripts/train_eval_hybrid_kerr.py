@@ -512,51 +512,53 @@ def make_plots(hist, fields, out_dir):
         plt.figure(figsize=(6, 4))
         plt.pcolormesh(sigma, tau, np.maximum(E, vmax * 1e-6), shading="auto",
                        cmap="magma_r", norm=LogNorm(vmin=vmax * 1e-5, vmax=vmax))
-        plt.colorbar(label="|psi| abs error")
-        plt.xlabel("sigma"); plt.ylabel("tau/M")
-        plt.title(f"Kerr {name} pointwise error (a/M={aM[ic]:.3f})")
+        plt.colorbar(label=r"$|\,|\psi| - |\psi_{\mathrm{fine}}|\,|$")
+        plt.xlabel(r"$\sigma$"); plt.ylabel(r"$\tau/M$")
+        plt.title(rf"Kerr {name} pointwise error ($a/M={aM[ic]:.2f}$)")
         plt.tight_layout()
-        plt.savefig(os.path.join(figs, f"hybrid_pointwise_error_{name}.png"), dpi=130); plt.close()
+        plt.savefig(os.path.join(figs, f"hybrid_pointwise_error_{name}.png"), dpi=200); plt.close()
 
-    # 3) ringdown at scri: Re(psi) prior/hybrid/fine overlay (canonical)
+    # 3) ringdown at scri: Re(psi) prior/hybrid/fine overlay (canonical);
+    #    Schwarzschild convention: fine=C0 blue solid, hybrid=C1 orange dashed,
+    #    coarse prior=grey dotted.
     plt.figure(figsize=(7, 4))
-    plt.plot(tau, fields["fine_re"][ic, :, scri], "k-", lw=1.4, label="fine FD")
-    plt.plot(tau, fields["up4_re"][ic, :, scri], "C1--", lw=1.0, label="coarse prior")
-    plt.plot(tau, fields["hyb_re"][ic, :, scri], "C0:", lw=1.4, label="hybrid")
-    plt.xlabel("tau/M"); plt.ylabel("Re psi (scri)"); plt.legend()
-    plt.title(f"Ringdown at scri (a/M={aM[ic]:.3f})"); plt.tight_layout()
-    plt.savefig(os.path.join(figs, "hybrid_ringdown_scri.png"), dpi=130); plt.close()
+    plt.plot(tau, fields["fine_re"][ic, :, scri], color="C0", ls="-", lw=1.4, label="FD (fine)")
+    plt.plot(tau, fields["up4_re"][ic, :, scri], color="0.5", ls=":", lw=1.2, label="coarse prior")
+    plt.plot(tau, fields["hyb_re"][ic, :, scri], color="C1", ls="--", lw=1.3, label="hybrid")
+    plt.xlabel(r"$\tau/M$"); plt.ylabel(r"$\mathrm{Re}\,\psi$ at $\mathcal{I}^{+}$"); plt.legend(frameon=False)
+    plt.title(rf"Kerr ringdown at $\mathcal{{I}}^{{+}}$ ($a/M={aM[ic]:.2f}$)"); plt.tight_layout()
+    plt.savefig(os.path.join(figs, "hybrid_ringdown_scri.png"), dpi=200); plt.close()
 
     # 4) field rel-L2 vs spin (population)
     plt.figure(figsize=(6, 4))
-    plt.scatter(aM, 100 * fields["fl_prior"], s=14, c="C1", label="coarse prior")
-    plt.scatter(aM, 100 * fields["fl_hyb"], s=14, c="C0", label="hybrid")
-    plt.scatter(aM, 100 * fields["fl_rich"], s=10, c="C2", marker="x", label="Richardson target")
+    plt.scatter(aM, 100 * fields["fl_prior"], s=16, c="0.5", label="coarse prior")
+    plt.scatter(aM, 100 * fields["fl_hyb"], s=16, c="C1", label="hybrid")
+    plt.scatter(aM, 100 * fields["fl_rich"], s=12, c="C2", marker="x", label="Richardson")
     plt.axhline(5.0, color="k", ls="--", lw=0.8, label="5% gate")
-    plt.xlabel("a/M"); plt.ylabel("field rel-L2 (%)"); plt.yscale("log"); plt.legend()
-    plt.title("Field accuracy vs spin"); plt.tight_layout()
-    plt.savefig(os.path.join(figs, "hybrid_field_vs_spin.png"), dpi=130); plt.close()
+    plt.xlabel(r"$a/M$"); plt.ylabel(r"field rel. $L^{2}$ (%)"); plt.yscale("log"); plt.legend(frameon=False, fontsize=8)
+    plt.title(r"Field accuracy vs spin"); plt.tight_layout()
+    plt.savefig(os.path.join(figs, "hybrid_field_vs_spin.png"), dpi=200); plt.close()
 
-    # 5) QNM Mw error vs spin
+    # 5) QNM Mw error vs spin (best-of-suite, matches the results table)
     rows = fields["rows"]
     plt.figure(figsize=(6, 4))
-    for key, c, lab in (("prior", "C1", "prior"), ("hybrid", "C0", "hybrid"), ("fine", "k", "fine")):
-        ys = [r["qnm"][key]["Mw_err_pct"] for r in rows]
-        plt.scatter(aM, ys, s=14, c=c, label=lab)
-    plt.axhline(1.0, color="r", ls="--", lw=0.8, label="1% gate")
-    plt.xlabel("a/M"); plt.ylabel("M*omega error (%)"); plt.yscale("log"); plt.legend()
-    plt.title("QNM accuracy vs spin (at scri)"); plt.tight_layout()
-    plt.savefig(os.path.join(figs, "hybrid_qnm_vs_spin.png"), dpi=130); plt.close()
+    for key, c, lab in (("prior", "0.5", "prior"), ("hybrid", "C1", "hybrid"), ("fine", "C0", "fine")):
+        ys = [r["qnm"][key]["best_Mw_err_pct"] for r in rows]
+        plt.scatter(aM, ys, s=16, c=c, label=lab)
+    plt.axhline(1.0, color="k", ls="--", lw=0.8, label="1% gate")
+    plt.xlabel(r"$a/M$"); plt.ylabel(r"$M\omega$ error (%)"); plt.yscale("log"); plt.legend(frameon=False, fontsize=8)
+    plt.title(r"Frequency accuracy vs spin (at $\mathcal{I}^{+}$)"); plt.tight_layout()
+    plt.savefig(os.path.join(figs, "hybrid_qnm_vs_spin.png"), dpi=200); plt.close()
 
-    # 6) QNM tau error vs spin (the weak axis -- shown explicitly)
+    # 6) QNM tau error vs spin (best-of-suite; the weak axis -- shown explicitly)
     plt.figure(figsize=(6, 4))
-    for key, c, lab in (("prior", "C1", "prior"), ("hybrid", "C0", "hybrid"), ("fine", "k", "fine")):
-        ys = [r["qnm"][key]["tau_err_pct"] for r in rows]
-        plt.scatter(aM, ys, s=14, c=c, label=lab)
-    plt.axhline(5.0, color="r", ls="--", lw=0.8, label="5% gate")
-    plt.xlabel("a/M"); plt.ylabel("tau error (%)"); plt.yscale("log"); plt.legend()
-    plt.title("Damping-time accuracy vs spin (at scri)"); plt.tight_layout()
-    plt.savefig(os.path.join(figs, "hybrid_tau_vs_spin.png"), dpi=130); plt.close()
+    for key, c, lab in (("prior", "0.5", "prior"), ("hybrid", "C1", "hybrid"), ("fine", "C0", "fine")):
+        ys = [r["qnm"][key]["best_tau_err_pct"] for r in rows]
+        plt.scatter(aM, ys, s=16, c=c, label=lab)
+    plt.axhline(5.0, color="k", ls="--", lw=0.8, label="5% gate")
+    plt.xlabel(r"$a/M$"); plt.ylabel(r"$\tau/M$ error (%)"); plt.yscale("log"); plt.legend(frameon=False, fontsize=8)
+    plt.title(r"Damping-time accuracy vs spin (at $\mathcal{I}^{+}$)"); plt.tight_layout()
+    plt.savefig(os.path.join(figs, "hybrid_tau_vs_spin.png"), dpi=200); plt.close()
 
     print(f"  wrote figures to {figs}", flush=True)
 

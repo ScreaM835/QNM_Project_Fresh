@@ -118,8 +118,107 @@ def plot_rw_vs_zerilli_l2() -> None:
     plt.close(fig)
 
 
+# ----------------------------------------------------------------------
+# Kerr background figures
+# ----------------------------------------------------------------------
+def plot_kerr_horizons() -> None:
+    """Kerr horizon radii r_pm/M and the compactification sigma = r_+/r."""
+    a = np.linspace(0.0, 1.0, 400)
+    disc = np.sqrt(np.clip(1.0 - a**2, 0.0, None))
+    r_plus = M + M * disc
+    r_minus = M - M * disc
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(7.4, 3.3))
+
+    # (a) horizon structure
+    ax1.plot(a, r_plus, "-", lw=2.0, color="C0", label=r"outer horizon $r_+$")
+    ax1.plot(a, r_minus, "--", lw=2.0, color="C3", label=r"inner horizon $r_-$")
+    ax1.fill_between(a, r_minus, r_plus, color="C0", alpha=0.10)
+    ax1.axvline(0.95, color="k", lw=0.8, ls=":", alpha=0.6)
+    ax1.text(0.95, 0.10, r"$a/M=0.95$", rotation=90, va="bottom", ha="right",
+             fontsize=8, color="k", alpha=0.7)
+    ax1.set_xlabel(r"spin $a/M$")
+    ax1.set_ylabel(r"horizon radius $r/M$")
+    ax1.set_title(r"(a) Kerr horizons $r_\pm = M \pm \sqrt{M^2-a^2}$")
+    ax1.set_xlim(0.0, 1.0)
+    ax1.set_ylim(0.0, 2.05)
+    ax1.legend(frameon=False, loc="center left")
+    ax1.grid(True, alpha=0.25)
+
+    # (b) compactification sigma = r_+/r for three spins
+    for a0, color, ls in [(0.0, "C0", "-"), (0.5, "C1", "--"), (0.9, "C3", ":")]:
+        rp = M + M * np.sqrt(1.0 - a0**2)
+        r = np.linspace(rp, 12.0 * M, 500)
+        sig = rp / r
+        ax2.plot(r, sig, ls, lw=1.9, color=color, label=rf"$a/M={a0:.1f}$")
+    ax2.axhline(1.0, color="C3", lw=0.8, ls="--", alpha=0.5)
+    ax2.text(11.5, 1.02, r"horizon $\sigma=1$", ha="right", fontsize=8, color="C3")
+    ax2.text(11.5, 0.03, r"$\mathcal{I}^+\ (\sigma=0)$", ha="right", fontsize=8, color="k")
+    ax2.set_xlabel(r"areal radius $r/M$")
+    ax2.set_ylabel(r"compactified coordinate $\sigma = r_+/r$")
+    ax2.set_title(r"(b) Radial compactification")
+    ax2.set_xlim(1.0, 12.0)
+    ax2.set_ylim(0.0, 1.05)
+    ax2.legend(frameon=False, loc="upper right")
+    ax2.grid(True, alpha=0.25)
+
+    fig.tight_layout()
+    fig.savefig(OUT / "kerr_horizons.png", dpi=200)
+    fig.savefig(OUT / "kerr_horizons.pdf")
+    plt.close(fig)
+
+
+def plot_kerr_spectrum() -> None:
+    """Gravitational (s=-2) QNM spectrum M*omega_R and tau/M vs spin a/M
+    for the fundamental n=0 modes (2,2), (3,2), (4,2), via the qnm package
+    (Leaver / Cook-Zalutskiy continued fraction)."""
+    import qnm
+    try:
+        qnm.download_data()
+    except Exception:
+        pass
+
+    spins = np.linspace(0.0, 0.99, 120)
+    modes = [(2, 2, 0, "C0", "-"), (3, 2, 0, "C1", "--"), (4, 2, 0, "C3", ":")]
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(7.4, 3.3))
+    for (ell, m, n, color, ls) in modes:
+        seq = qnm.modes_cache(s=-2, l=ell, m=m, n=n)
+        wr = np.empty_like(spins)
+        tau = np.empty_like(spins)
+        for i, a in enumerate(spins):
+            omega, _, _ = seq(a=a)
+            wr[i] = omega.real
+            tau[i] = -1.0 / omega.imag
+        lab = rf"$(\ell,m,n)=({ell},{m},{n})$"
+        ax1.plot(spins, wr, ls, lw=1.9, color=color, label=lab)
+        ax2.plot(spins, tau, ls, lw=1.9, color=color, label=lab)
+
+    for ax in (ax1, ax2):
+        ax.axvspan(0.0, 0.95, color="green", alpha=0.06)
+        ax.axvline(0.95, color="k", lw=0.8, ls=":", alpha=0.6)
+        ax.set_xlabel(r"spin $a/M$")
+        ax.set_xlim(0.0, 0.99)
+        ax.grid(True, alpha=0.25)
+    ax1.set_ylabel(r"oscillation frequency $M\omega_R$")
+    ax1.set_title(r"(a) Real frequency")
+    ax1.legend(frameon=False, loc="upper left")
+    ax2.set_ylabel(r"damping time $\tau/M$")
+    ax2.set_title(r"(b) Damping time")
+    ax2.text(0.475, 0.02, r"study range $a/M\in[0,0.95]$",
+             transform=ax2.get_xaxis_transform(), ha="center",
+             fontsize=8, color="green")
+
+    fig.tight_layout()
+    fig.savefig(OUT / "kerr_spectrum.png", dpi=200)
+    fig.savefig(OUT / "kerr_spectrum.pdf")
+    plt.close(fig)
+
+
 if __name__ == "__main__":
     plot_potential()
     plot_tortoise_map()
     plot_rw_vs_zerilli_l2()
+    plot_kerr_horizons()
+    plot_kerr_spectrum()
     print(f"wrote figures to {OUT}")

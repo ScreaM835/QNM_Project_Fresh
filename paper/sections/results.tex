@@ -3,21 +3,24 @@
 % =============================================================
 \section{Results}\label{sec:results}
 
-The four models are presented in a uniform format: field
+The three models are presented in a uniform format: field
 accuracy against the FD reference (snapshots, pointwise error,
 and summary metrics), the ringdown waveform at the observer,
 and the QNM extraction table of the five methods of
 Sec.~\ref{sec:qnm-methods} under the reporting convention of
 Sec.~\ref{sec:reporting}. Sections~\ref{sec:res-repro}%
---\ref{sec:res-inv} treat one black hole at a time
-(reproduction, enhanced forward, inverse);
+--\ref{sec:res-fwd} treat one black hole at a time
+(reproduction, enhanced forward);
 Sec.~\ref{sec:res-hyb} evaluates the hybrid
 surrogate on the canonical BH and on a $100$-BH test
-population. Supporting scans, ablations and diagnostics are
-collected in Appendix~\ref{app:supp}; the curriculum-learning
-study is reported in Appendix~\ref{sec:res-cur}.
+population; and Sec.~\ref{sec:res-kerr} generalises the hybrid
+to a population of rotating (Kerr) black holes. Supporting
+scans and diagnostics are
+collected in Appendix~\ref{app:supp}.
 Table~\ref{tab:results-summary} summarises the principal
-quantitative results of the four models.
+quantitative results of the three Schwarzschild models; the
+Kerr generalisation is summarised separately in
+Table~\ref{tab:kerr-summary}.
 
 \begin{table}[!htbp]
 \centering
@@ -33,8 +36,8 @@ the M1--M5 estimator suite of Sec.~\ref{sec:qnm-methods} --- the
 Leaver-closest of five extractors, none of which sees the
 reference during extraction --- labelled with the estimator
 used; the per-estimator breakdown is in
-Tables~\ref{tab:repro-qnm}, \ref{tab:fwd-qnm},
-\ref{tab:inv-qnm} and~\ref{tab:hyb-canonical}. All QNM errors are read at the common
+Tables~\ref{tab:repro-qnm}, \ref{tab:fwd-qnm}
+and~\ref{tab:hyb-canonical}. All QNM errors are read at the common
 observer $\xq = 10\,M$ (window $[10,50]\,M$ for the PINN rows,
 $[10,100]\,M$ for the hybrid).
 Population-row QNM
@@ -44,8 +47,7 @@ the corresponding values in \citet[Table~2]{Patel2024pinn} are
 $\mathrm{RL2} = 28.06\%$ (Zerilli) and $23.59\%$
 (Regge--Wheeler); for the hybrid rows the coarse-up baseline
 gives $\mathrm{RL2} = 4.93\%$ (canonical) and $6.11\%$
-(population). The inverse PINN simultaneously recovers the BH
-mass to $0.34\%$. Dashes denote quantities not applicable to,
+(population). Dashes denote quantities not applicable to,
 or not evaluated for, that row.}
 \label{tab:results-summary}
 \footnotesize
@@ -59,7 +61,6 @@ Sec. & Model & Evaluation & Field RMSD & RL2 [\%]
 \ref{sec:res-repro} & Reproduction (Zerilli)       & canonical BH             & $1.83\times 10^{-3}$ & $1.30$  & $1.08$~(M1)  & $1.50$~(M2)  \\
 \ref{sec:res-repro} & Reproduction (Regge--Wheeler) & canonical BH            & $3.77\times 10^{-3}$ & $2.67$  & $0.56$~(M1)  & $1.56$~(M2)  \\
 \ref{sec:res-fwd}   & Enhanced forward PINN        & canonical BH             & $8.17\times 10^{-4}$ & $0.58$  & $0.029$~(M4) & $1.99$~(M2)  \\
-\ref{sec:res-inv}   & Inverse PINN                 & canonical BH, $1\%$ noise & ---                 & $3.0$   & $0.30$~(M4)  & $1.59$~(M2)  \\
 \ref{sec:res-hyb}   & Hybrid surrogate             & canonical BH             & $6.28\times 10^{-4}$ & $0.445$ & $0.047$~(M5) & $1.34$~(M1)  \\
 \ref{sec:res-hyb}   & Hybrid surrogate             & $100$-BH population      & $9.68\times 10^{-4}$ & $0.648$ & $0.152$~(M4) & $0.528$~(M4) \\
 \bottomrule
@@ -387,219 +388,8 @@ window-limited; the Leaver-closest damping time is instead M2 on
 the wide window ($1.99\%$), the value reported in
 Table~\ref{tab:results-summary}.
 
-A curriculum-learning alternative to the greedy sampler ---
-sequential temporal windows with numerical-IC transfer ---
-lowers the earliest sub-domain RMSD by $37\%$ but improves
-neither the full-domain error nor the extraction
-(Appendix~\ref{sec:res-cur}).
-
 \FloatBarrier
 
-% --------------------------------------------------------------
-\subsection{Inverse PINN}
-\label{sec:res-inv}
-
-The inverse problem asks whether the black-hole mass can be
-recovered jointly with the ringdown template from noisy
-observations of the field; it can, to $0.34\%$. The inverse
-PINN is the forward network of
-Sec.~\ref{sec:res-fwd} with three additions: the mass $M$ is
-promoted from a fixed constant to a trainable scalar, a data
-loss anchors the network to $\Nobs = 500$ noisy samples of the
-field at $1\%$ Gaussian noise, and a damped-sinusoid ringdown
-template $(\omega_{\mathrm{learned}}, \tau_{\mathrm{learned}},
-A_{\mathrm{ring}}, \phi_0)$ is fitted jointly so that the QNM
-parameters are read out directly at convergence. Architecture,
-PDE residual and training schedule are otherwise identical to
-the forward setup (Sec.~\ref{sec:inv-pinn}).
-
-Table~\ref{tab:inv-summary} reports the field accuracy, the
-recovered mass, and the primary QNM estimate under the
-convention of Sec.~\ref{sec:reporting} for the six variants of
-Table~\ref{tab:variants}. Mass recovery is stable across all
-six independently trained variants ($0.34$--$1.44\%$, five
-within $0.5\%$), so the joint recovery mechanism is robust to
-the template-loss configuration. For variant D, the best run
-and the focus below, field accuracy is shown in
-Fig.~\ref{fig:inv-field}, the global pointwise error in
-Fig.~\ref{fig:inv-heatmap}, and the convergence of the five
-learnable scalars in Fig.~\ref{fig:inv-conv}.
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=0.82\textwidth]{../outputs/pinn/zerilli_l2_inverse_qnm_combo/snapshots.png}\\[0.4em]
-\includegraphics[width=0.82\textwidth]{../outputs/pinn/zerilli_l2_inverse_qnm_combo/abs_diff_snapshots.png}
-\caption{Inverse PINN versus FD reference for variant D at the
-snapshot times, in the same format as Fig.~\ref{fig:fwd-field}.
-Top: snapshots of $\Phi(x,t)$ at $t/M\in\{10,20,30,40\}$ overlaid
-for the inverse PINN and the FD reference, with $M$ treated as
-an unknown trainable scalar. Bottom: pointwise
-$|\Phi_\theta - \Phi_{\mathrm{FD}}|$ at the same four times.}
-\label{fig:inv-field}
-\end{figure}
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=0.92\textwidth]{../outputs/pinn/zerilli_l2_inverse_qnm_combo/error_heatmap.png}
-\caption{Inverse PINN global pointwise error for variant D, in
-the same format as Fig.~\ref{fig:fwd-heatmap}. Heatmap of
-$|\Phi_\theta - \Phi_{\mathrm{FD}}|$ on the full training
-domain $x\in[-50,150]\,M$, $t\in[0,50]\,M$.}
-\label{fig:inv-heatmap}
-\end{figure}
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_inverse_qnm_combo/param_convergence.png}
-\caption{Inverse PINN training-time parameter convergence for
-variant D, the best of the six variants. Five panels show the
-learnable scalars $M$, $\omega_{\mathrm{learned}}$,
-$\tau_{\mathrm{learned}}$, $A_{\mathrm{ring}}$, $\phi_0$ versus
-training iteration (logged-sample units, so the L-BFGS phase is
-compressed into the rightmost few samples). Truth values for
-$M$, $\omega_{\mathrm{learned}}$, $\tau_{\mathrm{learned}}$ are
-shown as red dashed horizontal lines; initial values as grey
-dotted lines. Bottom-right: the analytic single-mode template at
-the final learned scalars (red dashed) overlaid on the
-converged-network field $\Phi_\theta(\xq,t)$ and the FD truth
-(black); the orange band marks the training window
-$[\tring,\tend] = [18,50]\,M$. Out-of-window template divergence
-is the visual signature of the $A_{\mathrm{ring}}$--$\tau$
-degeneracy quantified in Appendix~\ref{app:supp-inv}
-(Tables~\ref{tab:inv-learned} and~\ref{tab:tau-degeneracy}).}
-\label{fig:inv-conv}
-\end{figure}
-
-\begin{table}[!htbp]
-\centering
-\caption{Inverse PINN primary results. $M$ is the learned mass.
-$\omega$ is the M4 plateau mean and $\sigma_\omega$ its plateau
-population standard deviation across the contiguous eight-window
-block of lowest combined relative scatter (Algorithm~\ref{alg:m4});
-the start-time bounds of the plateau are
-$[t_0^{\min},t_0^{\max}]$ in units of $M$ at fixed $\tend = 50\,M$.
-$\tau$ is M2 on the wide window $[10,50]\,M$. RL2 is the relative
-$L^2$ field error of $\Phi_\theta$ against the noiseless FD
-reference. Variant labels follow Table~\ref{tab:variants}.}
-\label{tab:inv-summary}
-\footnotesize
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{@{}lccccccc@{}}
-\toprule
-Variant & RL2 & $M$ err & $M\omega$ M4 & $\sigma_\omega$ & $\omega$ err & $\tau/M$ M2-wide & $\tau$ err \\
-\midrule
-baseline   & $3.5\%$ & $0.41\%$ & $0.379$ & $0.166$  & $1.5\%$$^{\dagger}$ & $11.83$ & $5.3\%$ \\
-A          & $2.9\%$ & $0.45\%$ & $0.370$ & $2{\times}10^{-4}$ & $0.89\%$ & $11.29$ & $\mathbf{0.43\%}$ \\
-B          & $6.9\%$ & $1.25\%$ & --- $^{\ddagger}$    & ---       & ---     & $8.63$  & $23.3\%$ \\
-C          & $3.6\%$ & $0.34\%$ & $0.561$ & $0.188$  & $50\%$$^{\dagger}$ & $11.82$ & $5.1\%$ \\
-\textbf{D} & $\mathbf{3.0\%}$ & $\mathbf{0.34\%}$ & $0.3748$ & $\mathbf{4{\times}10^{-5}}$ & $\mathbf{0.30\%}$ & $11.06$ & $1.6\%$ \\
-E          & $3.5\%$ & $1.44\%$ & $0.364$ & $4{\times}10^{-3}$ & $2.6\%$ & $11.10$ & $1.3\%$ \\
-\bottomrule
-\end{tabular}
-\\[0.4em]
-\footnotesize
-$\dagger$ Plateau standard deviation $\sigma_\omega/\omega \gtrsim
-30\%$ indicates that no genuine plateau forms; the entry is
-therefore a failed M4 result, not a tight estimate. \quad
-$\ddagger$ Two-mode NLS did not converge to a finite solution on
-any window; M4 returns NaN.
-\end{table}
-
-The five extraction methods are applied to
-$\Phi_\theta(\xq{=}10\,M,t)$ from variant D exactly as for the
-forward PINN: the ringdown is shown in
-Fig.~\ref{fig:inv-ringdown}, the per-method numbers in
-Table~\ref{tab:inv-qnm}, and the M4 plateau diagnostic in
-Fig.~\ref{fig:inv-plateau-m4} (the M5 counterpart is shown in
-Appendix~\ref{app:plots}, Fig.~\ref{fig:m5-grid});
-M3 is omitted for the same ill-conditioning as on the forward
-problem (Appendix~\ref{app:esprit}).
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_inverse_qnm_combo/ringdown_overlay.png}\\[0.6em]
-\includegraphics[width=0.85\textwidth]{../outputs/qnm/zerilli_l2_inverse_qnm_combo/pinn_ringdown.png}
-\caption{Inverse PINN ringdown at $\xq = 10\,M$ for variant D, in
-the same format as Fig.~\ref{fig:fwd-ringdown}. Top two panels:
-$\Phi_\theta(\xq,t)$ from the inverse PINN overlaid on the FD
-reference on linear (upper) and logarithmic (lower) vertical
-scales, showing the prompt burst followed by the
-exponentially-damped sinusoidal ringdown. Bottom: the same time
-series isolated from $\Phi_\theta$, on which the five extraction
-methods of Sec.~\ref{sec:qnm-methods} are applied to produce the
-entries of Table~\ref{tab:inv-qnm}.}
-\label{fig:inv-ringdown}
-\end{figure}
-
-\begin{table}[!htbp]
-\centering
-\caption{Inverse PINN QNM extraction for variant D, structured
-identically to Table~\ref{tab:fwd-qnm}. Reference values, window
-conventions, and plateau definitions are as in
-Table~\ref{tab:fwd-qnm}. M3 is not run for the inverse problem
-(see text and Appendix~\ref{app:esprit}).}
-\label{tab:inv-qnm}
-\footnotesize
-\setlength{\tabcolsep}{4pt}
-\renewcommand{\arraystretch}{1.05}
-\begin{tabular}{@{}lccccl@{}}
-\toprule
-Method & $M\omega$ & $\omega$ err & $\tau/M$ & $\tau$ err & Window or plateau \\
-\midrule
-M1 (FFT $+$ log-line)        & $0.3726$  & $0.29\%$  & $9.91$  & $11.86\%$ & $[10,\,50]\,M$ \\
-M2 (NLS, wide)               & $0.3798$  & $1.63\%$  & $11.06$ & $\mathbf{1.59\%}$ & $[10,\,50]\,M$ \\
-M2 (NLS on M4 plateau)       & $0.3748$  & $0.30\%$  & $9.48$  & $15.66\%$ & $[18,\,50]\,M$ \\
-M3 (ESPRIT, $K=6$)           & ---       & ---       & ---     & ---       & not run, cf.\ Appendix~\ref{app:esprit} \\
-M4 (1-D plateau)             & $0.37484{\pm}4{\times}10^{-5}$ & $\mathbf{0.30\%}$ & $9.481{\pm}3{\times}10^{-3}$ & $15.66\%$ & $t_0\in[10,25]M$, $\tend{=}50M$ \\
-M5 (2-D plateau)             & $0.37485{\pm}3{\times}10^{-5}$ & $0.30\%$ & $9.485{\pm}3{\times}10^{-3}$ & $15.62\%$ & $t_0\in[10,16.7]M$, $\tend\in[42,50]M$ \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=0.95\textwidth]{../outputs/qnm/zerilli_l2_inverse_qnm_combo/pinn_method4_stability.png}
-\caption{M4 plateau diagnostic for the inverse PINN, variant D.
-Format identical to Fig.~\ref{fig:fwd-plateau-m4}: $(\omega_0,
-\tau_0)$ as a function of $t_0$ at fixed $\tend = 50\,M$; the
-plateau extends across the entire $t_0\in[10,25]\,M$ scan
-range.}
-\label{fig:inv-plateau-m4}
-\end{figure}
-
-The cross-method picture for variant D mirrors the forward run:
-M4 and M5 yield mutually consistent $\omega$ estimates at the
-$0.30\%$ level with plateau standard deviations
-$\sim 3\text{--}4\times 10^{-5}$, and M2 on the wide window is
-the best $\tau$ estimator ($1.59\%$). For $\tau$, M4 and M5
-collapse to the learned-template value $\sim 9.48\,M$
-($\tau_{\mathrm{learned}}$ finishes $15.7\%$ below the Leaver
-value; Fig.~\ref{fig:inv-conv}) while the wide-window fit on
-the network's own field, constrained by the PDE residual and
-the noisy data, recovers $11.06\,M$: this is the
-$A_{\mathrm{ring}}$--$\tau$ degeneracy of
-Eq.~\eqref{eq:loss-ring}, and the reporting convention of
-Sec.~\ref{sec:reporting} therefore takes $\omega$ from M4 and
-$\tau$ from M2-wide, as in Table~\ref{tab:inv-summary}.
-
-Across variants the plateau standard deviation acts as the
-quality flag of Sec.~\ref{sec:plateau}: A, D and E form tight
-plateaus ($\sigma_\omega/\omega \le 1\%$) and recover $\omega$
-to $0.3$--$2.6\%$, while for baseline and C no genuine plateau
-forms and for B the two-mode NLS does not converge
-(Table~\ref{tab:inv-summary}). Variant D, combining the
-single-factor improvements of A--C, ranks first on $M$,
-$\omega$ and $\tau$ jointly ($M = 1.003$,
-$\sigma_\omega = 4\times 10^{-5}$). The learned-template
-scalars of all six variants (Appendix~\ref{app:supp-inv})
-drift $1.2$--$1.9\,M$ along the degeneracy for the strongly
-template-weighted variants, while the post-hoc fit recovers
-the physical decay rate.
-
-\FloatBarrier
-
-
-% --------------------------------------------------------------
 % --------------------------------------------------------------
 \subsection{Hybrid coarse-FD + neural-residual surrogate}
 \label{sec:res-hyb}
@@ -810,6 +600,185 @@ with train and validation tracking together
 validation MSE on the gated Richardson residual over $100$ Adam
 epochs.}
 \label{fig:hyb-loss}
+\end{figure}
+
+\FloatBarrier
+
+% ==============================================================
+\subsection{Generalisation to Kerr}
+\label{sec:res-kerr}
+
+The final experiment asks whether the hybrid construction is
+tied to the Schwarzschild geometry. We retrain the surrogate on
+a $128$-black-hole test set drawn from a Sobol sequence in
+dimensionless spin $a/M \in [0, 0.95]$, evolving the
+hyperboloidal Teukolsky field of Sec.~\ref{sec:teukolsky-problem} and
+targeting the fundamental $(\ell, m, n) = (4, 2, 0)$ mode.
+Table~\ref{tab:kerr-summary} collects the field and frequency
+accuracy by spin bin.
+
+\paragraph{Field.} Across the test set the coarse prior carries
+a median relative $L^{2}$ field error of $59.5\%$: at low
+resolution the hyperboloidal wavefront is badly
+under-resolved. The hybrid reduces this to $0.78\%$, a factor
+of $77$, and the error stays nearly flat across spin --- from
+$0.70\%$ at low spin to $1.08\%$ near extremality
+(Table~\ref{tab:kerr-summary}) --- so a single amortised
+operator absorbs almost the entire spin dependence of the
+field. The label-free Richardson target itself sits at
+$0.008\%$, confirming that the FNO, not the reference, sets the
+floor. Figure~\ref{fig:kerr-ringdown} overlays the
+reconstructed ringdown at $\scri$ against the fine reference
+for a representative $a/M = 0.7$ black hole, and
+Fig.~\ref{fig:kerr-pointwise} shows the coarse solve's error
+concentrated in the high-amplitude burst, which the residual
+correction removes.
+
+\paragraph{Frequency.} The amortisation is clearest at high
+spin, where the coarse prior degrades fastest. For
+$a/M \ge 0.8$ ($20$ black holes) the best-of-suite prior
+frequency error is $4.71\%$, which the hybrid cuts to $0.38\%$
+--- a $12\times$ improvement --- approaching the fine-solve
+floor of $0.02\%$ (Table~\ref{tab:kerr-summary},
+Fig.~\ref{fig:kerr-vs-spin}). Pooled over all spins the median
+frequency error falls from $0.59\%$ to $0.33\%$, with the fine
+solve at $0.05\%$. The correction is largest exactly where it
+is needed: at moderate spin the prior is already sub-percent
+and the hybrid tracks it, whereas near extremality --- where
+the near-horizon oscillation of Eq.~\eqref{eq:kerr-rescale} is
+strongest and the coarse grid fails --- the hybrid recovers
+more than an order of magnitude.
+
+\paragraph{Damping time.} The damping time is the harder
+channel (Fig.~\ref{fig:kerr-vs-spin}c), exactly as for the
+Zerilli surrogate (Sec.~\ref{sec:res-hyb}). Pooled over spin the
+hybrid $\tau$
+error ($1.52\%$) exceeds that of the coarse prior ($0.52\%$),
+while the fine solve ($0.27\%$) shows that the residual
+correction --- tuned to the field and its leading oscillation
+--- does not consistently sharpen the exponential envelope.
+This is the same trade-off seen for Schwarzschild: the operator
+restores the phase and amplitude of the field far better than
+its slowly varying decay rate, so $\tau$ remains a fine-solve
+quantity and the surrogate is a frequency-and-field
+accelerator rather than a damping-time estimator.
+
+\paragraph{Verdict.} Taken together, the Kerr experiment shows
+that the hybrid concept is geometry-agnostic. The same
+coarse-plus-residual construction, retrained without a single
+fine-grid field in its loss, transfers from a static
+Schwarzschild wave equation to a rotating, complex,
+hyperboloidal Teukolsky field and still delivers an
+order-of-magnitude field improvement and sub-percent
+frequencies across the astrophysical spin range --- a
+generalisation that a per-black-hole PINN, retrained from
+scratch for every spin, does not provide.
+
+\begin{table}[!htbp]
+\centering
+\caption{Kerr hybrid surrogate accuracy by spin bin over the
+$128$-black-hole test set: bin medians, with the final row the
+population median. Field errors are relative $L^{2}$ against the
+fine solve, for the coarse prior, the hybrid, and the label-free
+Richardson target. Frequency ($|\delta\omega|/\omega$) and
+damping-time ($|\delta\tau|/\tau$) errors are the best-of-suite
+values for the $(4,2,0)$ mode, with the fine-solve error shown
+for reference. The estimator winning most often for the hybrid
+is noted below the table
+(M3 $=$ selective ESPRIT, cES $=$ complex ESPRIT,
+c$\Phi$ $=$ complex-phase fit; Sec.~\ref{sec:teukolsky-problem}).}
+\label{tab:kerr-summary}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lr rrr rrr rrr}
+\toprule
+ & & \multicolumn{3}{c}{Field rel-$L^{2}$ (\%)}
+   & \multicolumn{3}{c}{$M\omega$ err.\ (\%)}
+   & \multicolumn{3}{c}{$\tau/M$ err.\ (\%)} \\
+\cmidrule(lr){3-5}\cmidrule(lr){6-8}\cmidrule(lr){9-11}
+$a/M$ & $n$ & prior & hybrid & Rich.
+      & prior & hybrid & fine
+      & prior & hybrid & fine \\
+\midrule
+$[0.0,0.3]$  & $41$ & $51.2$ & $0.70$ & $0.004$ & $0.63$ & $0.53$ & $0.06$ & $0.56$ & $1.79$ & $0.46$ \\
+$[0.3,0.6]$  & $40$ & $59.1$ & $0.70$ & $0.006$ & $0.44$ & $0.27$ & $0.08$ & $0.29$ & $1.67$ & $0.42$ \\
+$[0.6,0.8]$  & $27$ & $65.7$ & $0.86$ & $0.013$ & $0.39$ & $0.23$ & $0.04$ & $0.32$ & $1.22$ & $0.16$ \\
+$[0.8,0.95]$ & $20$ & $73.6$ & $1.08$ & $0.063$ & $4.71$ & $0.38$ & $0.02$ & $1.43$ & $2.19$ & $0.02$ \\
+\midrule
+All (median) & $128$ & $59.5$ & $0.78$ & $0.008$ & $0.59$ & $0.33$ & $0.05$ & $0.52$ & $1.52$ & $0.27$ \\
+\bottomrule
+\end{tabular}
+
+\smallskip
+{\footnotesize\raggedright Dominant hybrid estimator by
+ascending spin bin --- $M\omega$: cES, M3, M3, M3 (M3 overall);
+$\tau/M$: cES, cES, M3, c$\Phi$ (cES overall).\par}
+\end{table}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.82\textwidth]{../outputs/kerr/figs/hybrid_ringdown_scri.png}
+\caption{Kerr ringdown at null infinity $\scri$ for a
+representative $a/M = 0.7$ black hole. The hybrid (orange,
+dashed) overlays the fine reference (blue, solid), whereas the
+coarse prior (grey, dotted) departs from it in amplitude and
+phase through the peak of the burst.}
+\label{fig:kerr-ringdown}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\begin{subfigure}[t]{0.49\textwidth}
+\centering
+\includegraphics[width=\textwidth]{../outputs/kerr/figs/hybrid_pointwise_error_baseline.png}
+\subcaption{Coarse prior.}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.49\textwidth}
+\centering
+\includegraphics[width=\textwidth]{../outputs/kerr/figs/hybrid_pointwise_error_hybrid.png}
+\subcaption{Hybrid.}
+\end{subfigure}
+\caption{Pointwise field error over the compactified domain
+$(\sigma, \tau)$, both panels on the same logarithmic colour
+scale. The coarse prior (a) concentrates its error in the
+high-amplitude burst phase (early $\tau$); the residual FNO (b)
+removes that burst-phase structure, leaving a much lower
+residual across the domain.}
+\label{fig:kerr-pointwise}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\begin{subfigure}[t]{0.49\textwidth}
+\centering
+\includegraphics[width=\textwidth]{../outputs/kerr/figs/hybrid_field_vs_spin.png}
+\subcaption{Field error.}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.49\textwidth}
+\centering
+\includegraphics[width=\textwidth]{../outputs/kerr/figs/hybrid_qnm_vs_spin.png}
+\subcaption{Frequency error.}
+\end{subfigure}
+
+\vspace{0.6em}
+\begin{subfigure}[t]{0.49\textwidth}
+\centering
+\includegraphics[width=\textwidth]{../outputs/kerr/figs/hybrid_tau_vs_spin.png}
+\subcaption{Damping-time error.}
+\end{subfigure}
+\caption{Best-of-suite accuracy versus spin (coarse prior grey,
+hybrid orange; fine reference blue in (b) and (c), label-free
+Richardson target green in (a)). (a)~The hybrid field error is
+flat across $a/M$ while the coarse prior grows towards
+extremality. (b)~The prior frequency error spikes for
+$a/M \gtrsim 0.8$, where the hybrid recovers more than an order
+of magnitude and approaches the fine-solve floor. (c)~The
+damping time is the exception: the hybrid does not improve on
+the prior and stays well above the fine floor, as discussed in
+the text.}
+\label{fig:kerr-vs-spin}
 \end{figure}
 
 \FloatBarrier
