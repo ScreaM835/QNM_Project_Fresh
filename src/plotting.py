@@ -9,6 +9,18 @@ import matplotlib.pyplot as plt
 from .utils import ensure_dir
 
 
+# --- Standardised axis scales for cross-model comparison -------------------
+# Reference: the Regge--Wheeler reproduction (report Figs. 13-14). Fixing these
+# so every Schwarzschild model shares one scale lets the reader compare the
+# absolute-difference, snapshot and pointwise-error plots directly, instead of
+# each panel auto-scaling to its own data (which made the scales drift between
+# models). Callers may override per plot, but the defaults are the house scale.
+ABS_DIFF_YMAX = 0.02           # abs-difference snapshot y-axis top (RW max 1.84e-2)
+SNAPSHOT_YLIM = (-0.85, 0.6)   # field-snapshot y-range
+HEATMAP_VMIN = 1.0e-6          # pointwise-error log colour floor
+HEATMAP_VMAX = 2.1e-2          # pointwise-error log colour ceiling (RW max 2.09e-2)
+
+
 def plot_snapshots(
     x: np.ndarray,
     t: np.ndarray,
@@ -18,6 +30,7 @@ def plot_snapshots(
     outpath: str,
     title: str,
     model_label: str = "PINN",
+    ylim: Optional[Tuple[float, float]] = SNAPSHOT_YLIM,
 ) -> None:
     ensure_dir(os.path.dirname(outpath))
     fig, axes = plt.subplots(2, 2, figsize=(10, 7), sharex=True, sharey=True)
@@ -31,6 +44,8 @@ def plot_snapshots(
         ax.grid(True, alpha=0.3)
 
     axes[0].legend()
+    if ylim is not None:
+        axes[0].set_ylim(*ylim)
     fig.suptitle(title)
     fig.tight_layout()
     fig.savefig(outpath, dpi=200)
@@ -45,6 +60,7 @@ def plot_abs_diff_snapshots(
     times: List[float],
     outpath: str,
     title: str,
+    ymax: Optional[float] = ABS_DIFF_YMAX,
 ) -> None:
     ensure_dir(os.path.dirname(outpath))
     fig, axes = plt.subplots(2, 2, figsize=(10, 7), sharex=True, sharey=True)
@@ -56,6 +72,8 @@ def plot_abs_diff_snapshots(
         ax.set_title(f"t/M = {t[idx]:.0f}")
         ax.grid(True, alpha=0.3)
 
+    if ymax is not None:
+        axes[0].set_ylim(0.0, ymax)
     fig.suptitle(title)
     fig.tight_layout()
     fig.savefig(outpath, dpi=200)
@@ -201,6 +219,8 @@ def plot_error_heatmap(
     signed: bool = False,
     xlim: Optional[Tuple[float, float]] = None,
     model_label: str = "PINN",
+    vmin: Optional[float] = None,
+    vmax: Optional[float] = None,
 ) -> None:
     """
     2D colormap of |phi_FD - phi_model| (or signed difference) over the full
@@ -222,9 +242,8 @@ def plot_error_heatmap(
         cbar.set_label(rf"$\Phi_{{\mathrm{{FD}}}} - \Phi_{{\mathrm{{{model_label}}}}}$")
     else:
         from matplotlib.colors import LogNorm
-        pos = diff[np.isfinite(diff) & (diff > 0)]
-        vmin = max(float(pos.min()), 1e-6) if pos.size else 1e-6
-        vmax = float(diff.max()) if np.isfinite(diff).any() and diff.max() > vmin else vmin * 10
+        vmin = HEATMAP_VMIN if vmin is None else vmin
+        vmax = HEATMAP_VMAX if vmax is None else vmax
         im = ax.pcolormesh(
             x, t, np.clip(diff, vmin, None), shading="auto", cmap="magma_r",
             norm=LogNorm(vmin=vmin, vmax=vmax),
