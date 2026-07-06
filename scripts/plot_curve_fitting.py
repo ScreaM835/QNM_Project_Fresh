@@ -86,7 +86,7 @@ def main():
         raise SystemExit("No waveform/QNM outputs found; run run_pinn.py and extract_qnm.py first.")
 
     fig, ax = plt.subplots(figsize=(9, 5.5))
-    colors = {"FD": ("tab:blue", "tab:cyan"), "PINN": ("tab:red", "tab:orange")}
+    colors = {"FD": ("tab:blue", "tab:blue"), "PINN": ("tab:orange", "tab:orange")}
 
     for tag, t, y, m1, m2 in sources:
         m = (t >= t_start) & (t <= t_end)
@@ -100,12 +100,12 @@ def main():
         A1, phi1 = _fit_amp_phase(tt, yy, m1["omega"], m1["tau"])
         fit1 = _damped_cosine(tt, A1, m1["tau"], m1["omega"], phi1)
         ax.semilogy(tt, np.abs(fit1), "--", color=c_fit, lw=1.1, alpha=0.75,
-                    label=f"{tag}$_1$ fit  ($\\tau/M$={m1['tau_dim']:.3f}, {m1['tau_pct_err']:.2f}%)")
+                    label=f"{tag} M1 fit")
 
         # Method 2: full nonlinear fit (A, tau, omega, phi all in json).
         fit2 = _damped_cosine(tt, m2["A"], m2["tau"], m2["omega"], m2["phi"])
         ax.semilogy(tt, np.abs(fit2), ":", color=c_fit, lw=1.8,
-                    label=f"{tag}$_2$ fit  ($\\tau/M$={m2['tau_dim']:.3f}, {m2['tau_pct_err']:.2f}%)")
+                    label=f"{tag} M2 fit")
 
     ax.set_xlabel(r"$t/M$")
     ax.set_ylabel(r"$|\Phi(x_q, t)|$")

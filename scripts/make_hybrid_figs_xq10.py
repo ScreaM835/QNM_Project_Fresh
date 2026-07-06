@@ -56,15 +56,17 @@ def main() -> None:
     # ---- ringdown overlay -------------------------------------------------
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 7), sharex=True)
     ax1.plot(t, y_fine, label="FD fine", linewidth=1.2)
+    ax1.plot(t, y_base, label="coarse + upsample", linewidth=1.0,
+             linestyle=":", alpha=0.8, color="grey")
     ax1.plot(t, y_hyb, label="Hybrid", linewidth=1.2, linestyle="--")
     ax1.set_ylabel(r"$\Phi(x_q, t)$")
     ax1.set_title(r"Ringdown at $x_q = 10\,M$, canonical BH")
     ax1.legend(); ax1.grid(True, alpha=0.3)
     ax2.semilogy(t, np.abs(y_fine) + 1e-30, label="FD fine", linewidth=1.2)
-    ax2.semilogy(t, np.abs(y_hyb) + 1e-30, label="Hybrid", linewidth=1.2,
-                 linestyle="--")
     ax2.semilogy(t, np.abs(y_base) + 1e-30, label="coarse + upsample",
                  linewidth=1.0, linestyle=":", alpha=0.8, color="grey")
+    ax2.semilogy(t, np.abs(y_hyb) + 1e-30, label="Hybrid", linewidth=1.2,
+                 linestyle="--")
     ax2.set_xlabel("t / M"); ax2.set_ylabel(r"$|\Phi(x_q, t)|$")
     ax2.legend(); ax2.grid(True, alpha=0.3)
     fig.tight_layout()
@@ -72,10 +74,12 @@ def main() -> None:
     fig.savefig(out, dpi=200); plt.close(fig)
     print(f"[fig] {out}")
 
-    # ---- M4 stability scan ------------------------------------------------
+    # ---- M4 stability scan (canonical Algorithm-1 grid; M4 uses the fixed
+    #      usable-signal cutoff t_end=80 M matching the canonical extraction
+    #      window, M5 scans to the domain end) ---------------------------------
     r = qnm_method_4_window_scan(
-        t, y_hyb.astype(np.float64), t_start_min=10.0, t_start_max=18.0,
-        t_end=50.0, n_starts=12, potential="zerilli", ell=2,
+        t, y_hyb.astype(np.float64), t_start_min=10.0, t_start_max=25.0,
+        t_end=80.0, n_starts=16, potential="zerilli", ell=2,
     )
     e4 = percentage_errors({"omega": r["omega"], "tau": r["tau"]},
                            potential="zerilli", ell=2, M=1.0)
@@ -116,12 +120,12 @@ def main() -> None:
     fig.savefig(out, dpi=120); plt.close(fig)
     print(f"[fig] {out}")
 
-    # ---- M5 2-D stability scan ---------------------------------------------
+    # ---- M5 2-D stability scan (canonical Algorithm-1 grid, [10,100]) ------
     m5 = qnm_method_5_2d_scan(
         t, y_hyb.astype(np.float64),
-        t_start_min=10.0, t_start_max=18.0,
-        t_end_min=40.0, t_end_max=50.0,
-        n_starts=8, n_ends=5,
+        t_start_min=10.0, t_start_max=25.0,
+        t_end_min=30.0, t_end_max=100.0,
+        n_starts=10, n_ends=6,
         potential="zerilli", ell=2,
     )
     e5 = percentage_errors({"omega": m5["omega"], "tau": m5["tau"]},

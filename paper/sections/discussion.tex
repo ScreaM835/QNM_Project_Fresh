@@ -7,7 +7,7 @@
 The reproduction of Sec.~\ref{sec:res-repro} makes the
 comparison with \citet{Patel2024pinn} exact; the further
 improvement to $\mathrm{RL2}=0.58\%$
-(Eq.~\eqref{eq:fwd-metrics}) is accounted for by the doubled
+(Table~\ref{tab:fwd-summary}) is accounted for by the doubled
 L-BFGS budget and the greedy adaptive resampling of
 Sec.~\ref{sec:fwd-pinn}. The sub-permille eigenvalue PINN of
 \citet{Cornell2022pinnqnm} is frequency-domain and not directly
@@ -50,7 +50,7 @@ Teukolsky operator; the single quadrupole channel
 $\Phi(\xq,t)$ lifts analogously to one head per harmonic. The
 substantive limitation is the ill-conditioning of ESPRIT
 on a nearly clean damped sinusoid, which excludes M3 from the
-primary numbers (Appendix~\ref{app:esprit}).
+primary numbers.
 
 A related scope point concerns the overtone. The two-mode M4
 template is credited for the sub-percent fundamental-mode
@@ -72,7 +72,7 @@ cost of one coarse solve plus one forward pass. Its gain is structural: the coar
 error correlates strongly with the prior gradient, so the
 parameter-free gate routes network capacity onto the wavefronts
 where the prior fails, cutting the population field MSE by
-$\sim\!82\times$ while protecting the regions the classical
+$\sim\!46\times$ while protecting the regions the classical
 solve already resolves (Sec.~\ref{sec:res-hyb}); the field gain
 does not become a median QNM gain because the
 coarse-up baseline already sits at the extractor floor at the

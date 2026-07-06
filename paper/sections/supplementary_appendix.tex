@@ -9,7 +9,7 @@ Sec.~\ref{sec:results}.
 \subsection{Hybrid: gradient-gate diagnostics}
 \label{app:supp-gate}
 
-Figure~\ref{fig:hyb-grad} (log--log Pearson $r = 0.917$) and
+Figure~\ref{fig:hyb-grad} (log--log Pearson $r = 0.921$) and
 Table~\ref{tab:hyb-gate-decile} are the empirical basis of the
 gate: the correction cuts the mean error by $14.1\times$ in the
 top gradient decile, falling to $2.6\times$ by the sixth, with
@@ -18,18 +18,12 @@ label-free in Appendix~\ref{app:gate-scale}.
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.82\textwidth]{../outputs/hybrid/fno_sw_gate_s1em3/figs/grad_vs_error.png}
+\includegraphics[width=0.82\textwidth]{../outputs/hybrid/fno_sw_gate_s1em3_t100/figs/grad_vs_error.png}
 \caption{Coarse-prior error versus prior gradient on the
-canonical BH, the diagnostic motivating the gradient gate.
-Each point is one $(x,t)$ cell; the horizontal axis is the
-prior gradient magnitude $|\nabla\mathcal{U}\Phi^{\mathrm{c}}|$
-and the vertical axis the coarse-up baseline error
-$|\Phi^{\mathrm{f}} - \mathcal{U}\Phi^{\mathrm{c}}|$, both on
-log scales. The log--log Pearson correlation is $r = 0.917$:
-the prior error is large precisely on the high-gradient
-wavefronts and small in the low-gradient interior and causal
-exterior, so the gate $g$ (Eq.~\eqref{eq:hyb-gate}) routes the
-network correction to the cells that need it.}
+canonical BH, each point one $(x,t)$ cell with both axes on log
+scales. The strong correlation ($r = 0.921$) confirms that the
+prior error concentrates on the high-gradient wavefronts, which
+the gate $g$ (Eq.~\eqref{eq:hyb-gate}) targets.}
 \label{fig:hyb-grad}
 \end{figure}
 
@@ -59,26 +53,67 @@ Gradient decile & $\overline{|\nabla\mathcal{U}\Phi^{\mathrm{c}}|}$
 \end{tabular}
 \end{table}
 
-\subsection{Hybrid M5 plateau diagnostic}
-\label{app:supp-m5}
+\subsection{Plateau-scan diagnostics}
+\label{app:supp-plateau}
 
-Figure~\ref{fig:hyb-plateau-m5}
-shows the M5 2-D plateau scan for the hybrid canonical
-extraction; it confirms the main-text M4 value
-(Table~\ref{tab:hyb-canonical}).
+The M4 and M5 plateau constructions of Sec.~\ref{sec:plateau}
+underpin the frequency and damping-time entries of
+Tables~\ref{tab:fwd-qnm} and~\ref{tab:hyb-canonical}.
+Figures~\ref{fig:fwd-plateau-m4}--\ref{fig:hyb-plateau-m5}
+collect the scans for the forward PINN and the hybrid surrogate.
+The canonical hybrid M5 scan recovers the frequency to
+$0.047\%$, consistent with the hybrid M4 plateau.
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.95\textwidth]{../outputs/hybrid/fno_sw_gate_s1em3/figs/hybrid_plateau_m5_xq10.png}
-\caption{M5 2-D plateau scan on the hybrid prediction at the
-canonical BH and $\xq = 10\,M$. Heatmaps of the fitted
-$\omega$ (left) and $\tau$ (right) over an $8 \times 5$ grid in
-$(t_{0}, \tend)$ with $t_{0} \in [10, 18]\,M$ and
-$\tend \in [40, 50]\,M$, on the shared colour scales
+\includegraphics[width=0.95\textwidth]{../outputs/qnm/zerilli_l2_greedy_f03_lbfgs30k/pinn_method4_stability.png}
+\caption{M4 plateau diagnostic for the forward PINN.
+$(\omega_0,\tau_0)$ as a function of the start time $t_0$ on
+$[10,25]\,M$ at fixed $\tend = 50\,M$, with the eight-window
+plateau block ($t_0\in[14,21]\,M$) shaded.}
+\label{fig:fwd-plateau-m4}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.85\textwidth,keepaspectratio]{../outputs/qnm/zerilli_l2_greedy_f03_lbfgs30k/pinn_method5_2d_heatmap.png}
+\caption{M5 2-D plateau scan for the forward PINN. Heatmaps of
+the fitted $\omega$ (left) and $\tau$ (right) over the
+$(t_0,\tend)$ grid, on the shared colour scales
 $\omega \in [0.30, 0.50]$ and $\tau \in [5, 20]\,M$. The red
 rectangle marks the identified plateau block
-($t_{0} \in [10.0, 13.4]\,M$,
-$\tend \in [40.0, 42.5]\,M$). White cells are NLS fits that
+($t_0 \in [10.0, 16.7]\,M$, $\tend \in [42.0, 50.0]\,M$). White
+cells are NLS fits that failed to converge.}
+\label{fig:fwd-plateau-m5}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.80\textwidth]{../outputs/hybrid/fno_sw_gate_s1em3_t100/figs/hybrid_plateau_m4_xq10.png}
+\caption{M4 1-D plateau scan on the hybrid prediction at the
+canonical BH and $\xq = 10\,M$. Per-window two-mode NLS fits
+(blue circles) on $t_{0} \in [10, 25]\,M$ at the fixed
+usable-signal cutoff $\tend = 80\,M$. The red circles mark the
+contiguous plateau block on $t_{0} \in [13, 20]\,M$ that forms
+the canonical M4 estimate, recovering $\omega$ to $0.27\%$ and
+$\tau$ to $1.31\%$. Black
+dotted lines mark the Leaver reference values $\omega = 0.3737$
+and $\tau = 11.241\,M$.}
+\label{fig:hyb-plateau-m4}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.95\textwidth]{../outputs/hybrid/fno_sw_gate_s1em3_t100/figs/hybrid_plateau_m5_xq10.png}
+\caption{M5 2-D plateau scan on the hybrid prediction at the
+canonical BH and $\xq = 10\,M$. Heatmaps of the fitted
+$\omega$ (left) and $\tau$ (right) over a $10 \times 6$ grid in
+$(t_{0}, \tend)$ with $t_{0} \in [10, 25]\,M$ and
+$\tend \in [30, 100]\,M$, on the shared colour scales
+$\omega \in [0.30, 0.50]$ and $\tau \in [5, 20]\,M$. The red
+rectangle marks the identified plateau block
+($t_{0} \in [10.0, 16.7]\,M$,
+$\tend \in [44.0, 72.0]\,M$). White cells are NLS fits that
 failed to converge.}
 \label{fig:hyb-plateau-m5}
 \end{figure}

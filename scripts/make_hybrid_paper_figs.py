@@ -60,8 +60,10 @@ M_CANON, X0_CANON, SIGMA_CANON = 1.0, 4.0, 5.0
 THEORY_W = 0.3737
 THEORY_T = 11.241
 
-# Snapshot times in M -- match the PINN forward convention (t in [0, 50] M).
-SNAP_TIMES = [5.0, 15.0, 30.0, 50.0]
+# Snapshot times in M -- match the PINN forward convention
+# (times = [10, 20, 30, 40] M in scripts/run_pinn.py) for cross-model
+# consistency of the field-snapshot figures.
+SNAP_TIMES = [10.0, 20.0, 30.0, 40.0]
 
 
 # --------------------------------------------------------------------------
@@ -244,12 +246,13 @@ def fig_abs_diff_snapshots():
     c = load_cache()
     x = c["x"]; t = c["t"]; pf = c["psi_fine"]; ph = c["psi_hybrid"]
     times = [tj for tj in SNAP_TIMES if tj <= float(t.max()) + 1e-6]
+    tstr = r",\,".join(f"{tj:.0f}" for tj in times)
     out = OUT_DIR / "hybrid_abs_diff_snapshots.png"
     pinn_plot.plot_abs_diff_snapshots(
         x=x, t=t, phi_fd=pf, phi_pinn=ph, times=times,
         outpath=str(out),
         title=(r"$|\Phi_{\mathrm{FD\,fine}} - \Phi_{\mathrm{Hybrid}}|$  "
-               r"at $t/M \in \{5,15,30,50\}$ (canonical BH)"),
+               r"at $t/M \in \{" + tstr + r"\}$ (canonical BH)"),
     )
     print(f"[fig] {out}")
 

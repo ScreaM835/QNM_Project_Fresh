@@ -974,9 +974,10 @@ sensitive to the wavefront error the surrogate repairs. Because
 the Teukolsky field is complex, the estimator suite of
 Sec.~\ref{sec:qnm-methods} is applied to its real and imaginary
 channels separately and augmented with two complex-signal
-estimators --- complex ESPRIT (cES) and a complex-phase fit
-(c$\Phi$); with spherical--spheroidal mixing populating the
-ringdown with several nearby modes, the reported value is the
+estimators, complex ESPRIT (cES) and a complex-phase fit
+(c$\Phi$), defined in Algorithms~\ref{alg:cphi}
+and~\ref{alg:ces}; with spherical--spheroidal mixing populating
+the ringdown with several nearby modes, the reported value is the
 Leaver-closest of this suite (best-of-suite) for the target
 $(4,2,0)$ multiplet, read at $\scri$ ($\sigma = 0$).
 
@@ -1140,7 +1141,7 @@ with the longer-$\tau$ component taken as the fundamental, so the
 overtone term absorbs residual $n = 1$ power that would
 otherwise bias a single-mode fit at early times.
 
-\begin{algorithm}[t]
+\begin{algorithm}[H]
 \caption{M1 --- spectral peak and log-envelope slope, the
 \citet{Patel2024pinn} procedure.}
 \label{alg:m1}
@@ -1155,7 +1156,7 @@ otherwise bias a single-mode fit at early times.
 \end{algorithmic}
 \end{algorithm}
 
-\begin{algorithm}[t]
+\begin{algorithm}[H]
 \caption{M2 --- single damped-sinusoid nonlinear least squares.}
 \label{alg:m2}
 \begin{algorithmic}[1]
@@ -1167,7 +1168,7 @@ otherwise bias a single-mode fit at early times.
 \end{algorithmic}
 \end{algorithm}
 
-\begin{algorithm}[t]
+\begin{algorithm}[H]
 \caption{M3 --- ESPRIT subspace decomposition \citep{Roy1989esprit}.}
 \label{alg:m3}
 \begin{algorithmic}[1]
@@ -1181,13 +1182,13 @@ otherwise bias a single-mode fit at early times.
 \end{algorithmic}
 \end{algorithm}
 
-\begin{algorithm}[t]
+\begin{algorithm}[H]
 \caption{M4 --- two-mode NLS with a 1-D start-time plateau scan.}
 \label{alg:m4}
 \begin{algorithmic}[1]
 \STATE \textbf{Input:} $\Phi(\xq,t)$,
        grid $\{t_0^{(k)}\}_{k=1}^{16} \subset [10,25]\,M$,
-       fixed $\tend = 50\,M$, plateau width $w = 8$.
+       fixed $\tend$ at the domain end, plateau width $w = 8$.
 \FOR{$k = 1,\dots,16$}
   \STATE Fit Eq.~\eqref{eq:two-mode} to $\Phi(\xq,t)$ on $[t_0^{(k)},\tend]$
          by NLS.
@@ -1203,12 +1204,13 @@ otherwise bias a single-mode fit at early times.
 \end{algorithmic}
 \end{algorithm}
 
-\begin{algorithm}[t]
+\begin{algorithm}[H]
 \caption{M5 --- two-mode NLS with a 2-D two-edge plateau scan.}
 \label{alg:m5}
 \begin{algorithmic}[1]
 \STATE \textbf{Input:} $\Phi(\xq,t)$, grid
-       $t_0 \in [10,25]\,M \times \tend \in [30,50]\,M$ ($10\times 6$),
+       $t_0 \in [10,25]\,M$ and $\tend$ from $30\,M$ to the domain
+       end ($10\times 6$),
        plateau block $5\times 3$.
 \FOR{each window $(t_0,\tend)$ on the grid}
   \STATE Fit Eq.~\eqref{eq:two-mode} by NLS; the longer-$\tau$ component
@@ -1230,11 +1232,63 @@ $(\sigma_\omega,\sigma_\tau)$ as a fit-window systematic
 uncertainty, and the reporting convention of
 Sec.~\ref{sec:reporting} selects the primary value. ESPRIT (M3)
 is ill-conditioned on the PINN waveforms at $\xq = 10\,M$
-($K = 6$; Appendix~\ref{app:esprit}) and is quoted only where it
+($K = 6$) and is quoted only where it
 is well-conditioned, on the hybrid-pipeline fields; to our
 knowledge M5 is the first systematic two-dimensional plateau
 analysis applied to PINN-derived QNM extraction. Both plateau
 scans are sketched in Fig.~\ref{fig:windows}.
+
+\paragraph{Kerr complex estimators.} The Schwarzschild field is
+real, but the Teukolsky field read at $\scri$ is genuinely
+complex, $\Psi(\tau) = \sum_n A_n e^{-i\omega_n \tau}$
+(Sec.~\ref{sec:teukolsky-problem}). In the Kerr case only, M1--M5
+are therefore run on $\mathrm{Re}\,\Psi$ and $\mathrm{Im}\,\Psi$
+separately and the suite is augmented with two complex-native
+estimators that act on $\Psi$ directly. The complex-phase fit
+c$\Phi$ (Algorithm~\ref{alg:cphi}) is the complex analogue of M1:
+a single mode has $\log|\Psi| = \log|A| - \tau/\tau_{\mathrm{d}}$
+and $\arg\Psi = \arg A - \omega_R\,\tau$, so the damping time
+follows from the envelope slope and the frequency from the slope
+of the unwrapped phase, with no spectral peak-finding. Complex
+ESPRIT cES (Algorithm~\ref{alg:ces}) is the complex analogue of
+M3: because $\Psi$ is already a sum of complex exponentials, the
+subspace decomposition is applied to it with no Hilbert
+transform, so each physical mode appears once and the fundamental
+and first overtone --- nearly equal in frequency but differing
+several-fold in damping time --- are resolved explicitly. The
+reported Kerr value is the Leaver-closest of this augmented suite
+for the target $(4,2,0)$ multiplet.
+
+\begin{algorithm}[H]
+\caption{c$\Phi$ --- complex-phase fit (Kerr only), the complex
+analogue of M1.}
+\label{alg:cphi}
+\begin{algorithmic}[1]
+\STATE \textbf{Input:} complex $\Psi(\scri,\tau)$ on window
+       $[\tau_0,\tend]$.
+\STATE $1/\tau_{\mathrm{d}} \gets -\,\mathrm{slope}$ of the OLS fit
+       of $\log|\Psi|$ versus $\tau$; \ $\tau \gets \tau_{\mathrm{d}}$.
+\STATE $\omega_R \gets -\,\mathrm{slope}$ of the OLS fit of the
+       unwrapped phase $\arg\Psi$ versus $\tau$.
+\STATE \textbf{return} $(\omega_R,\tau)$.
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{cES --- complex ESPRIT (Kerr only), the complex analogue
+of M3.}
+\label{alg:ces}
+\begin{algorithmic}[1]
+\STATE \textbf{Input:} complex $\Psi(\scri,\tau)$ on window
+       $[\tau_0,\tend]$, model order $K = 2$.
+\STATE $\{z_n\}_{n=0}^{K-1} \gets$ ESPRIT poles of $\Psi$ directly
+       (no Hilbert transform),
+       $z_n = e^{(-1/\tau_n + i\omega_{R,n})\Delta\tau}$.
+\STATE Keep physical modes ($\tau_n > 0$), sorted by descending
+       $\tau_n$; the longest-lived is the fundamental.
+\STATE \textbf{return} the fundamental $(\omega_{R,0},\tau_0)$.
+\end{algorithmic}
+\end{algorithm}
 
 \begin{figure}[t]
 \centering
@@ -1243,40 +1297,41 @@ scans are sketched in Fig.~\ref{fig:windows}.
 %-------------------------------------------------------------
 \begin{subfigure}[t]{\textwidth}
 \centering
-\begin{tikzpicture}[>=stealth, x=0.20cm, y=0.45cm,
+\begin{tikzpicture}[>=stealth, x=0.13cm, y=0.45cm,
                     every node/.style={font=\scriptsize}]
   % --- decorative ringdown waveform (top band) ---
   \begin{scope}[yshift=2.6cm]
-    \draw[domain=0:50, samples=240, smooth, thick, blue!55!black]
+    \draw[domain=0:80, samples=320, smooth, thick, blue!55!black]
       plot (\x, {0.9*exp(-0.09*\x)*cos(72*\x)});
-    \node[blue!55!black, anchor=west] at (51,0)
+    \node[blue!55!black, anchor=west] at (81,0)
          {$\Phi(\xq,t)$};
     % light dashed connector to indicate same time axis
-    \foreach \x in {10,18,25,50}
+    \foreach \x in {10,25,50,80}
       \draw[gray!40, dashed, very thin] (\x,-1.0) -- (\x,-2.5);
   \end{scope}
 
-  % --- M4 windows: vary t_0 in [10,25], fixed t_end = 50 ---
-  % plateau block (t_0 = 10..16) drawn solid
-  \foreach \t/\y in {10/0, 12/0.55, 14/1.10, 16/1.65}
-    \draw[orange!85!black, very thick] (\t,\y) -- (50,\y);
-  % post-plateau windows drawn dotted
-  \foreach \t/\y in {18/2.20, 22/2.75}
-    \draw[orange!85!black, very thick, dotted] (\t,\y) -- (50,\y);
-  \node[orange!85!black, anchor=west] at (51,1.4)
+  % --- M4 windows: vary t_0 in [10,25], fixed t_end = 80 ---
+  % plateau block (t_0 = 13..20) drawn solid
+  \foreach \t/\y in {13/0.55, 15/1.10, 17/1.65, 19/2.20}
+    \draw[orange!85!black, very thick] (\t,\y) -- (80,\y);
+  % windows outside the plateau drawn dotted
+  \foreach \t/\y in {10/0, 22/2.75}
+    \draw[orange!85!black, very thick, dotted] (\t,\y) -- (80,\y);
+  \node[orange!85!black, anchor=west] at (81,1.4)
        {M4: scan $t_0$};
 
   % time axis
-  \draw[->, thick] (-1,-0.6) -- (54,-0.6) node[right]{$t/M$};
-  \foreach \x in {0,10,18,25,50}
+  \draw[->, thick] (-1,-0.6) -- (84,-0.6) node[right]{$t/M$};
+  \foreach \x in {0,10,25,50,80}
     \draw (\x,-0.5) -- (\x,-0.7) node[below]{$\x$};
 \end{tikzpicture}
 \caption{M4 schematic: 1-D scan of the start time $t_0$ (six
 representative windows of the sixteen-window, step-$1\,M$ scan
-shown) with the end time fixed at $t=50\,M$.
-Solid bars belong to the contiguous plateau block; dotted bars sit
-outside it. The decorative curve at the top depicts the ringdown
-waveform $\Phi(\xq,t)$ on the same time axis.}
+shown) with the end time fixed at the usable-signal cutoff
+$t=80\,M$. Solid bars belong to the contiguous plateau block and
+dotted bars sit outside it. The decorative curve at the top
+depicts the ringdown waveform $\Phi(\xq,t)$ on the same time
+axis.}
 \label{fig:m4}
 \end{subfigure}
 
@@ -1294,7 +1349,7 @@ waveform $\Phi(\xq,t)$ on the same time axis.}
   \draw[->, thick] (0,-0.2) -- (0,7.5) node[above]{$\tend/M$};
   \foreach \x/\lab in {0/10, 3/16.7, 6/22, 9/25}
     \draw (\x,0.08) -- (\x,-0.08) node[below]{$\lab$};
-  \foreach \y/\lab in {0/30, 2.5/35, 5/42, 7/50}
+  \foreach \y/\lab in {0/30, 2/50, 5/80, 7/100}
     \draw (0.08,\y) -- (-0.08,\y) node[left]{$\lab$};
 
   % grid of (t_0,t_end) candidate windows (10x6 dots)
@@ -1302,18 +1357,18 @@ waveform $\Phi(\xq,t)$ on the same time axis.}
     \foreach \j in {0,...,5}
       \fill[gray!50] ({\i*0.95+0.1},{\j*1.25+0.2}) circle (1.6pt);
 
-  % plateau rectangle: t_0 in [10,16.7], t_end in [42,50]
+  % plateau rectangle: t_0 in [10,16.7], t_end in [44,72]
   \draw[red!80!black, very thick, fill=red!10, fill opacity=0.5]
-        (-0.05,4.7) rectangle (3.1,7.1);
-  \node[red!80!black, anchor=south west, font=\small] at (3.2,5.6)
+        (-0.05,1.4) rectangle (3.1,4.2);
+  \node[red!80!black, anchor=south west, font=\small] at (3.2,2.8)
        {plateau};
 \end{tikzpicture}
 \caption{M5 schematic: 2-D scan in the $(t_0,\tend)$ plane. Grey
 dots are candidate fit windows on a $10\times 6$ grid with
-$t_0\in[10,25]\,M$, $\tend\in[30,50]\,M$. The shaded red rectangle
+$t_0\in[10,25]\,M$, $\tend\in[30,100]\,M$. The shaded red rectangle
 (plateau) is the contiguous $5\times 3$ block of lowest combined
-relative scatter measured on the forward waveform,
-$t_0\in[10,16.7]\,M$ and $\tend\in[42,50]\,M$.}
+relative scatter measured on the hybrid waveform,
+$t_0\in[10,16.7]\,M$ and $\tend\in[44,72]\,M$.}
 \label{fig:m5}
 \end{subfigure}
 \caption{Fit-window scan schematics for the two plateau-based QNM

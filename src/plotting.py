@@ -221,9 +221,16 @@ def plot_error_heatmap(
         cbar = fig.colorbar(im, ax=ax, pad=0.02)
         cbar.set_label(rf"$\Phi_{{\mathrm{{FD}}}} - \Phi_{{\mathrm{{{model_label}}}}}$")
     else:
-        im = ax.pcolormesh(x, t, diff, shading="auto", cmap="magma_r")
+        from matplotlib.colors import LogNorm
+        pos = diff[np.isfinite(diff) & (diff > 0)]
+        vmin = max(float(pos.min()), 1e-6) if pos.size else 1e-6
+        vmax = float(diff.max()) if np.isfinite(diff).any() and diff.max() > vmin else vmin * 10
+        im = ax.pcolormesh(
+            x, t, np.clip(diff, vmin, None), shading="auto", cmap="magma_r",
+            norm=LogNorm(vmin=vmin, vmax=vmax),
+        )
         cbar = fig.colorbar(im, ax=ax, pad=0.02)
-        cbar.set_label(rf"$|\Phi_{{\mathrm{{FD}}}} - \Phi_{{\mathrm{{{model_label}}}}}|$")
+        cbar.set_label(rf"$|\Phi_{{\mathrm{{FD}}}} - \Phi_{{\mathrm{{{model_label}}}}}|$ (log scale)")
 
     ax.set_xlabel(r"$x_* / M$")
     ax.set_ylabel("t / M")

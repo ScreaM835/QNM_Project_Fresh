@@ -73,17 +73,32 @@ def reconstruct_canonical():
 
 def plot_ringdown(f):
     tau, scri = f["tau"], f["scri"]
-    plt.figure(figsize=(7, 4))
-    plt.plot(tau, f["fine_re"][:, scri], color=C_FINE, ls="-", lw=1.4, label="FD (fine)")
-    plt.plot(tau, f["up4_re"][:, scri], color=C_PRIOR, ls=":", lw=1.2, label="coarse prior")
-    plt.plot(tau, f["hyb_re"][:, scri], color=C_HYB, ls="--", lw=1.3, label="hybrid")
-    plt.xlabel(r"$\tau/M$")
-    plt.ylabel(r"$\mathrm{Re}\,\psi$ at $\mathcal{I}^{+}$")
-    plt.legend(frameon=False)
-    plt.title(rf"Kerr ringdown at $\mathcal{{I}}^{{+}}$ ($a/M={f['aM']:.2f}$)")
-    plt.tight_layout()
-    plt.savefig(os.path.join(FIGS, "hybrid_ringdown_scri.png"), dpi=200)
-    plt.close()
+    fine = f["fine_re"][:, scri]
+    prior = f["up4_re"][:, scri]
+    hyb = f["hyb_re"][:, scri]
+    # complex magnitude |psi| for the log-scale panel (Re + Im channels)
+    mag_fine = np.sqrt(f["fine_re"][:, scri] ** 2 + f["fine_im"][:, scri] ** 2)
+    mag_prior = np.sqrt(f["up4_re"][:, scri] ** 2 + f["up4_im"][:, scri] ** 2)
+    mag_hyb = np.sqrt(f["hyb_re"][:, scri] ** 2 + f["hyb_im"][:, scri] ** 2)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(7, 6), sharex=True)
+    ax1.plot(tau, fine, color=C_FINE, ls="-", lw=1.4, label="FD (fine)")
+    ax1.plot(tau, prior, color=C_PRIOR, ls=":", lw=1.2, label="coarse prior")
+    ax1.plot(tau, hyb, color=C_HYB, ls="--", lw=1.3, label="hybrid")
+    ax1.set_ylabel(r"$\mathrm{Re}\,\psi$ at $\mathcal{I}^{+}$")
+    ax1.legend(frameon=False)
+    ax1.set_title(rf"Kerr ringdown at $\mathcal{{I}}^{{+}}$ ($a/M={f['aM']:.2f}$)")
+    ax1.grid(True, alpha=0.3)
+    ax2.semilogy(tau, mag_fine + 1e-30, color=C_FINE, ls="-", lw=1.4, label="FD (fine)")
+    ax2.semilogy(tau, mag_prior + 1e-30, color=C_PRIOR, ls=":", lw=1.2, label="coarse prior")
+    ax2.semilogy(tau, mag_hyb + 1e-30, color=C_HYB, ls="--", lw=1.3, label="hybrid")
+    ax2.set_xlabel(r"$\tau/M$")
+    ax2.set_ylabel(r"$|\psi|$ at $\mathcal{I}^{+}$")
+    ax2.set_ylim(1e-5, None)
+    ax2.legend(frameon=False)
+    ax2.grid(True, alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(os.path.join(FIGS, "hybrid_ringdown_scri.png"), dpi=200)
+    plt.close(fig)
 
 
 def plot_pointwise(f):

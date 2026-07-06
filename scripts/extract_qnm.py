@@ -168,7 +168,7 @@ def main():
                 axes[1].axhline(m4["tau"], color="C3", ls="--", lw=0.8)
             axes[1].axhline(e4["tau_theory"], color="k", ls=":", lw=0.8)
             axes[1].set_xlabel("start time t0"); axes[1].set_ylabel(r"$\tau / M$")
-            fig.suptitle(f"Method 4 stability scan ({tag}, xq={xq})")
+            fig.suptitle(rf"Method 4 stability scan ($x_q = {xq}\,M$)")
             fig.tight_layout()
             fig.savefig(os.path.join(outdir, f"{tag}_method4_stability.png"), dpi=120)
             plt.close(fig)
@@ -254,7 +254,7 @@ def main():
                     (t0_lo, te_lo), t0_hi - t0_lo, te_hi - te_lo,
                     fill=False, edgecolor="red", lw=1.5,
                 ))
-            fig.suptitle(f"Method 5 2-D stability scan ({tag}, xq={xq})")
+            fig.suptitle(rf"Method 5 2-D stability scan ($x_q = {xq}\,M$)")
             fig.tight_layout()
             fig.savefig(os.path.join(outdir, f"{tag}_method5_2d_heatmap.png"), dpi=120)
             plt.close(fig)
