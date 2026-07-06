@@ -82,6 +82,16 @@ def plot_abs_diff_snapshots(
 
 def plot_loss(history: Dict[str, List[float]], outpath: str, title: str) -> None:
     ensure_dir(os.path.dirname(outpath))
+    # Guard against a duplicated history: a resumed two-phase (Adam + L-BFGS)
+    # run can log the whole cycle twice, so the second half exactly repeats the
+    # first. Keep only the first, valid cycle.
+    Lt = history.get("L_total", [])
+    n = len(Lt)
+    if n >= 4 and n % 2 == 0 and list(Lt[: n // 2]) == list(Lt[n // 2:]):
+        history = {
+            k: (v[: n // 2] if isinstance(v, list) and len(v) == n else v)
+            for k, v in history.items()
+        }
     fig = plt.figure(figsize=(9, 5))
 
     # Use actual iteration numbers if available, otherwise fallback to indices
