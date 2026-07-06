@@ -58,7 +58,7 @@ field RMSD, for which only RL2 is defined as noted above.}
 Sec. & Model & Evaluation & Field RMSD & RL2 [\%]
      & $|\Delta\omega|/\omega$ [\%] & $|\Delta\tau|/\tau$ [\%] \\
 \midrule
-\ref{sec:res-repro} & Reproduction (Zerilli)        & canonical BH        & $1.83\times 10^{-3}$ & $1.30$  & $1.08$~(M1)  & $1.50$~(M2)  \\
+\ref{sec:res-repro} & Reproduction (Zerilli)        & canonical BH        & $3.68\times 10^{-3}$ & $2.61$  & $1.04$~(M2)  & $1.27$~(M2)  \\
 \ref{sec:res-repro} & Reproduction (Regge--Wheeler) & canonical BH        & $3.77\times 10^{-3}$ & $2.67$  & $0.56$~(M1)  & $1.56$~(M2)  \\
 \ref{sec:res-fwd}   & Enhanced forward PINN         & canonical BH        & $8.17\times 10^{-4}$ & $0.58$  & $0.029$~(M4) & $1.99$~(M2)  \\
 \ref{sec:res-hyb}   & Hybrid surrogate              & canonical BH        & $1.70\times 10^{-3}$ & $1.24$  & $0.047$~(M5) & $1.31$~(M4)  \\
@@ -110,7 +110,7 @@ Table~\ref{tab:repro-qnm}.}
  & Field RMSD & RL2 [\%] & $|\Delta\omega|/\omega$ [\%]
    & $|\Delta\tau|/\tau$ [\%] \\
 \midrule
-Zerilli (PINN)                & $1.83\times 10^{-3}$ & $1.30$ & $1.08$~(M1) & $1.50$~(M2) \\
+Zerilli (PINN)                & $3.68\times 10^{-3}$ & $2.61$ & $1.04$~(M2) & $1.27$~(M2) \\
 Zerilli (FD reference)        & ---                  & ---    & $0.56$~(M1) & $2.00$~(M2) \\
 Regge--Wheeler (PINN)         & $3.77\times 10^{-3}$ & $2.67$ & $0.56$~(M1) & $1.56$~(M2) \\
 Regge--Wheeler (FD reference) & ---                  & ---    & $0.10$~(M1) & $1.48$~(M1) \\
@@ -121,16 +121,27 @@ Regge--Wheeler (FD reference) & ---                  & ---    & $0.10$~(M1) & $1
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.82\textwidth]{../outputs/pinn/zerilli_l2_paper/snapshots.png}\\[0.4em]
-\includegraphics[width=0.88\textwidth]{../outputs/pinn/zerilli_l2_paper/error_heatmap.png}
+\includegraphics[width=0.82\textwidth]{../outputs/pinn/zerilli_l2_paper/abs_diff_snapshots.png}
 \caption{Faithful reproduction on the Zerilli potential. Top:
 snapshots of $\Phi(x,t)$ at $t/M \in \{10,20,30,40\}$ overlaid
 for the reproduced PINN and the FD reference; the curves are
-visually indistinguishable on this scale. Bottom: global
-pointwise error $|\Phi_{\mathrm{FD}} - \Phi_{\mathrm{PINN}}|$
-on $x \in [-50,150]\,M$, $t \in [0,50]\,M$, peaking at
-$\sim\!1.0\times 10^{-2}$ on the outgoing wavefront,
-consistent with the gridwise RMSD of $1.83\times 10^{-3}$.}
+visually indistinguishable on this scale. Bottom: pointwise
+$|\Phi_{\mathrm{FD}} - \Phi_{\mathrm{PINN}}|$ at the same four
+times, consistent with the gridwise RMSD of
+$3.68\times 10^{-3}$.}
 \label{fig:repro-zer-field}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.88\textwidth]{../outputs/pinn/zerilli_l2_paper/error_heatmap.png}
+\caption{Faithful reproduction on the Zerilli potential:
+global pointwise error $|\Phi_{\mathrm{FD}} - \Phi_{\mathrm{PINN}}|$
+on $x \in [-50,150]\,M$, $t \in [0,50]\,M$, on a logarithmic
+colour scale, peaking at $\sim\!1.6\times 10^{-2}$ on the
+outgoing wavefront, consistent with the gridwise RMSD of
+$3.68\times 10^{-3}$.}
+\label{fig:repro-zer-heatmap}
 \end{figure}
 
 \begin{figure}[!htbp]
@@ -194,11 +205,11 @@ Top: Zerilli. Bottom: Regge--Wheeler.}
 \FloatBarrier
 
 \paragraph{Field accuracy.} At matched settings the reproduction
-reaches $\mathrm{RL2} = 1.30\%$ (RMSD $1.83\times 10^{-3}$) on
+reaches $\mathrm{RL2} = 2.61\%$ (RMSD $3.68\times 10^{-3}$) on
 the Zerilli potential and $\mathrm{RL2} = 2.67\%$
 (RMSD $3.77\times 10^{-3}$) on the Regge--Wheeler potential,
 against $28.06\%$ and $23.59\%$ respectively in
-\citet[Table~2]{Patel2024pinn}, a factor of $\sim\!21$ (Zerilli)
+\citet[Table~2]{Patel2024pinn}, a factor of $\sim\!11$ (Zerilli)
 and $\sim\!9$ (Regge--Wheeler) at identical architecture, loss
 weights and optimiser budget. The remaining differences are
 implementation-level, from double-precision training and the
@@ -206,7 +217,7 @@ outgoing-pulse initial velocity of Sec.~\ref{sec:fwd-pinn}. The
 snapshot overlays of Figs.~\ref{fig:repro-zer-field}
 and~\ref{fig:repro-rw-field} are visually indistinguishable from
 the reference, and the pointwise error peaks at
-$\sim\!1.0\times 10^{-2}$ on the outgoing wavefront.
+$\sim\!1.6\times 10^{-2}$ on the outgoing wavefront.
 
 \paragraph{QNM accuracy.} Table~\ref{tab:repro-qnm} applies the
 two extraction methods used by \citet{Patel2024pinn} (M1 and M2,
@@ -216,7 +227,7 @@ reconstructions in Figs.~\ref{fig:repro-zer-ringdown}
 and~\ref{fig:repro-rw-ringdown}. The frequencies agree at the
 one-to-two-percent level on both potentials; the damping time,
 the observable most sensitive to field quality, improves
-several-fold, from $14.42\%$ to $1.50\%$ (Zerilli) and from
+several-fold, from $14.42\%$ to $1.27\%$ (Zerilli) and from
 $5.39\%$ to $1.56\%$ (Regge--Wheeler, M2).
 
 \begin{table}[!htbp]
@@ -241,8 +252,8 @@ improvement discussed in the text.}
 \cmidrule(lr){3-4}\cmidrule(l){5-6}
 Potential & Method & $|\Delta\omega|/\omega$ [\%] & $|\Delta\tau|/\tau$ [\%] & $|\Delta\omega|/\omega$ [\%] & $|\Delta\tau|/\tau$ [\%] \\
 \midrule
-Zerilli & M1 (FFT $+$ log-line) & $1.08$ & $5.07$ & $0.29$ & $10.25$ \\
-Zerilli & M2 (1-mode NLS) & $1.25$ & $\mathbf{1.50}$ & $0.52$ & $14.42$ \\
+Zerilli & M1 (FFT $+$ log-line) & $1.57$ & $7.64$ & $0.29$ & $10.25$ \\
+Zerilli & M2 (1-mode NLS) & $1.04$ & $\mathbf{1.27}$ & $0.52$ & $14.42$ \\
 Regge--Wheeler & M1 (FFT $+$ log-line) & $0.56$ & $4.34$ & $0.11$ & $6.82$ \\
 Regge--Wheeler & M2 (1-mode NLS) & $1.97$ & $\mathbf{1.56}$ & $2.51$ & $5.39$ \\
 \bottomrule
