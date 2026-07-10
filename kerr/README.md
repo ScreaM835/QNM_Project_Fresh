@@ -1,97 +1,115 @@
-our# kerr/ — Kerr Teukolsky $(\ell=m=2)$ extension
+# Kerr Hyperboloidal Teukolsky hFNO
 
-Subfolder of `project32_qnm_pinn_improved`. **Self-contained: does not
-import from the parent `src/`.** Reusable parent modules (M4 extractor,
-plotting, the Schwarzschild forward-PINN core) are *copied* into `kerr/src/`
-rather than imported, so the parent paper's pipeline stays frozen.
+This directory contains the Kerr extension reported in the project. It evolves
+the complex spin `s=-2` Teukolsky field on a horizon-penetrating hyperboloidal
+slice and applies the same coarse-prior-plus-residual framework used by the
+Schwarzschild hFNO.
 
-## Scope
+The reported experiment targets the fundamental `(l,m,n)=(4,2,0)` mode across
+`a/M in [0,0.95]`. It is an adaptation and separate training of the hybrid
+framework, not transfer of Schwarzschild network weights.
 
-- **Phase A.** Time-domain Teukolsky $(s=-2,\ell=m=2)$ FD core on hyperboloidal
-  slicing, **hand-coded** (RK4 method-of-lines, ~500 LoC). No wrapping of
-  external time-domain Teukolsky libraries; the integrator is the research
-  artefact and must live here. Validated at $a/M = 0$ against the parent
-  Schwarzschild Zerilli result.
-- **Phase B.** Forward FD waveforms across the full sweep
-  $a/M \in [0, 0.95]$, with M4 plateau extraction validated against the
-  `qnm` (PyPI) continued-fraction package. **Reported in paper body at
-  three canonical spins $\{0, 0.5, 0.9\}$;** the full sweep
-  $\omega_{220}(a)$ curve and table go in an appendix.
-- **Phase C.** Kerr-native neural waveform solver: a **parametric
-  physics-informed neural network (PINN)** that solves the time-domain
-  Teukolsky equation directly (PDE residual + analytic initial data;
-  **no FD field in the loss**), conditioned on $(a/M, r_0, w)$. QNMs are
-  then extracted from the PINN waveform by the validated Phase B M4
-  extractor. Pivoted here from the originally-planned coarse-FD +
-  FNO-residual hybrid (see `kerr/notes/phase_c_plan.md` §C.0′ for the
-  rationale and the derived PDE). Framing in paper: *"inspired by our
-  Schwarzschild forward PINN, adapted and improved for Kerr"* — and the
-  first rung of the higher-dimensional PDE-solver programme.
-- **Phase D.** Paper integration (new Kerr methods + results subsections in
-  `../paper/`).
+## Numerical Pipeline
 
-Out of scope: inverse PINN on Kerr (parameter recovery from data), Bayesian
-posteriors, detector data, multi-mode joint extraction. Listed as future
-work. **Forward PINNs on Kerr are now in scope** as the Phase C method (see
-above); this supersedes the earlier listing of "PINNs on Kerr" as future
-work, per the Phase C pivot (`kerr/notes/phase_c_plan.md` §C.0′).
+Each Sobol sample `(a/M, r0, w)` is evolved to `tau/M=220` on nested spatial
+grids:
+
+| Role | Grid | Spatial discretisation |
+|---|---:|---|
+| Fine evaluation field | `N=801` | fourth-order centred plus sixth-difference KO |
+| Richardson rung | `N=401` | fourth-order centred plus sixth-difference KO |
+| Richardson rung | `N=201` | fourth-order centred plus sixth-difference KO |
+| Deployment prior | `N=101` | second-order centred plus fourth-difference KO |
+
+All grids use RK4 time integration with CFL safety `0.4`, KO strength `0.2`,
+and a common stored cadence `Delta tau=0.25M`. Initial data are a
+time-symmetric Gaussian of amplitude one with `r0/M in [8,11]` and
+`w/M in [1,1.5]`.
+
+The label-free target is
+
+```text
+u_star = (16 * upsample(u_401) - upsample(u_201)) / 15
+```
+
+The hFNO receives the upsampled `N=101` complex prior, the initial pulse and
+the broadcast spin. It predicts a two-channel real/imaginary residual. The
+fine `N=801` field is used only for evaluation.
+
+## Reported Run
+
+Configuration: `configs/hybrid_kerr_l4_decoupled.yaml`
+
+- Data split: `1024/128/128`, disjoint Sobol draws with seed `0`
+- Training seed: `1234`
+- FNO: four layers, modes `(64,24)`, hidden width `48`
+- Trainable parameters: approximately `7.7 million`
+- Training: 200 Adam epochs
+
+Held-out test medians:
+
+| Quantity | Prior | hFNO | Fine or Richardson reference |
+|---|---:|---:|---:|
+| Field RL2 | `59.5%` | `0.78%` | Richardson `0.008%` |
+| Frequency error | `0.59%` | `0.33%` | Fine `0.05%` |
+| Damping-time error | `0.52%` | `1.52%` | Fine `0.27%` |
+
+For the high-spin bin `a/M in [0.8,0.95]`, the frequency error decreases from
+`4.71%` to `0.38%`. The damping-time regression is retained in the report as
+the principal limitation of the global field loss.
+
+## Build the Corpus
+
+Run from the repository root. The following command builds the training split
+with the exact grid ladder used in the report:
+
+```text
+python kerr/scripts/build_kerr_dataset_lscan.py --ell 4 --m 2 --split train --seed 0 --ks 2 4 8 --coarse-n "2:401,4:201,8:101" --grid-order "1:4,2:4,4:4,8:2" --out kerr/outputs/phase_c_l4_decoupled/dataset_train.npz --workers 1
+```
+
+Repeat with `--split val` and `--split test`, changing the output filename.
+On Windows, use `--workers 1`; Linux runs may use multiple workers.
+
+## Train and Evaluate
+
+```text
+python kerr/scripts/train_eval_hybrid_kerr.py --config kerr/configs/hybrid_kerr_l4_decoupled.yaml
+```
+
+To reevaluate an existing checkpoint without retraining:
+
+```text
+python kerr/scripts/train_eval_hybrid_kerr.py --config kerr/configs/hybrid_kerr_l4_decoupled.yaml --eval-only
+```
+
+The job writes `model.pt`, `history.json`, `report.json`, `per_sample.json` and
+the paper-style figures beneath the configured output directory.
+
+## Tracked and External Artifacts
+
+`outputs/_run2_download/` contains the reportable `history.json`,
+`report.json`, `per_sample.json` and figure set used by the manuscript.
+
+The full `dataset_train.npz`, `dataset_val.npz`, `dataset_test.npz` and
+`model.pt` are not tracked because of their size. Complete field-level figure
+regeneration therefore requires rebuilding the corpus and model with the
+commands above or supplying those artifacts separately. The tracked JSON files
+are sufficient to audit every aggregate number in the Kerr Results table.
 
 ## Layout
 
+- `src/teukolsky_minimal_gauge.py`: complex hyperboloidal evolution system
+- `src/kerr_dataset.py`: nested-grid corpus and Sobol splits
+- `src/hybrid_data_pipe.py`: spatial upsampling and Richardson assembly
+- `src/hybrid_fno.py`: complex residual FNO
+- `src/qnm_ensemble_kerr.py`: Kerr QNM extraction suite
+- `scripts/build_kerr_dataset_lscan.py`: corpus builder
+- `scripts/train_eval_hybrid_kerr.py`: train, evaluate and plot entry point
+- `scripts/replot_kerr_paper_figs.py`: regenerate figures from saved artifacts
+- `configs/hybrid_kerr_l4_decoupled.yaml`: reported configuration
+
+To regenerate the paper figures from separately supplied artifacts:
+
+```text
+python kerr/scripts/replot_kerr_paper_figs.py --dataset <dataset_test.npz> --model <model.pt>
 ```
-kerr/
-  src/
-    teukolsky_fd.py        Phase A — to be written
-    qnm_kerr_reference.py  Phase A — wraps the `qnm` PyPI package
-    extractor_m4.py        copied from parent src/qnm.py (renamed to
-                           kill the third-party `qnm` package shadow)
-    plotting.py            copied from parent src/plotting.py
-    pinn.py                Phase C — to copy from parent src/pinn.py (SW
-                           forward-PINN core; basis for the Kerr PINN)
-    teukolsky_residual.py  Phase C — torch Teukolsky PDE residual (to write)
-    kerr_pinn.py           Phase C — parametric PINN + train loop (to write)
-    fno_model.py           hybrid-era copy; superseded by PINN pivot, kept
-                           for provenance
-    hybrid_fno.py          hybrid-era copy; superseded by PINN pivot, kept
-                           for provenance
-  scripts/
-    validate_a0.py         Phase A acceptance: Teukolsky a=0 vs Zerilli
-    train_kerr_pinn.py     Phase C — PINN training (to write)
-    eval_kerr_pinn.py      Phase C — PINN vs FD vs Leaver (to write)
-  configs/
-    teukolsky_a0.yaml      Phase A canonical run
-    kerr_pinn.yaml         Phase C — PINN config (to write)
-  outputs/                  gitignored; large artefacts
-```
-
-Run scripts from inside `kerr/`:
-```
-cd kerr
-python scripts/validate_a0.py
-```
-
-## Acceptance gates (verbatim, do not soften)
-
-- **Phase A:** $M\omega_{220}$ at $a=0$ within $0.1\%$ of Leaver and within
-  $0.05\%$ of the parent paper's Zerilli M4 result; integrator stable to
-  $t=200M$; no boundary growth.
-- **Phase B:** $M\omega_{220}$ error against `qnm` package $\le 0.1\%$ at
-  all three reported spins $\{0, 0.5, 0.9\}$; first overtone $n=1$
-  resolved at $a/M = 0.9$; population-mean error across the full
-  $a/M \in [0, 0.95]$ sweep $\le 0.2\%$.
-- **Phase C:** on **held-out spins** (test split, unseen in training), the
-  PINN waveform matches the fine FD field to relative $L^2 \le 5\%$, **and**
-  the QNM extracted from the PINN waveform matches **Leaver** ($M\omega_{220}$
-  within $1\%$, damping time $\tau$ within $5\%$). **Both** must hold.
-  *(Replaces the hybrid-era "$\ge 10\times$ coarse-up baseline" gate, which
-  became void once the coarse-FD baseline was dropped in the PINN pivot —
-  see `kerr/notes/phase_c_plan.md` §C.0′. This is a re-anchoring to the
-  oracles we already trust (fine FD + Leaver), not a softening.)*
-
-## Phase C abort policy
-
-If Phase C fails its acceptance gate after one architecture has been
-trained and evaluated: **ship Phase A+B only.** Kerr section becomes
-"forward Teukolsky generalisation, validated against `qnm` across
-$a/M \in [0, 0.95]$." No second-architecture rescue attempt within this
-paper; deferred-architectures go to future work.

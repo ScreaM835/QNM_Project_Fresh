@@ -4,110 +4,146 @@
 \section{Discussion}\label{sec:discussion}
 
 \paragraph{Relation to prior work.}
-The reproduction of Sec.~\ref{sec:res-repro} makes the
-comparison with \citet{Patel2024pinn} exact; the further
-improvement to $\mathrm{RL2}=0.58\%$
-(Table~\ref{tab:fwd-summary}) is accounted for by the doubled
-L-BFGS budget and the greedy adaptive resampling of
-Sec.~\ref{sec:fwd-pinn}. The sub-permille eigenvalue PINN of
-\citet{Cornell2022pinnqnm} is frequency-domain and not directly
-comparable to a time-domain post-hoc fit; the hard boundary
-enforcement of \citet{Luna2022teukolskypinn} is a natural
-variant of our soft setup.
+The faithful reproduction of \citet{Patel2024pinn} establishes
+the time-domain PINN baseline used throughout this study. It
+retains the published network, loss construction, optimiser
+schedule and collocation strategy, and provides a controlled
+comparator for the enhanced forward PINN and the hFNO. Direct
+eigenvalue PINNs such as those of \citet{Cornell2022pinnqnm} and
+\citet{Luna2022teukolskypinn} solve a different problem because
+the QNM frequency is itself a trainable variable. The present
+models instead approximate the time-domain field, from which
+the QNM is measured afterwards.
 
-\paragraph{The plateau as a quality flag.}
-The plateau standard deviation $\sigma_\omega$ estimates the
-fit-window systematic and simultaneously acts as a validity
-flag: a small $\sigma_\omega$
-certifies the estimate, a large or undefined one rejects it. M5
-generalises the scan to the joint $(t_0,\tend)$ plane and
-becomes necessary when the window edge approaches
-$t_{\mathrm{tail}}$: when too little ringdown remains inside the
-window, no block of fits is stationary and the flag correctly
-withholds the estimate.
+\paragraph{A learned correction to a numerical propagator.}
+The principal contribution is the hFNO, which is best
+interpreted as a learned defect correction for a coarse
+numerical solver. The finite-difference prior carries
+characteristic propagation, potential scattering and the
+imposed boundary treatment. The neural operator is therefore
+not required to reconstruct the complete solution map from the
+initial data alone. It learns the structured difference between
+the under-resolved trajectory and a higher-order Richardson
+estimate. This division of labour follows the broader strategy
+of combining numerical solvers with learned corrections
+\citep{Um2020solverloop,Kochkov2021mlcfd,Liu2022ppnn}, while
+differing in two important respects. The hFNO predicts the
+complete spatiotemporal correction rather than inserting a
+learned update at every numerical step, and its target is
+constructed from two coarse solves rather than fine-grid
+training fields. Multi-fidelity operator learning provides a
+close methodological parallel because it likewise uses a
+low-fidelity field as both an input and an anchor for residual
+learning \citep{Thakur2023mfwno}.
 
-\paragraph{Detector-unit translation.}
-For a GW150914-class Schwarzschild remnant
-($M = 65\,M_\odot$) the Leaver values used throughout
-correspond to $f_{220} \approx 186\,\mathrm{Hz}$ and
-$\tau_0 \approx 3.60\,\mathrm{ms}$, and the enhanced forward
-PINN's fractional errors map to
-$\sigma_{f_{220}} \approx 0.05\,\mathrm{Hz}$ and
-$\sigma_{\tau_0} \approx 72\,\mu\mathrm{s}$ --- at least an
-order of magnitude below the statistical uncertainties reported
-at ringdown signal-to-noise $\rho_{\mathrm{ring}} \sim 8$--$10$
-\citep{LIGO2016ringdown,Isi2019tests}. At current sensitivities
-the limiting uncertainty is therefore the data noise rather
-than the network systematics; the balance inverts at the
-per-mille sensitivities forecast for next-generation detectors
-\citep{Berti2007ringdown}.
+\paragraph{Evidence from Schwarzschild and Kerr.}
+On the Schwarzschild test population, the hFNO reduces the mean
+field RL2 error from $13.39\%$ to $1.85\%$ and the field MSE by
+a factor of $46$. The gradient correlation shows why this
+decomposition is effective. The largest coarse-grid errors
+occur near the propagating wavefronts, allowing the learned
+correction to concentrate on a structured and spatially
+restricted defect. On Kerr, the same coarse-prior-plus-residual
+construction is retained after adapting the representation to
+the complex hyperboloidal Teukolsky field and retraining across
+spin. The median field error falls from $59.5\%$ to $0.78\%$,
+while the high-spin frequency error falls from $4.71\%$ to
+$0.38\%$. The Richardson target itself has a median field error
+of $0.008\%$, showing that the remaining discrepancy is
+dominated by approximation of the correction rather than by
+the target construction. The Kerr experiment therefore
+demonstrates portability of the hybrid design across two
+perturbation formulations, not transfer of one trained model
+between geometries.
 
-\paragraph{Limitations.}
-Of the two original scope choices, the fixed Schwarzschild
-background is lifted in Sec.~\ref{sec:res-kerr}, where the
-hybrid is retrained on rotating (Kerr) backgrounds via the
-Teukolsky operator; the single quadrupole channel
-$\Phi(\xq,t)$ lifts analogously to one head per harmonic. The
-substantive limitation is the ill-conditioning of ESPRIT
-on a nearly clean damped sinusoid, which excludes M3 from the
-primary numbers.
+\paragraph{What the QNM results reveal.}
+The QNM measurements diagnose which parts of the corrected
+field are retained most accurately. The hFNO recovers the
+Schwarzschild population frequency to $0.152\%$ and the Kerr
+population frequency to $0.33\%$, but the Kerr damping-time
+error increases from $0.52\%$ for the coarse prior to $1.52\%$
+after correction. This separation is consistent with the field
+loss being dominated by the high-amplitude burst and
+wavefronts, while the damping time depends strongly on the much
+smaller late-time envelope. It identifies a limitation of the
+present objective rather than an intrinsic limitation of
+learned field correction. The extraction suite remains a
+downstream diagnostic, and the plateau spread measures
+fit-window sensitivity rather than model uncertainty.
 
-A related scope point concerns the overtone. The two-mode M4
-template is credited for the sub-percent fundamental-mode
-accuracy (the overtone term absorbs $n=1$ contamination;
-\citealt{Giesler2019overtones}), but reporting
-$(M\omega_1,\tau_1/M)$ as a separate result is not warranted:
-our Gaussian initial data excite $n=1$ far more weakly than the
-numerical-relativity remnants on which the Giesler prescription
-was demonstrated, and the plateau-mean overtone recovers
-$M\omega_1$ no better than $\sim\!20\%$. Overtone-exciting
-initial data are a natural follow-up, given the active
-controversy over the GW150914 overtone
-\citep{Cotesta2022overtones,Isi2021priors}.
+\paragraph{Scope and limitations.}
+The reported population tests are in distribution, use one
+perturbative harmonic in each geometry and require separate
+training for the Schwarzschild and Kerr formulations. The
+fixed-grid Fourier representation has not been tested under
+changes of domain, resolution or boundary treatment. The
+gradient gate is effective globally but does not guarantee
+pointwise improvement wherever the prior is already accurate.
+Richardson extrapolation also relies on the two coarse
+discretisations lying within the expected convergence regime.
+Controlled overtone-rich initial data and additional harmonics
+are required before extending the physical claims beyond the
+fundamental modes studied here. Finally,
+Eq.~\eqref{eq:hyb-work-ratio} counts only the finite-difference
+point updates in the Schwarzschild coarse solve. A wall-clock
+comparison including interpolation and neural inference is still
+required to establish the realised speedup and training
+break-even point.
 
-\paragraph{Amortised surrogates.}
-Each PINN must be trained anew for every black hole; the hybrid
-trains once and then serves any in-distribution draw at the
-cost of one coarse solve plus one forward pass. Its gain is structural: the coarse-prior
-error correlates strongly with the prior gradient, so the
-parameter-free gate routes network capacity onto the wavefronts
-where the prior fails, cutting the population field MSE by
-$\sim\!46\times$ while protecting the regions the classical
-solve already resolves (Sec.~\ref{sec:res-hyb}); the field gain
-does not become a median QNM gain because the
-coarse-up baseline already sits at the extractor floor at the
-common observer.
+\paragraph{Further amortisation.}
+The present hFNO amortises the correction but still evaluates a
+coarse solve for every new black hole. Multi-fidelity operator
+learning suggests a second stage in which a low-fidelity
+operator approximates the coarse solver and the residual
+operator supplies the fine correction
+\citep{Thakur2023mfwno}. Retaining the numerical solver as a
+fallback would preserve the physical anchor when predictive
+uncertainty is large. A complementary route is
+multi-resolution active learning, which selects both the next
+parameter sample and the resolution at which it should be
+generated according to expected information gain per unit cost
+\citep{Li2024mrafno}. Applied here, this could allocate the more
+expensive Richardson pairs to spins, initial data and wavefront
+structures that contribute most to the correction error.
 
-\paragraph{Geometry-agnostic generalisation.}
-The Kerr experiment of Sec.~\ref{sec:res-kerr} shows that the
-hybrid is not tied to the Schwarzschild wave equation. The same
-coarse-plus-residual operator, retrained on the complex,
-hyperboloidal Teukolsky field across spins $a/M \in [0,0.95]$,
-cuts the median field error by $77\times$ and recovers the
-near-extremal fundamental frequency by an order of magnitude
-($4.71\%\to0.38\%$), precisely where the coarse prior fails
-fastest. This is the qualitative advantage of an amortised
-surrogate over a per-instance PINN: a PINN must be retrained
-from scratch for every spin, whereas the operator transfers
-across the parameter family at one coarse solve plus one
-forward pass. The damping time remains the harder channel on
-Kerr just as on Schwarzschild --- the residual correction,
-tuned to the field and its leading oscillation, does not
-sharpen the exponential envelope, so $\tau$ stays a fine-solve
-quantity. This is an intrinsic property of correcting a field
-rather than a decay rate, not a Kerr-specific artefact.
+\paragraph{Long-time and structure-preserving operators.}
+The damping-time result motivates replacing the single global
+correction with a temporally decomposed or rollout-aware
+operator. Solver-in-the-loop training and long-time operator
+learning show that exposing a model to its own corrected states
+can reduce accumulated phase and amplitude error
+\citep{Um2020solverloop,Wang2023longtime,McCabe2023stability}.
+A Koopman residual operator offers a related hypothesis. Since
+the fixed-background perturbation equations are already linear,
+its role would be to learn a compact parameter-dependent
+evolution subspace rather than to linearise the dynamics. The
+latent evolution could be tested directly for preservation of
+the damped modal spectrum across prompt response, ringdown and
+tail regimes \citep{Brunton2022koopman,Xiong2024kno}.
 
-\paragraph{Methodological outlook.}
-Recasting the point estimate as a Bayesian posterior over
-$(\omega,\tau)$ with the trained PINN as the forward operator
-\citep{Isi2021priors} would combine the network-systematic
-uncertainty (which the plateau diagnostic estimates) with the
-data-statistical uncertainty that a point estimate lacks; a
-Cram\'er--Rao baseline completes it. On the training side, the
-static loss weights could be replaced by adaptive
-\citep{Wang2021gradientpath,Wang2022ntk,McClenny2023sapinn} or
-causal time-weighting \citep{Wang2022causal} schemes ---
-natural for ringdown, where the early-time pulse must be
-resolved before the late-time decay can be trusted --- and the
-soft Sommerfeld boundaries enforced hard via an output
-transform \citep{Luna2022teukolskypinn}.
+For Schwarzschild, a second structure-preserving direction
+follows from writing the semidiscrete wave equation in the
+canonical variables $(\Phi,\Pi)$. SympFlow constructs
+time-continuous symplectic maps from exact Hamiltonian subflows
+and permits backward-error analysis of the learned evolution
+\citep{Canizares2026sympflow}. A corresponding hybrid model
+could preserve the Hamiltonian structure of the interior update
+while treating radiation through the boundaries as an explicit
+energy flux. Such a construction should first be established
+for the Schwarzschild system. Extension to the complex Kerr
+evolution would require a separate derivation of the
+appropriate conservative and radiative structure.
+
+\paragraph{From waveforms to inference.}
+The amortised waveform family can also support an amortised
+inference pipeline. Reduced bases and reduced-order quadratures
+compress repeated gravitational-wave likelihood evaluations
+into a small set of empirically selected samples while retaining
+the accuracy of the original likelihood
+\citep{Canizares2013roq,Canizares2015roq}. Building such a basis
+from the hFNO waveform family would connect rapid field
+generation to Bayesian inference over black-hole and ringdown
+parameters. This would provide a more complete test of
+practical value than detector-unit conversion alone and would
+allow detector noise, calibrated hFNO discrepancy and
+fit-window dependence to be treated as distinct contributions.

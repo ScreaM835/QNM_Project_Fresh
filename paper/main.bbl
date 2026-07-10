@@ -1,9 +1,15 @@
-\begin{thebibliography}{53}
+\begin{thebibliography}{66}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
 \expandafter\ifx\csname urlstyle\endcsname\relax
   \providecommand{\doi}[1]{doi: #1}\else
   \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Ait~Haddou(2023)]{Haddou2023drgt}
+Marwan Ait~Haddou.
+\newblock Quasi-normal modes of near-extremal black holes in {dRGT} massive
+  gravity using physics-informed neural networks.
+\newblock \emph{arXiv:2303.02395 [gr-qc]}, 2023.
 
 \bibitem[Baydin et~al.(2018)Baydin, Pearlmutter, Radul, and
   Siskind]{Baydin2018ad}
@@ -32,11 +38,42 @@ Emanuele Berti, Vitor Cardoso, and Andrei~O. Starinets.
 \newblock Quasinormal modes of black holes and black branes.
 \newblock \emph{Class. Quantum Grav.}, 26:\penalty0 163001, 2009.
 
+\bibitem[Brunton et~al.(2022)Brunton, Budi\v{s}i\'c, Kaiser, and
+  Kutz]{Brunton2022koopman}
+Steven~L. Brunton, Marko Budi\v{s}i\'c, Eurika Kaiser, and J.~Nathan Kutz.
+\newblock Modern {Koopman} theory for dynamical systems.
+\newblock \emph{SIAM Rev.}, 64\penalty0 (2):\penalty0 229--340, 2022.
+\newblock \doi{10.1137/21M1401243}.
+
 \bibitem[Buonanno et~al.(2007)Buonanno, Cook, and
   Pretorius]{Buonanno2007ringdown}
 Alessandra Buonanno, Gregory~B. Cook, and Frans Pretorius.
 \newblock Inspiral, merger and ring-down of equal-mass black-hole binaries.
 \newblock \emph{Phys. Rev. D}, 75:\penalty0 124018, 2007.
+
+\bibitem[Canizares et~al.(2013)Canizares, Field, Gair, and
+  Tiglio]{Canizares2013roq}
+Priscilla Canizares, Scott~E. Field, Jonathan~R. Gair, and Manuel Tiglio.
+\newblock Gravitational wave parameter estimation with compressed likelihood
+  evaluations.
+\newblock \emph{Phys. Rev. D}, 87:\penalty0 124005, 2013.
+\newblock \doi{10.1103/PhysRevD.87.124005}.
+
+\bibitem[Canizares et~al.(2015)Canizares, Field, Gair, Raymond, Smith, and
+  Tiglio]{Canizares2015roq}
+Priscilla Canizares, Scott~E. Field, Jonathan~R. Gair, Vivien Raymond, Rory
+  Smith, and Manuel Tiglio.
+\newblock Accelerated gravitational-wave parameter estimation with reduced
+  order modeling.
+\newblock \emph{Phys. Rev. Lett.}, 114:\penalty0 071104, 2015.
+\newblock \doi{10.1103/PhysRevLett.114.071104}.
+
+\bibitem[Canizares et~al.(2026)Canizares, Murari, Sch\"onlieb, Sherry, and
+  Shumaylov]{Canizares2026sympflow}
+Priscilla Canizares, Davide Murari, Carola-Bibiane Sch\"onlieb, Ferdia Sherry,
+  and Zakhar Shumaylov.
+\newblock Symplectic neural flows for modeling and discovery.
+\newblock \emph{arXiv:2412.16787 [cs.LG]}, 2026.
 
 \bibitem[Chandrasekhar and Detweiler(1975)]{Chandrasekhar1975}
 S.~Chandrasekhar and S.~Detweiler.
@@ -53,11 +90,20 @@ Alan~S. Cornell, Anele Ncube, and Gerhard Harmsen.
 \newblock Determining quasinormal modes using physics informed neural networks.
 \newblock \emph{Phys. Rev. D}, 106:\penalty0 124047, 2022.
 
-\bibitem[Cotesta et~al.(2022)Cotesta, Carullo, Berti, and
-  Cardoso]{Cotesta2022overtones}
-Roberto Cotesta, Gregorio Carullo, Emanuele Berti, and Vitor Cardoso.
-\newblock Analysis of ringdown overtones in {GW150914}.
-\newblock \emph{Phys. Rev. Lett.}, 129:\penalty0 111102, 2022.
+\bibitem[Cornell et~al.(2024)Cornell, Herbst, Ncube, and
+  Noshad]{Cornell2024rwteukolsky}
+Alan~S. Cornell, Sheldon~R. Herbst, Anele~M. Ncube, and Hajar Noshad.
+\newblock Solving the {Regge-Wheeler} and {Teukolsky} equations: supervised
+  versus unsupervised physics-informed neural networks.
+\newblock \emph{arXiv:2402.11343 [gr-qc]}, 2024.
+
+\bibitem[Cuomo et~al.(2022)Cuomo, Schiano~di Cola, Giampaolo, Rozza, Raissi,
+  and Piccialli]{Cuomo2022pinnreview}
+Salvatore Cuomo, Vincenzo Schiano~di Cola, Fabio Giampaolo, Gianluigi Rozza,
+  Maziar Raissi, and Francesco Piccialli.
+\newblock Scientific machine learning through physics-informed neural networks:
+  Where we are and what's next.
+\newblock \emph{Journal of Scientific Computing}, 92:\penalty0 88, 2022.
 
 \bibitem[Giesler et~al.(2019)Giesler, Isi, Scheel, and
   Teukolsky]{Giesler2019overtones}
@@ -95,6 +141,13 @@ Maximiliano Isi, Matthew Giesler, Will~M. Farr, Mark~A. Scheel, and Saul~A.
 S.~Iyer and C.~M. Will.
 \newblock Black-hole normal modes: a {WKB} approach.
 \newblock \emph{Phys. Rev. D}, 35:\penalty0 3621--3631, 1987.
+
+\bibitem[Karniadakis et~al.(2021)Karniadakis, Kevrekidis, Lu, Perdikaris, Wang,
+  and Yang]{Karniadakis2021piml}
+George~Em Karniadakis, Ioannis~G. Kevrekidis, Lu~Lu, Paris Perdikaris, Sifan
+  Wang, and Liu Yang.
+\newblock Physics-informed machine learning.
+\newblock \emph{Nature Reviews Physics}, 3:\penalty0 422--440, 2021.
 
 \bibitem[Kingma and Ba(2015)]{Kingma2015adam}
 Diederik~P. Kingma and Jimmy Ba.
@@ -137,6 +190,11 @@ E.~W. Leaver.
   holes.
 \newblock \emph{Proc. R. Soc. Lond. A}, 402:\penalty0 285--298, 1985.
 
+\bibitem[Li et~al.(2024)Li, Yu, Xing, Kirby, Narayan, and Zhe]{Li2024mrafno}
+Shibo Li, Xin Yu, Wei Xing, Robert~M. Kirby, Akil Narayan, and Shandian Zhe.
+\newblock Multi-resolution active learning of {Fourier} neural operators.
+\newblock \emph{arXiv:2309.16971 [cs.LG]}, 2024.
+
 \bibitem[Li et~al.(2021)Li, Kovachki, Azizzadenesheli, Liu, Bhattacharya,
   Stuart, and Anandkumar]{Li2021fno}
 Zongyi Li, Nikola Kovachki, Kamyar Azizzadenesheli, Burigede Liu, Kaushik
@@ -155,6 +213,12 @@ Zongyi Li, Nikola Kovachki, Kamyar Azizzadenesheli, Burigede Liu, Kaushik
 Dong~C. Liu and Jorge Nocedal.
 \newblock On the limited memory {BFGS} method for large scale optimization.
 \newblock \emph{Math. Programming}, 45:\penalty0 503--528, 1989.
+
+\bibitem[Liu et~al.(2022)Liu, Zhu, Lu, Sun, and Wang]{Liu2022ppnn}
+Xin-Yang Liu, Min Zhu, Lu~Lu, Hao Sun, and Jian-Xun Wang.
+\newblock Multi-resolution partial differential equations preserved learning
+  framework for spatiotemporal dynamics.
+\newblock \emph{arXiv:2205.03990 [cs.LG]}, 2022.
 
 \bibitem[Lu et~al.(2021{\natexlab{a}})Lu, Jin, Pang, Zhang, and
   Karniadakis]{Lu2021deeponet}
@@ -186,15 +250,34 @@ Raimon Luna, Andrea Maselli, and Paolo Pani.
   approach.
 \newblock \emph{arXiv:2404.11583 [gr-qc]}, 2024.
 
+\bibitem[Martel and Poisson(2005)]{MartelPoisson2005}
+Karl Martel and Eric Poisson.
+\newblock Gravitational perturbations of the {Schwarzschild} spacetime: A
+  practical covariant and gauge-invariant formalism.
+\newblock \emph{Phys. Rev. D}, 71:\penalty0 104003, 2005.
+
+\bibitem[McCabe et~al.(2023)McCabe, Harrington, Subramanian, and
+  Brown]{McCabe2023stability}
+Michael McCabe, Peter Harrington, Shashank Subramanian, and Jed Brown.
+\newblock Towards stability of autoregressive neural operators.
+\newblock \emph{Trans. Mach. Learn. Res.}, 2023.
+
 \bibitem[McClenny and Braga-Neto(2023)]{McClenny2023sapinn}
 Levi~D. McClenny and Ulisses Braga-Neto.
 \newblock Self-adaptive physics-informed neural networks.
 \newblock \emph{J. Comput. Phys.}, 474:\penalty0 111722, 2023.
 
-\bibitem[Moncrief(1975)]{Moncrief1974}
+\bibitem[Moncrief(1974)]{Moncrief1974}
 V.~Moncrief.
-\newblock Gauge-invariant perturbations of {Reissner--Nordstr\"om} black holes.
-\newblock \emph{Phys. Rev. D}, 12:\penalty0 1526--1537, 1975.
+\newblock Gravitational perturbations of spherically symmetric systems. {I}.
+  the exterior problem.
+\newblock \emph{Annals of Physics}, 88:\penalty0 323--342, 1974.
+
+\bibitem[Nagar and Rezzolla(2005)]{NagarRezzolla2005}
+Alessandro Nagar and Luciano Rezzolla.
+\newblock Gauge-invariant non-spherical metric perturbations of {Schwarzschild}
+  black-hole spacetimes.
+\newblock \emph{Class. Quantum Grav.}, 22:\penalty0 R167--R192, 2005.
 
 \bibitem[Nollert(1993)]{Nollert1993}
 H.-P. Nollert.
@@ -213,19 +296,6 @@ Ali {\"O}vg{\"u}n, {\.I}zzet Sakall{\i}, and Halil Mutuk.
 Rodrigo Panosso~Macedo.
 \newblock Hyperboloidal framework for the {Kerr} spacetime.
 \newblock \emph{Class. Quantum Grav.}, 37:\penalty0 065019, 2020.
-
-\bibitem[Panosso~Macedo(2024)]{PanossoMacedo2024review}
-Rodrigo Panosso~Macedo.
-\newblock Hyperboloidal approach for static spherically symmetric spacetimes: a
-  didactical introduction and applications in black-hole physics.
-\newblock \emph{Phil. Trans. R. Soc. A}, 382:\penalty0 20230046, 2024.
-
-\bibitem[Panosso~Macedo et~al.(2018)Panosso~Macedo, Jaramillo, and
-  Ansorg]{PanossoMacedo2018}
-Rodrigo Panosso~Macedo, Jos\'e~Luis Jaramillo, and Marcus Ansorg.
-\newblock Hyperboloidal slicing approach to quasinormal mode expansions: The
-  {Reissner--Nordstr\"om} case.
-\newblock \emph{Phys. Rev. D}, 98:\penalty0 124005, 2018.
 
 \bibitem[Paszke et~al.(2019)Paszke, Gross, Massa, Lerer, Bradbury, Chanan,
   Killeen, Lin, Gimelshein, Antiga, Desmaison, K{\"o}pf, Yang, DeVito, Raison,
@@ -291,6 +361,12 @@ Saul~A. Teukolsky.
   for gravitational, electromagnetic, and neutrino-field perturbations.
 \newblock \emph{Astrophys. J.}, 185:\penalty0 635--648, 1973.
 
+\bibitem[Thakur et~al.(2023)Thakur, Tripura, and Chakraborty]{Thakur2023mfwno}
+Akshay Thakur, Tapas Tripura, and Souvik Chakraborty.
+\newblock Multi-fidelity wavelet neural operator with application to
+  uncertainty quantification.
+\newblock \emph{arXiv:2208.05606 [cs.LG]}, 2023.
+
 \bibitem[Um et~al.(2020)Um, Brand, Fei, Holl, and Thuerey]{Um2020solverloop}
 Kiwon Um, Robert Brand, Yun Fei, Philipp Holl, and Nils Thuerey.
 \newblock Solver-in-the-loop: Learning from differentiable physics to interact
@@ -304,6 +380,13 @@ C.~V. Vishveshwara.
   black-hole.
 \newblock \emph{Nature}, 227:\penalty0 936--938, 1970.
 \newblock \doi{10.1038/227936a0}.
+
+\bibitem[Wang and Perdikaris(2023)]{Wang2023longtime}
+Sifan Wang and Paris Perdikaris.
+\newblock Long-time integration of parametric evolution equations with
+  physics-informed {DeepONets}.
+\newblock \emph{J. Comput. Phys.}, 475:\penalty0 111855, 2023.
+\newblock \doi{10.1016/j.jcp.2022.111855}.
 
 \bibitem[Wang et~al.(2021)Wang, Teng, and Perdikaris]{Wang2021gradientpath}
 Sifan Wang, Yujun Teng, and Paris Perdikaris.
@@ -331,6 +414,13 @@ Chenxi Wu, Min Zhu, Qinyang Tan, Yadhu Kartha, and Lu~Lu.
   sampling for physics-informed neural networks.
 \newblock \emph{Comput. Methods Appl. Mech. Engrg.}, 403:\penalty0 115671,
   2023.
+
+\bibitem[Xiong et~al.(2024)Xiong, Huang, Zhang, Deng, Sun, and
+  Tian]{Xiong2024kno}
+Wei Xiong, Xiaomeng Huang, Ziyang Zhang, Ruixuan Deng, Pei Sun, and Yang Tian.
+\newblock {Koopman} neural operator as a mesh-free solver of nonlinear partial
+  differential equations.
+\newblock \emph{arXiv:2301.10022 [cs.LG]}, 2024.
 
 \bibitem[Yu et~al.(2022)Yu, Lu, Meng, and Karniadakis]{Yu2022gpinn}
 Jeremy Yu, Lu~Lu, Xuhui Meng, and George~Em Karniadakis.

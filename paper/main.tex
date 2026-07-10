@@ -92,142 +92,158 @@ Schwarzschild Quasi-Normal-Mode Extraction}
 
 \begin{abstract}
 \noindent
-Time-domain quasi-normal-mode (QNM) extraction is limited by the
-accuracy of the underlying field solution and by fit-window
-systematics that are rarely quantified. We benchmark
-physics-informed neural networks (PINNs) and a hybrid surrogate
-that trains a small Fourier neural operator (FNO) to correct a
-coarse finite-difference (FD) solve, on the Schwarzschild
-$\ell = 2$ master equations against Leaver's continued-fraction
-values. A faithful, architecture-matched reproduction of the
-most closely comparable prior study --- the only previous
-time-domain PINN treatment of these equations
-\citep{Patel2024pinn} --- reduces its reported field error by an
-order of magnitude on both isospectral potentials;
-residual-greedy sampling and a doubled quasi-Newton budget then
-reach $0.58\%$ relative field error, from which the fundamental
-QNM frequency is recovered to $0.029\%$ using a new plateau-scan
-estimator that quantifies the fit-window systematic and flags
-its own validity. The hybrid surrogate, trained once over
-$1{,}000$ initial-data draws, serves any new draw at the cost of
-one coarse solve plus one forward pass, reducing the population
-mean-squared field error by a factor of $46$ at one
-sixty-fourth of the fine-solve cost. Finally, the same
-solver-correction design, retrained on the Teukolsky equation,
-carries the approach to rotating (Kerr) black holes: across
-spins $a/M \in [0, 0.95]$ it cuts the median field error by a
-factor of $77$ and recovers the near-extremal fundamental
-frequency to $0.38\%$.
+The ringdown of a perturbed black hole radiates a discrete
+spectrum of complex frequencies, the quasinormal modes (QNMs),
+which are fixed only by the mass and spin of the remnant and
+therefore provide a direct test of the black hole solution
+predicted by general relativity. Extracting these frequencies
+from a time-domain simulation is limited by the accuracy of the
+underlying field solution. This dissertation
+benchmarks physics-informed neural networks (PINNs) on the
+Schwarzschild $\ell=2$ Regge--Wheeler and Zerilli master
+equations, comparing field solutions with finite-difference
+references and extracted QNMs with Leaver's continued-fraction
+values.
+We first reproduce the only previous time-domain PINN study of
+these equations at matched settings, which
+alone cuts its reported field error by an order of magnitude.
+Adding residual-greedy sampling and a doubled quasi-Newton
+budget then brings the relative field error against the FD
+solution down to $0.58\%$. From this improved field, a new
+plateau-scan QNM estimator recovers the fundamental frequency to
+$0.029\%$. A trained PINN, however, must be retrained
+for each new initial-data or parameter configuration. To generalise
+across many such configurations without retraining, we introduce
+a hybrid Fourier neural operator (hFNO), which combines a coarse
+finite-difference solve with a Fourier neural operator that learns
+its discretisation error. Trained over
+$1{,}000$ initial-data draws, it achieved a mean field error
+of $1.85\%$ against the fine solution on $100$ test black
+hole configurations. After adapting the same
+coarse-prior-plus-residual framework to the Teukolsky equation
+and retraining it across spin, the Kerr hFNO achieves a median
+field error of $0.78\%$ against the fine solve on $128$ test black hole
+configurations across spins from $0$ to $0.95$, and recovering the
+high-spin fundamental frequency to within $0.38\%$ error. Together,
+these results show that learned correction of a coarse numerical
+prior can approach fine-solve accuracy across the tested
+Schwarzschild and Kerr families.
 \end{abstract}
 
 % =====================================================================
 \section{Introduction}\label{sec:intro}
 
-The ringdown phase of a perturbed black hole carries a discrete
-spectrum of complex frequencies, the quasi-normal modes (QNMs)
-\citep{Vishveshwara1970}, fixed by the background geometry
-alone and hence a direct spectroscopic probe of the spacetime
-\citep{Berti2009review,KonoplyaZhidenko2011}. The ringdown
-analysis of GW150914 \citep{LIGO2016ringdown} made QNM
-spectroscopy an observational discipline: tests of the no-hair
-conjecture and of strong-field general relativity turn on how
-accurately the QNM frequencies are extracted and how reliably
-the associated systematics are quantified
-\citep{Berti2007ringdown,Isi2021priors}. In the frequency
-domain, Leaver's continued-fraction method \citep{Leaver1985}
-tabulates QNMs to arbitrary precision and calibrates every
-other approach; in the time domain --- adopted here, mirroring
-gravitational-wave data analysis
-\citep{Buonanno2007ringdown,LIGO2016ringdown,Isi2021priors} ---
-the master equation is integrated numerically and the QNMs are
-read off the late-time waveform by fitting damped sinusoids
-\citep{Berti2009review}.
+The ringdown phase of a perturbed black hole consists of damped
+oscillations at a discrete set of complex frequencies, the
+quasinormal modes (QNMs) \citep{Vishveshwara1970}, determined
+only by the remnant mass and spin. The ringdown analysis of
+GW150914 \citep{LIGO2016ringdown} opened black hole
+spectroscopy as an observational programme
+\citep{Berti2009review,KonoplyaZhidenko2011}. In observational
+spectroscopy, measuring multiple QNMs would test whether the
+remnant is the Kerr black hole predicted by general relativity
+rather than an exotic compact object \citep{Isi2019tests}.
+Accurate time-domain extraction of even the fundamental mode is
+therefore a necessary benchmark. Such tests require
+percent-level accuracy in the recovered frequencies, a regime
+expected only for high signal-to-noise ringdowns in future
+detectors such as the Einstein Telescope and LISA
+\citep{Berti2007ringdown}. It is therefore important not only to
+extract accurate frequencies, but also to track how those
+frequencies change with the chosen fit window
+\citep{Isi2021priors}. In the frequency domain, Leaver's
+continued-fraction method \citep{Leaver1985} computes QNMs to
+very high precision and provides the standard reference values
+for other approaches. Beyond Leaver's method, quasinormal modes
+have also been computed via WKB expansions and pseudospectral
+methods. WKB schemes require higher-order expansions for improved
+accuracy, while spectral methods are highly accurate but require
+a careful choice of basis and boundary treatment. We instead work
+in the time domain, closer in form to gravitational-wave
+ringdown analysis
+\citep{Buonanno2007ringdown,LIGO2016ringdown,Isi2021priors},
+where the master equation is integrated numerically and QNMs are
+extracted from the late-time waveform by fitting damped
+sinusoids \citep{Berti2009review}.
 
-The principal methodological issue in the time-domain pipeline
-is the choice of fit window: the damped-sinusoid template is
-misspecified outside the QNM regime, so the recovered
-$(\omega,\tau)$ carry a window-dependent bias that no amount of
-data removes and that existing analyses rarely quantify --- in
-some cases comparable to the quoted statistical errors
-\citep{Isi2021priors}.
+Time-domain extraction also depends on the interval over which the
+late-time waveform is fitted. The damped-sinusoid template is most
+appropriate only after the prompt response has decayed and before
+late-time tails, boundary effects or numerical residuals dominate.
+The recovered $(\omega,\tau)$ can therefore vary with the chosen
+window, so we track this variation as a downstream diagnostic of
+waveform quality \citep{Isi2021priors}.
 
 Two limitations of the prior PINN-for-QNM literature
-(Sec.~\ref{sec:bg-pinn}) motivate the present work:
+(Sec.~\ref{sec:bg-pinn}) motivate the present work. First,
 \citet{Patel2024pinn}, the only prior PINN study of the
 time-domain Zerilli problem, report a $28.06\%$ relative field
 error that dominates their QNM error budget, with a fit window
-fixed by hand; and every PINN treatment retrains from scratch
-for each black hole, with no amortization across the parameter
-space.
+fixed by hand. Second, existing PINN treatments must be
+retrained for each set of black hole parameters, rather than
+learning a reusable map across the parameter space. These
+equations are a natural testbed for such
+methods. The parameter space is low-dimensional, the boundary
+conditions are known analytically, and Leaver's values provide
+reference frequencies against which the numerical fields and
+extracted QNMs can be checked.
 
 We address both points on the Schwarzschild $\ell = 2$ master
 equations, evaluating three models under a single extraction
 protocol. The architecture-matched reproduction of
 \citet{Patel2024pinn} reduces their reported field errors by an
-order of magnitude on both isospectral potentials; the
-extensions below are reported on the Zerilli equation. An enhanced forward PINN --- doubled L-BFGS
-budget and residual-greedy adaptive sampling --- reaches
-$0.58\%$ relative field error, from which a new plateau-scan
-estimator that reports its own fit-window systematic recovers
-the fundamental frequency to $0.029\%$. Finally, a
-hybrid surrogate, trained once across the initial-data
-distribution, corrects a $1/64$-cost coarse FD solve with a
-small FNO on a label-free, Richardson-extrapolated estimate of
-its discretisation error, confined to the under-resolved
-wavefronts by a parameter-free gradient gate; it then serves
-any new draw at one coarse solve plus one forward pass, cutting
-the population field MSE by $46\times$ with no fine-grid field
-in its training loss.
+order of magnitude on both the Regge--Wheeler and Zerilli
+potentials. We then carry out the extensions on the Zerilli
+equation. An enhanced forward PINN, using a doubled L-BFGS
+budget and residual-greedy adaptive sampling, reaches $0.58\%$
+relative field error. A new plateau-scan estimator then
+recovers the fundamental frequency to $0.029\%$ and records the
+variation with fit window. Finally, a hybrid Fourier neural
+operator combines a $k=4$ coarse FD solve with a small FNO trained across the
+initial-data distribution. Its training target is built without
+fine-grid data by Richardson extrapolation of the discretisation
+error, while a parameter-free gradient gate confines the
+correction to under-resolved wavefronts. Once trained, it
+evaluates a new initial-data configuration using one coarse
+solve and one forward pass, achieving a mean field error of
+$1.85\%$ against the fine solve, a $46\times$ reduction in
+population field MSE with no fine-grid field in its training
+loss. Coarsening both $\Delta x$ and $\Delta t$ by four reduces
+the coarse solver's finite-difference point-update count by
+approximately a factor of sixteen; an end-to-end wall-clock
+comparison has not been performed.
 
-The three models above all treat a Schwarzschild black hole,
-where the metric perturbation separates into the
-Regge--Wheeler and Zerilli wave equations. Astrophysical
-remnants rotate, and rotation couples the radial and angular
-sectors: the governing equation becomes the Teukolsky master
-equation \citep{Teukolsky1973}, whose spectrum depends on the
-spin. As a final test of whether the hybrid concept is tied to
-a particular geometry, we retrain the surrogate on a family of
-rotating (Kerr) black holes spanning dimensionless spins
+The preceding models all treat non-rotating Schwarzschild black
+holes, whose metric perturbations separate into the
+Regge--Wheeler and Zerilli equations. Astrophysical
+remnants rotate, breaking spherical symmetry and replacing
+spherical harmonics with spin-weighted spheroidal harmonics. The
+governing equation becomes the Teukolsky master equation
+\citep{Teukolsky1973}, whose spectrum depends on the spin. To
+test whether the hybrid framework extends beyond Schwarzschild,
+we adapt it to a family of rotating (Kerr) black holes and
+retrain it across dimensionless spins
 $a/M \in [0, 0.95]$. Prior neural-network treatments of the
 Kerr spectrum solve the frequency-domain eigenvalue problem
 for isolated modes \citep{Luna2022teukolskypinn,
-Cornell2022pinnqnm} and never produce a waveform; our
-surrogate instead emits the full time-domain ringdown at null
-infinity and, amortised once across spin, recovers the median
-field to $0.78\%$ (a $77\times$ reduction over the coarse
-prior) and the near-extremal fundamental frequency to
-$0.38\%$.
-
-A remark on scope. This is a controlled extraction benchmark
-against known continued-fraction reference values, not an
-observational pipeline: the fields are simulated, the ground
-truth is known, and the objective is the accuracy with which
-each model recovers it. Observer position and extraction window
-are configuration parameters of the benchmark, fixed per
-pipeline by a validity criterion evaluated on the FD reference
-alone (the plateau flag of Sec.~\ref{sec:plateau}), never by
-proximity of any extracted value to the known answer.
+Cornell2024rwteukolsky} and do not reconstruct the time-domain
+waveform. The resulting Kerr hFNO produces the time-domain ringdown at null
+infinity and, amortised once across spin, achieves a median
+relative $L^{2}$ field error of $0.78\%$ against the fine
+hyperboloidal solve, while recovering the high-spin
+fundamental frequency to $0.38\%$.
 
 The remainder of this section reviews the perturbation problem,
 time-domain extraction, and the prior machine-learning
-literature. Section~\ref{sec:methods} states the three
-Schwarzschild models and their generalisation to Kerr,
-together with the extraction protocol, Sec.~\ref{sec:results}
-reports their results, Sec.~\ref{sec:discussion} discusses
-them, and
-Sec.~\ref{sec:conclusion} concludes; hyperparameter tables and
-supporting scans are collected in the appendices.
-Table~\ref{tab:framework} summarises the framework: each model
-produces an observer time series, which a single
-extraction protocol converts into $(\omega,\tau)$ with a
-validity flag.
+literature. Table~\ref{tab:framework} summarises the workflow
+used throughout the report.
 
 \begin{table}[!htbp]
 \centering
 \caption{The unified framework. Every field-producing model
 feeds a single extraction protocol that returns the primary
-$(\omega,\tau)$ estimate with a validity flag, benchmarked
-against Leaver's continued-fraction values.}
+$(\omega,\tau)$ estimate benchmarked against Leaver's
+continued-fraction values.}
 \label{tab:framework}
 \small
 \setlength{\tabcolsep}{6pt}
@@ -241,14 +257,13 @@ Field-producing models &
   (ii)~enhanced forward PINN (Sec.~\ref{sec:res-fwd});\;
   (iii)~hybrid coarse-FD $+$ FNO residual, trained once on
   $10^{3}$ draws (Sec.~\ref{sec:res-hyb});\;
-  (iv)~Kerr hybrid surrogate (Sec.~\ref{sec:res-kerr}) \\
+  (iv)~Kerr hFNO (Sec.~\ref{sec:res-kerr}) \\
 Observer series &
   $\Phi(\xq, t)$ at $\xq = 10\,M$ (Schwarzschild);\;
   $\Psi$ at null infinity $\scri$ (Kerr) \\
 Extraction protocol &
   five estimators M1--M5 (Sec.~\ref{sec:qnm-methods});\;
-  plateau validity criterion $\to \sigma_\omega$ flag
-  (Sec.~\ref{sec:plateau});\;
+  plateau scans (Sec.~\ref{sec:plateau});\;
   reporting convention (Sec.~\ref{sec:reporting}) \\
 Primary estimate &
   $(\omega, \tau)$ benchmarked against Leaver's
@@ -257,12 +272,12 @@ Primary estimate &
 \end{tabular}
 \end{table}
 
-\subsection{Schwarzschild QNMs and time-domain extraction}
+\subsection{Schwarzschild perturbations and QNM spectrum}
 \label{sec:bg-zerilli}
 
-Throughout this paper we work with a non-rotating, uncharged,
-asymptotically flat black hole of mass $M$, described by the
-Schwarzschild line element
+We first consider the non-rotating, uncharged, asymptotically
+flat Schwarzschild black hole of mass $M$, described by the
+line element
 \begin{equation}
   \mathrm{d}s^{2} \;=\;
   -f(r)\,\mathrm{d}t^{2}
@@ -275,42 +290,35 @@ Schwarzschild line element
 in geometric units $G = c = 1$. The horizon is at $r = 2M$ and
 spatial infinity at $r \to \infty$.
 
-The ringdown is described by linear perturbations
-$g_{\mu\nu} = g_{\mu\nu}^{\mathrm{Schw}} + h_{\mu\nu}$ of
-Eq.~\eqref{eq:schwarzschild}, expanded in tensor spherical
-harmonics,
-\begin{equation}
-  h_{\mu\nu}(t,r,\theta,\varphi)
-  \;=\; \sum_{\ell, m}
-  h_{\mu\nu}^{(\ell m)}(t,r)\;Y^{(\ell m)}_{\mu\nu}(\theta,\varphi),
-  \label{eq:harmonic-expansion}
-\end{equation}
-which decouples the linearised vacuum equations between
-multipoles $(\ell, m)$ and, under parity, between the
-\emph{axial} (odd) and \emph{polar} (even) sectors
-\citep{ReggeWheeler1957,Berti2009review}. Each sector reduces
-to a single gauge-invariant master scalar $\Phi(t,r)$ --- for
-the polar sector via the Moncrief reduction
-\citep{Moncrief1974} --- from which the metric perturbation is
-reconstructed as
-\begin{equation}
-  h_{\mu\nu}(t,r,\theta,\varphi)
-  \;=\; \frac{1}{r}\sum_{\ell, m}
-  \Phi^{(\ell m)}(t,r)\;
-  T^{(\ell m)}_{\mu\nu}(\theta,\varphi)
-  \label{eq:moncrief-ansatz}
-\end{equation}
-with $T^{(\ell m)}_{\mu\nu}$ a known tensor-harmonic template.
-The axial reduction yields the Regge--Wheeler equation and the
-polar reduction the Zerilli equation
-\citep{Zerilli1970,Chandrasekhar1975}; both take the form
+Small perturbations of this background are written as
+$g_{\mu\nu} = g_{\mu\nu}^{\mathrm{Schw}} + h_{\mu\nu}$ and
+decomposed in spherical harmonics adapted to the product
+structure $\mathcal{M}_{2} \times S^{2}$. The angular basis
+contains scalar harmonics, their even- and odd-parity vectorial
+derivatives, and the associated tensorial spherical harmonics;
+the expansion amplitudes depend only on $(t,r)$
+\citep{MartelPoisson2005,NagarRezzolla2005}. Spherical symmetry
+decouples the linearised vacuum equations between multipoles
+$(\ell, m)$ and, under parity, between the \emph{axial} (odd)
+and \emph{polar} (even) sectors
+\citep{ReggeWheeler1957,Zerilli1970,Moncrief1974,Berti2009review}.
+For radiative multipoles $\ell \ge 2$, each sector is described
+by a gauge-invariant master function: the axial sector by a
+Regge--Wheeler or closely related Cunningham--Price--Moncrief
+variable, and the polar sector by a Zerilli--Moncrief variable.
+Once a gauge is specified, these master functions determine the
+corresponding metric perturbation amplitudes. The axial reduction
+yields the Regge--Wheeler equation and the polar reduction the
+Zerilli equation \citep{Chandrasekhar1975,MartelPoisson2005}.
+Both are wave equations of the form
 \begin{equation}
   \partial_{t}^{2}\Phi
   - \partial_{x}^{2}\Phi
   + V_{\ell}\bigl(r(x)\bigr)\,\Phi \;=\; 0,
   \label{eq:zerilli}
 \end{equation}
-in the tortoise coordinate $x$, defined by
+with different effective potentials $V_{\ell}$, in the tortoise
+coordinate $x$, defined by
 \begin{equation}
   \frac{\mathrm{d}x}{\mathrm{d}r} \;=\; \frac{1}{f(r)}
   \;=\; \left(1 - \frac{2M}{r}\right)^{-1}
@@ -318,10 +326,11 @@ in the tortoise coordinate $x$, defined by
   x \;=\; r + 2M\,\ln\!\left(\frac{r}{2M} - 1\right).
   \label{eq:tortoise}
 \end{equation}
-The substitution absorbs the metric factor $f(r)$, leaving the
-flat-space d'Alembertian of Eq.~\eqref{eq:zerilli}, and sends
-the horizon to $x \to -\infty$, so the exterior $r > 2M$ covers
-the full real line. The Zerilli potential for the polar sector
+The tortoise coordinate absorbs the metric factor $f(r)$ into
+the radial derivative, leaving the flat-space d'Alembertian of
+Eq.~\eqref{eq:zerilli}, and sends the horizon to
+$x \to -\infty$, so the exterior $r > 2M$ covers the full real
+line. The Zerilli potential for the polar sector
 at multipole $\ell$ is
 \begin{equation}
   V_{\ell}^{\mathrm{Z}}(r) \;=\;
@@ -344,16 +353,15 @@ and vanishes in both asymptotic regions,
   \end{cases}
   \label{eq:V-asymptotic}
 \end{equation}
-so Eq.~\eqref{eq:zerilli} is a wave equation on a finite
-barrier peaked near the photon sphere $r \simeq 3M$
-(Figs.~\ref{fig:bg-potential} and~\ref{fig:bg-tortoise}), with
-free propagation on either side --- the barrier that gives the
-ringdown its QNM structure. This paper studies the polar
-$\ell = 2$ sector with $M = 1$ as the unit of mass and time;
-the classical reduction to the master equations
-\citep{ReggeWheeler1957,Zerilli1970,Moncrief1974,Chandrasekhar1975}
-is used as stated, with a self-contained derivation reproduced
-in the repository documentation.
+Thus Eq.~\eqref{eq:zerilli} describes wave propagation on a
+finite potential barrier peaked near the photon sphere
+$r \simeq 3M$ (Figs.~\ref{fig:bg-potential}
+and~\ref{fig:bg-tortoise}), with free propagation near the
+horizon and at spatial infinity. The barrier defines the
+scattering problem whose resonant response appears as
+quasinormal ringdown. The calculations below use this classical
+reduction to master equations without modification
+\citep{ReggeWheeler1957,Zerilli1970,Moncrief1974,Chandrasekhar1975,MartelPoisson2005}.
 
 \begin{figure}[!htbp]
 \centering
@@ -375,16 +383,15 @@ in the repository documentation.
   Eq.~\eqref{eq:tortoise}. The horizon at $r = 2M$ is pushed to
   $x \to -\infty$, and $r(x) \to x$ at large $x$. The PINN
   observer position $\xq = 10\,M$ lies in the asymptotic
-  region; the surrogate sections extract at $\xq = 2\,M$,
-  adjacent to the barrier peak.}
+  region.}
   \label{fig:bg-tortoise}
 \end{minipage}
 \end{figure}
 
-A quasi-normal mode is a separated solution
+A quasinormal mode is a separated solution
 $\Phi(t,x) = \mathrm{e}^{-\mathrm{i}\omega t}\,\psi(x)$ of
-Eq.~\eqref{eq:zerilli}, which turns it into the
-time-independent Schr\"odinger-like equation
+Eq.~\eqref{eq:zerilli}. Substitution gives the time-independent
+Schr\"odinger-like equation
 \begin{equation}
   \frac{\mathrm{d}^{2}\psi}{\mathrm{d}x^{2}}
   + \bigl(\omega^{2} - V_{\ell}(r(x))\bigr)\psi(x) \;=\; 0.
@@ -408,19 +415,19 @@ complex spectrum \citep{Berti2009review,KonoplyaZhidenko2011},
   \qquad \omega_{n}^{R}, \tau_{n} > 0,
   \label{eq:qnm-omega}
 \end{equation}
-ordered by overtone index $n = 0, 1, 2, \ldots$ in increasing
-damping rate $1/\tau_n$: the real part $\omega_n^{R}$ is the
+ordered by overtone index $n=0,1,2,\ldots$ in increasing
+damping rate $1/\tau_n$. The real part $\omega_n^{R}$ is the
 oscillation frequency and $\tau_n$ the damping time.
 
 For Schwarzschild $\ell = 2$ the fundamental ($n = 0$) and
 first overtone ($n = 1$) are
 \begin{equation}
-  M\omega_{0} = 0.3737, \quad \tau_{0}/M = 11.241,
+  M\omega_{0}^{R} = 0.3737, \quad \tau_{0}/M = 11.241,
   \qquad
-  M\omega_{1} = 0.3467, \quad \tau_{1}/M = 3.651,
+  M\omega_{1}^{R} = 0.3467, \quad \tau_{1}/M = 3.651,
   \label{eq:qnm-ref}
 \end{equation}
-computed to arbitrary numerical precision by Leaver's
+computed to high numerical precision by Leaver's
 continued-fraction method \citep{Leaver1985} and tabulated by
 \citet{Berti2009review}; every extraction reported in this
 paper is benchmarked against them. The fundamental $\ell = 2$
@@ -431,201 +438,178 @@ sufficient signal-to-noise ratio
 WKB expansions
 \citep{SchutzWill1985,IyerWill1987,Konoplya2003wkb} and the
 asymptotic-iteration method \citep{Cho2010aim} provide
-semi-analytic alternatives \citep{Leaver1985,Nollert1993}.
+semi-analytic estimates, while Leaver's continued-fraction
+method and Nollert's refinement provide high-accuracy numerical
+benchmarks \citep{Leaver1985,Nollert1993}.
 
-\label{sec:bg-extraction}
-A ringdown waveform $\Phi(\xq, t)$ measured at a fixed observer
-is, between the prompt response and the late-time power-law
-tail \citep{Berti2009review}, a sum of damped sinusoids
+\subsection{Kerr perturbations and the Teukolsky equation}
+\label{sec:teukolsky-problem}
+
+Schwarzschild is the non-rotating limit. Astrophysical remnants
+rotate, and a rotating black hole of mass $M$ and spin
+$a = J/M$ is described, in Boyer--Lindquist coordinates, by the
+Kerr line element
 \begin{equation}
-  \Phi(\xq, t) \;\approx\;
-  \sum_{n} A_n\,\mathrm{e}^{-(t-t_0)/\tau_n}
-  \cos\bigl(\omega_n^{R}(t-t_0) + \phi_n\bigr).
-  \label{eq:qnm-template}
+  \begin{aligned}
+  \mathrm{d}s^{2} ={}&
+    -\left(1 - \frac{2Mr}{\Sigma}\right)\mathrm{d}t^{2}
+    - \frac{4 M a r \sin^{2}\!\theta}{\Sigma}\,
+       \mathrm{d}t\,\mathrm{d}\varphi \\
+    &+ \frac{\Sigma}{\Delta}\,\mathrm{d}r^{2}
+    + \Sigma\,\mathrm{d}\theta^{2} \\
+    &+ \left(r^{2} + a^{2}
+       + \frac{2 M a^{2} r \sin^{2}\!\theta}{\Sigma}\right)
+       \sin^{2}\!\theta\,\mathrm{d}\varphi^{2},
+  \end{aligned}
+  \label{eq:kerr-metric}
 \end{equation}
-Three families of methods recover $(\omega_n,\tau_n)$ from
-samples of $\Phi$. Spectral methods locate $\omega_n^{R}$ as
-peaks in the discrete Fourier transform and recover $\tau_n$
-from the log-envelope slope at the waveform extrema,
+with $\Sigma = r^{2} + a^{2}\cos^{2}\theta$ and
+$\Delta = r^{2} - 2Mr + a^{2}$. This reduces to the
+Schwarzschild metric Eq.~\eqref{eq:schwarzschild} as
+$a \to 0$. The roots of $\Delta$ are the outer and inner
+horizons
 \begin{equation}
-  \log|\Phi(\xq, t_k)| \;\approx\;
-  \log A_{0} - \frac{t_k - t_0}{\tau_{0}}.
-  \label{eq:logline}
+  r_{\pm} = M \pm \sqrt{M^{2} - a^{2}},
+  \label{eq:kerr-horizons}
 \end{equation}
-Nonlinear least squares (NLS) fits Eq.~\eqref{eq:qnm-template}
-directly, jointly optimising amplitudes, phases, frequencies
-and decay times for a user-specified number of modes
-\citep{Buonanno2007ringdown}. Subspace methods --- Prony
-\citep{Berti2007prony}, matrix-pencil \citep{HuaSarkar1990} and
-ESPRIT \citep{Roy1989esprit} --- model the uniformly sampled
-analytic signal as a sum of complex exponentials,
+which merge at extremality $a \to M$. The off-diagonal
+$\mathrm{d}t\,\mathrm{d}\varphi$ term is the frame dragging that
+distinguishes Kerr from Schwarzschild. We study spins
+$a/M \in [0, 0.95]$, stopping short of extremality.
+
+Gravitational perturbations of Kerr do not split into parity
+sectors. Instead, gravitational perturbations are described by the
+spin-weight $s=-2$ Teukolsky master equation \citep{Teukolsky1973}.
+For the gravitational ($s = -2$) field the separable ansatz
+$\psi = e^{-i\omega t + i m\varphi}\,
+{}_{-2}S_{\ell m}(\theta)\,R(r)$ yields a spheroidal angular
+equation, whose eigenfunctions are the spin-weighted spheroidal
+harmonics ${}_{-2}S_{\ell m}(\theta; a\omega)$ with separation
+constant $\lambda$, and the radial equation
 \begin{equation}
-  \Phi(\xq, k\Delta t)
-  \;\approx\; \sum_{n=0}^{K-1} c_{n}\, z_{n}^{\,k},
+  \Delta^{2}\frac{\mathrm{d}}{\mathrm{d}r}\!
+    \left(\Delta^{-1}\frac{\mathrm{d}R}{\mathrm{d}r}\right)
+  + \left[\frac{K^{2} + 4 i (r - M) K}{\Delta}
+          - 8 i \omega r - \lambda\right] R = 0,
   \qquad
-  z_{n} \;=\; e^{(-1/\tau_{n} + \mathrm{i}\omega_{n}^{R})\Delta t},
-  \label{eq:esprit-model}
+  K = (r^{2} + a^{2})\,\omega - a m .
+  \label{eq:teukolsky}
 \end{equation}
-and recover the poles $z_{n}$ --- hence
-$(\omega_{n}^{R},\tau_{n})$ --- from a generalised
-eigendecomposition of a Hankel data matrix, without nonlinear
-optimisation. All three families share the hyperparameter that
-dominates the systematic error budget: the fit window
-$[t_0, \tend]$. Existing analyses generally quote a single
-fixed window \citep{Buonanno2007ringdown,LIGO2016ringdown};
-Bayesian priors over the start time address the issue
-probabilistically \citep{Isi2021priors}, but a deterministic
-plateau-based diagnostic reported alongside the primary
-estimate is not in common use. Methods M4 and M5
-(Secs.~\ref{sec:qnm-methods}--\ref{sec:plateau}) implement
-plateau scans over the start time alone and over both window
-edges respectively, reporting the plateau standard deviation
-$\sigma_\omega$ as a fit-window systematic uncertainty;
-Fig.~\ref{fig:bg-plateau-cartoon} illustrates the shape of
-$\omega(t_0)$ that motivates the construction.
+Rotation enters through both $a\omega$ in the angular eigenvalue
+and the $a m$ term in $K$, coupling the spectrum to the azimuthal
+number $m$. For gravitational perturbations with $s=-2$, the
+radial Teukolsky equation is complex-valued. As $a \to 0$,
+Eq.~\eqref{eq:teukolsky} reduces to the Bardeen--Press form of
+the Schwarzschild perturbation equation, whose gravitational QNM
+spectrum agrees with the Regge--Wheeler and Zerilli spectra. The
+quasinormal spectrum therefore depends on spin
+(Fig.~\ref{fig:kerr-spectrum}). For the prograde modes shown
+here, the real frequency $M\omega_{R}$ rises and the damping time
+$\tau$ lengthens as $a/M$ increases, so an hFNO trained across
+spins must learn this spin dependence.
 
 \begin{figure}[!htbp]
 \centering
-\begin{tikzpicture}[
-  every node/.style={font=\small},
-  arr/.style={->, >=stealth},
-]
-  % axes
-  \draw[->] (0,0) -- (10.5,0) node[right] {$t_0/M$};
-  \draw[->] (0,-0.2) -- (0,3.4) node[above] {recovered $\omega(t_0)$};
-
-  % reference line (true value)
-  \draw[dashed, gray!70] (0,2.0) -- (10.2,2.0)
-    node[right, font=\scriptsize, black] {Leaver $\omega_0$};
-
-  % shaded plateau region
-  \fill[green!12] (4.0,0.05) rectangle (7.2,3.3);
-  \node[font=\scriptsize, green!40!black] at (5.6,3.05) {M4 plateau};
-
-  % shaded burst region (left)
-  \fill[red!8] (0.05,0.05) rectangle (3.0,3.3);
-  \node[font=\scriptsize, red!50!black, align=center] at (1.5,3.05)
-    {prompt\\burst};
-
-  % shaded tail region (right)
-  \fill[orange!10] (8.0,0.05) rectangle (10.3,3.3);
-  \node[font=\scriptsize, orange!60!black, align=center] at (9.15,3.05)
-    {tail\\contamination};
-
-  % cartoon curve: oscillates large at left, flat in middle, drifts at right
-  \draw[thick, blue!70!black, smooth, samples=140, domain=0.2:10.0]
-    plot (\x, {2.0
-      + 0.55*exp(-0.7*\x)*sin(deg(2.5*\x))
-      + 0.04*sin(deg(6*\x))*exp(-0.4*\x)
-      + 0.02*(\x-7.2)*(\x>7.2)*(\x-7.2)
-    });
-
-  % markers for plateau edges
-  \draw[dashed, green!40!black] (4.0,0) -- (4.0,3.3);
-  \draw[dashed, green!40!black] (7.2,0) -- (7.2,3.3);
-  \node[font=\scriptsize, green!40!black] at (4.0,-0.25) {$t_0^{\min}$};
-  \node[font=\scriptsize, green!40!black] at (7.2,-0.25) {$t_0^{\max}$};
-
-  % phase regions on x-axis
-  \node[font=\scriptsize, gray!50!black] at (5.6,-0.65) {QNM regime};
-\end{tikzpicture}
-\caption{Schematic of the recovered frequency $\omega(t_0)$ as a
-function of the fit-window start time $t_0$, motivating the M4
-plateau construction (Sec.~\ref{sec:plateau}). At early $t_0$
-(red region) the prompt burst contaminates the fit and
-$\omega(t_0)$ oscillates strongly. Inside the QNM regime (green
-region) $\omega(t_0)$ is approximately constant, defining the
-plateau $[t_0^{\min}, t_0^{\max}]$ over which M4 averages. At
-large $t_0$ (orange region) the late-time power-law tail
-becomes comparable to the ringdown amplitude and $\omega(t_0)$
-drifts. The dashed line marks the Leaver reference value of
-Eq.~\eqref{eq:qnm-ref}.}
-\label{fig:bg-plateau-cartoon}
+\includegraphics[width=0.92\textwidth]{../outputs/background/kerr_spectrum.pdf}
+\caption{Gravitational ($s = -2$) quasinormal spectrum of Kerr
+versus spin $a/M$, for the fundamental ($n = 0$) modes
+$(\ell, m) = (2,2), (3,2), (4,2)$, computed by Leaver's
+continued-fraction method \citep{Leaver1985} through the
+\texttt{qnm} package \citep{Stein2019qnm}. (a) The oscillation
+frequency $M\omega_{R}$ and (b) the damping time $\tau/M$ both
+grow towards extremality, and higher $\ell$ oscillates faster.
+The shaded band marks the study range $a/M \in [0, 0.95]$. At
+$a = 0$ the $(2,2,0)$ values reproduce the Schwarzschild
+reference of Eq.~\eqref{eq:qnm-ref}. We target the $(4,2,0)$
+mode, the fastest-oscillating of the three.}
+\label{fig:kerr-spectrum}
 \end{figure}
 
-\subsection{PINNs and prior PINN-for-QNM work}
+\subsection{PINNs and neural-network QNM studies}
 \label{sec:bg-pinn}
 
-A physics-informed neural network (PINN) \citep{Raissi2017} is
-a mesh-free PDE solver: a network $\Phi_\theta(x,t)$ is trained
-to minimise a weighted composite of mean-squared PDE,
-initial-condition and boundary-condition residuals on sampled
-collocation points, with all derivatives supplied exactly by
-automatic differentiation \citep{Baydin2018ad}. How to balance
-the residual weights is an active research area
-\citep{Wang2021gradientpath,Wang2022ntk,McClenny2023sapinn};
-the concrete seven-term loss used in this work is
-Eq.~\eqref{eq:loss-fwd} of Sec.~\ref{sec:fwd-pinn}
-(Fig.~\ref{fig:fwd-pinn-arch}). Training standardly proceeds in
-two phases --- Adam \citep{Kingma2015adam}, then L-BFGS
-\citep{Liu1989lbfgs} to exploit the near-quadratic local
-landscape --- and two refinements are relevant here:
-gradient-enhanced PINNs penalise the gradient of the PDE
-residual so that it vanishes smoothly \citep{Yu2022gpinn}, and
-residual-adaptive sampling concentrates collocation points
-where the residual is currently largest \citep{Wu2023adaptive}
---- on wave-like problems, the moving front. DeepXDE
-\citep{Lu2021deepxde} implements all of these as standard
-options.
+A physics-informed neural network (PINN) \citep{Raissi2017}
+approximates the solution of a differential equation with a
+differentiable neural ansatz and trains it by penalising the PDE
+residual together with the initial and boundary residuals at
+collocation points
+\citep{Karniadakis2021piml,Cuomo2022pinnreview}. Automatic
+differentiation supplies the derivatives entering the residual
+\citep{Baydin2018ad}, so the method avoids finite-difference
+stencils but still depends on the sampling strategy, network
+architecture, optimiser and relative weighting of the loss terms.
+These sensitivities are well known in the PINN literature, where
+loss balancing, gradient pathologies and adaptive sampling remain
+active topics
+\citep{Wang2021gradientpath,Wang2022ntk,McClenny2023sapinn,Wang2022causal,Wu2023adaptive}.
+The concrete architecture, loss and training schedule used here
+are specified in Sec.~\ref{sec:fwd-pinn}.
 
 \label{sec:bg-prior}
-Five prior works apply PINNs to the QNM problem, all in the
-forward direction. \citet{Ovgun2021qnmnn} compute dS and AdS
-QNMs from the shooting form of the eigenvalue equation;
-\citet{Cornell2022pinnqnm} train the complex eigenvalue
-$\omega$ alongside a frequency-domain network and reach
-sub-permille accuracy on the fundamental $\ell = 2$ mode ---
-an eigenvalue computation not directly comparable to a
-time-domain post-hoc fit; \citet{Luna2022teukolskypinn} solve
-the time-domain Teukolsky equation with hard-enforced boundary
-conditions and sequential warm-starts in spin;
-\citet{Luna2024qnm} treat frequency-domain QNMs in modified
-gravity. The closest comparator is \citet{Patel2024pinn}, who
-solve the time-domain Zerilli and Regge--Wheeler equations with
-a fully-connected PINN; their reported field error and single
-fixed-window fit are the two limitations identified at the
-start of the introduction.
-No prior PINN study reports a fit-window systematic on the
-recovered $(\omega,\tau)$; the plateau criterion of
-Sec.~\ref{sec:reporting} supplies one and doubles as a
-deterministic validity flag.
+For the present comparison, prior neural-network QNM studies are
+best separated by whether they solve an eigenvalue problem
+directly or first generate a time-domain waveform.
+\citet{Ovgun2021qnmnn} use a feedforward neural-network method
+for dS and AdS black-hole QNMs. \citet{Cornell2022pinnqnm}
+train a PINN eigenvalue solver for non-rotating black holes and
+recover low-lying modes with small errors. \citet{Haddou2023drgt}
+apply PINNs to near-extremal black holes in dRGT massive gravity.
+\citet{Luna2022teukolskypinn} solve the separated radial and
+angular Teukolsky eigenvalue problem for Kerr, hard-enforcing
+regularity and QNM boundary behaviour. \citet{Luna2024qnm}
+extend the same frequency-domain strategy to modified gravity
+with numerical background solutions, while
+\citet{Cornell2024rwteukolsky} use supervised PINNs with
+labelled eigenfunction data to access higher Regge--Wheeler and
+Teukolsky overtones. These studies compute the QNM frequency as
+part of the neural solution. They therefore differ from the
+present time-domain benchmark, where the learned object is first
+the waveform and the QNM estimate is extracted afterwards.
+
+The closest comparator for this dissertation is
+\citet{Patel2024pinn}, who solve the time-domain Zerilli and
+Regge--Wheeler initial-boundary-value problems with a
+fully-connected PINN and then extract QNMs from the observer
+waveform. Their reported field error is the main baseline for
+the reproduction study, and their extraction procedure provides
+the reproduced baseline for our downstream QNM comparison.
 
 \subsection{Neural operators and prior operator-learning work}
 \label{sec:bg-fno}
 
-Rather than training one network per PDE instance, a
-\emph{neural operator}
-\citep{Lu2021deeponet,Li2021fno,Kovachki2023neuralop} learns the
-solution operator
-$\mathcal{G}_{\theta}\colon \mathcal{A} \to \mathcal{U}$ of a
-parametric family, amortising every instance into a single
-forward pass.
-DeepONet \citep{Lu2021deeponet} factorises $\mathcal{G}_{\theta}$
-into branch and trunk networks; the Fourier neural
-operator (FNO) \citep{Li2021fno,Kovachki2023neuralop}
-parameterises the operator by global convolutions in
-Fourier space, making it discretisation-invariant and
-well-suited to hyperbolic problems on regular grids.
-Operator learning spans the Burgers, Darcy and Navier--Stokes
-benchmarks
-\citep{Li2021fno,Lu2021deeponet,Kovachki2023neuralop} but, to
-our knowledge, has not been applied to the time-domain
-black-hole perturbation problem.
+A neural operator learns a map between function spaces rather
+than a solution for one fixed PDE instance
+\citep{Lu2021deeponet,Li2021fno,Kovachki2023neuralop}. For a
+parametric family, it approximates the solution operator
+$\mathcal{G}_{\theta}\colon \mathcal{A} \to \mathcal{U}$ and
+can then evaluate new parameter draws with one forward pass.
+DeepONet represents this map with branch and trunk networks
+\citep{Lu2021deeponet}. The Fourier neural operator (FNO)
+instead parameterises the integral kernel in Fourier space,
+giving spectral convolution layers that can be evaluated across
+compatible grid resolutions
+\citep{Li2021fno,Kovachki2023neuralop}. Neural operators have
+been demonstrated on standard PDE benchmarks including Burgers'
+equation, Darcy flow and Navier-Stokes flow
+\citep{Li2021fno,Lu2021deeponet,Kovachki2023neuralop}. To our
+knowledge, there has been no previous neural-operator
+application to the time-domain Regge--Wheeler or Zerilli
+problem.
 
-A third strand keeps a classical solver in the loop and learns
-only a correction to it: solver-in-the-loop training
-\citep{Um2020solverloop} and learned corrections to
-under-resolved fluid solvers \citep{Kochkov2021mlcfd} show that
-a small network correcting a cheap classical solve can match a
-much finer classical solution at a fraction of its cost. The
-hybrid surrogate of Sec.~\ref{sec:hyb-method} belongs to this
-strand, carrying the FNO of \citet{Li2021fno} as its residual
-operator, with two distinctions: its training target is built
-label-free by classical Richardson extrapolation
-\citep{Richardson1911} of two coarse solves, so no fine-grid
-field enters the loss, and a parameter-free gradient gate
-confines the learned correction to the under-resolved
-wavefronts.
+A related line of work combines neural networks with classical
+solvers rather than replacing the solver entirely.
+Solver-in-the-loop training uses differentiable PDE solvers to
+train stable learned corrections \citep{Um2020solverloop}, and
+learned corrections to under-resolved fluid solvers can recover
+accuracy comparable to much finer simulations at lower cost
+\citep{Kochkov2021mlcfd}. The hFNO of
+Sec.~\ref{sec:hyb-method} follows this coarse-solver-plus-learned-
+correction idea. It uses a coarse finite-difference solve to
+carry the wave propagation and an FNO to learn the remaining
+coarse-to-fine residual. The residual target is built without fine-grid training
+fields by Richardson extrapolation of two coarse solves
+\citep{Richardson1911}, and a deterministic gradient gate
+focuses the learned correction on the under-resolved wavefronts.
 
 % =====================================================================
 \input{sections/methods}
@@ -639,62 +623,47 @@ wavefronts.
 % =====================================================================
 \section{Conclusion}\label{sec:conclusion}
 
-We applied three models --- a faithful-reproduction and an
-enhanced forward PINN, and a hybrid coarse-FD
-+ neural-residual surrogate --- to the Schwarzschild $\ell = 2$
-master equations, under a single post-hoc extraction protocol
-benchmarked against Leaver's continued-fraction values. The
-architecture-matched reproduction of \citet{Patel2024pinn}
-reduces their reported field error by an order of magnitude on
-both isospectral potentials, with damping-time errors symmetric
-across the pair ($1.50\%$/$1.56\%$) as isospectrality requires;
-doubling the L-BFGS budget and adding residual-greedy sampling
-then reaches $0.58\%$, from which the fundamental mode is
-recovered to $0.029\%$ in $\omega$ (M4) and $1.99\%$ in $\tau$ (M2).
+We benchmarked a faithful reproduction of
+\citet{Patel2024pinn}, an enhanced forward PINN and a hybrid
+Fourier neural operator on time-domain black-hole
+perturbations, using post-hoc QNM estimates as diagnostics of
+the computed fields. The faithful reproduction yields field
+errors an order of magnitude below the values reported for both
+Schwarzschild $\ell=2$ potentials. Residual-greedy sampling and
+an extended L-BFGS stage reduce the Zerilli field error to
+$0.58\%$, with best-of-suite fundamental-mode errors of
+$0.029\%$ in frequency and $1.99\%$ in damping time relative
+to the Leaver values.
 
-The main methodological contribution is the plateau-based
-extraction of Sec.~\ref{sec:plateau}: the plateau standard
-deviation $\sigma_\omega$ quantifies the fit-window systematic
-and doubles as a deterministic validity flag, so that no quoted
-number depends on a fixed-by-hand window.
+The principal result is the hFNO, which learns a correction to
+a coarse numerical trajectory from a Richardson estimate formed
+without fine-grid training fields. Across the $100$-configuration
+Schwarzschild test population, it reduces the mean field error
+from $13.39\%$ to $1.85\%$ and the field MSE by a factor of
+$46$, while recovering the fundamental frequency to $0.152\%$.
+After adaptation to the complex hyperboloidal Teukolsky field
+and separate retraining, the Kerr hFNO reduces the
+population-median field error from $59.5\%$ to $0.78\%$. In the
+high-spin bin, the frequency error decreases from $4.71\%$ to
+$0.38\%$.
 
-The hybrid surrogate amortises what the PINNs pay per black
-hole: trained once on $1{,}000$ draws, it runs a $1/64$-cost
-coarse solve and repairs its discretisation error with a small
-gated network trained on a label-free Richardson target,
-serving any new draw at one coarse solve plus one forward pass
-and cutting the population field MSE by $46\times$. At the
-common observer the hybrid tracks the fine reference's frequency
-to $0.15\%$; its damping time is limited by the network's
-late-ring residual rather than the estimator, so its
-contribution is field accuracy, not a sharper spectroscopy.
-
-The hybrid concept proves geometry-agnostic. Retrained on
-rotating (Kerr) black holes through the Teukolsky equation
-across spins $a/M \in [0, 0.95]$, the same coarse-plus-residual
-operator --- evolved on a hyperboloidal slice and corrected
-with no fine-grid field in its loss --- cuts the median field
-error by $77\times$ and recovers the near-extremal fundamental
-frequency to $0.38\%$, an order of magnitude over the coarse
-prior, exactly where that prior fails fastest. This
-generalisation across a family of black holes is the structural
-advantage of an amortised operator over a per-instance PINN,
-which must be retrained from scratch for each spin.
-
-Follow-up directions --- a Bayesian
-posterior around the deterministic estimate and
-overtone-exciting initial data --- are set out in
-Sec.~\ref{sec:discussion}.
+These results demonstrate that the coarse-prior-plus-residual
+design is effective across the two tested perturbation
+formulations and their sampled parameter ranges. The Kerr
+damping-time error nevertheless increases from $0.52\%$ to
+$1.52\%$, identifying the low-amplitude late-time field as the
+main unresolved limitation. Late-time-sensitive training and
+an end-to-end runtime comparison are therefore the immediate
+tests required to establish the method's practical value.
 
 % =====================================================================
 \section*{Code availability}
 
-All configurations, run scripts, the FD reference solver, the
-five extraction methods, the plateau pipeline, and the
-per-window extraction tables and derivation notes referenced
-throughout this report are contained in the code repository
-submitted alongside it; every figure and table in the report is
-regenerated by the scripts there.
+The accompanying repository contains the configurations, run
+scripts, numerical solvers, extraction methods and analysis
+scripts used in this report. Large trained-model and dataset
+artifacts that cannot be included directly are identified in the
+repository documentation.
 
 % =====================================================================
 \appendix
@@ -706,7 +675,7 @@ Sec.~\ref{sec:fwd-problem}. Table~\ref{tab:fd-scheme} summarises
 the scheme; the full stencil-level specification is in the
 repository documentation.
 
-\begin{table}[h!]
+\begin{table}[!htbp]
 \centering
 \caption{Finite-difference reference solver (grid and step sizes
 in Table~\ref{tab:fwd-hyper}).}
@@ -736,7 +705,7 @@ Earliest reflection & $t \ge 108\,M$, outside $t_{\max} = 50\,M$ \\
 This appendix collects the full hyperparameter list for the
 forward PINN of Sec.~\ref{sec:fwd-pinn}.
 
-\begin{table}[h!]
+\begin{table}[!htbp]
 \centering
 \caption{Architecture and training hyperparameters for the
 forward PINN of Sec.~\ref{sec:fwd-pinn}.}

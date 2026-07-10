@@ -14,7 +14,7 @@
 
 \title{\large\bfseries A UNIFIED DEEP-LEARNING FRAMEWORK FOR SCHWARZSCHILD
 QUASI-NORMAL-MODE EXTRACTION\\[0.3em]
-\normalsize\scshape Executive Summary}
+\normalfont\normalsize\scshape Executive Summary}
 \author{\small Jonathan Chung \quad$|$\quad MPhil Data Intensive Science
 \quad$|$\quad University of Cambridge}
 \date{}
@@ -25,80 +25,74 @@ QUASI-NORMAL-MODE EXTRACTION\\[0.3em]
 \section{Motivation \& Scientific Justification}
 
 The ringdown of a perturbed black hole is a superposition of damped
-sinusoids --- quasi-normal modes (QNMs) --- whose frequencies and
+sinusoids, the quasinormal modes (QNMs), whose frequencies and
 damping times are fixed entirely by the black hole's mass and spin
 [1]. Measuring them from gravitational-wave data and comparing
 against the predictions of general relativity is among the cleanest
 strong-field tests available, and has been an observational
 programme since the ringdown analysis of GW150914 [2]. The precision
-of such tests rests on two computational ingredients: the accuracy
-of the underlying waveform solution, and the reliability of reading
-the QNM parameters off it. The second receives surprisingly little
-scrutiny --- the damped-sinusoid template is valid only inside a
-finite time window, and the choice of window biases the recovered
-parameters in ways most analyses do not quantify.
+of such tests rests on the accuracy of the underlying waveform and on
+the time interval used to fit its damped modal content [3,4].
 
-Machine-learning solvers promise to relieve the first bottleneck.
 Physics-informed neural networks (PINNs) solve differential
 equations by minimising the equation residual directly; the only
 prior PINN treatment of the time-domain Schwarzschild problem,
 however, reports a $28\%$ relative waveform error that dominates its
 QNM error budget, with a fit window fixed by hand [5]. This project
-benchmarks what PINNs and neural surrogates can deliver for QNM
-extraction --- on the Schwarzschild $\ell = 2$ master equations,
-where exact reference values are known from Leaver's
-continued-fraction method [3] --- and builds an extraction protocol
-that quantifies its own fit-window systematic.
+first tests whether that calculation can be reproduced and improved.
+It then addresses the per-instance training cost of a PINN with a
+hybrid Fourier neural operator (hFNO), which learns to correct a
+coarse numerical trajectory across a family of initial data. The
+same coarse-prior-plus-residual framework is subsequently adapted to
+the complex Teukolsky field of rotating Kerr black holes [9].
 
 \section{Methodology}
 
-Four models are evaluated under one fixed protocol. (i) A
+Four numerical tests are evaluated. (i) A
 \emph{reproduction} PINN, architecture-matched to the prior study
 [5], establishes a trustworthy baseline. (ii) An \emph{enhanced
 forward} PINN doubles the quasi-Newton optimisation budget and adds
 residual-greedy sampling, which concentrates training points where
-the equation residual is currently largest. (iii) An \emph{inverse}
-PINN embeds a ringdown template with five learnable scalars and
-recovers the black-hole mass jointly with the waveform from $500$
-observations at $1\%$ noise. (iv) A \emph{hybrid surrogate} runs a
-coarse finite-difference solve at $1/64$ of the reference cost and
-trains a small Fourier neural operator [6] ($1.1$ million
-parameters) to predict its discretisation error, following the
-solver-correction strand of the machine-learning literature [7, 8];
-the training target is built label-free by Richardson extrapolation
-of two coarse solves, and a parameter-free gate confines the
-correction to the under-resolved wavefronts.
+the equation residual is largest. (iii) The Schwarzschild hFNO uses
+a $k=4$ finite-difference trajectory as an additive prior and a
+$1.13$-million-parameter FNO [6] to predict its discretisation error,
+following the solver-correction literature [7,8]. Its label-free
+target is formed by Richardson extrapolation of the $k=4$ and $k=2$
+solves, and a prior-gradient gate confines the correction to
+under-resolved wavefronts. Coarsening both space and time by four
+reduces the finite-difference point-update count by approximately a
+factor of sixteen; the total wall-clock speedup has not been
+measured. (iv) For Kerr, the framework is adapted to a complex
+hyperboloidal Teukolsky field and retrained across spin. The
+deployment prior uses $N=101$, while independent $N=201$ and $N=401$
+fields form the Richardson target and an $N=801$ field is retained
+for evaluation.
 
-Extraction is deliberately model-agnostic: every model produces the
-same observer time series (Figure~1), from which five estimators
-recover the frequency and damping time $(\omega, \tau)$. The
-methodological contribution is a \emph{plateau scan}
-(Figure~2): the fit window is swept systematically (one edge or
-both), and the contiguous block of windows over which the recovered
-values are stationary supplies the estimate, its window systematic
-$\sigma_\omega$, and a validity flag --- if no plateau exists, the
-estimate is rejected rather than silently biased.
+Each field is analysed with the post-hoc extraction framework of the
+report. Five real-signal estimators are used for Schwarzschild, with
+complex-signal extensions for Kerr. One- and two-edge plateau scans
+sweep the fit window and report the variation of the fitted
+frequency and damping time across its most stable contiguous block
+(Figure~2).
 
 \begin{figure}[!tb]
 \centering
-\includegraphics[width=\columnwidth]{../outputs/hybrid/fno_sw_gate_s1em3/figs/hybrid_ringdown_xq10.png}
+\includegraphics[width=\columnwidth]{../outputs/hybrid/fno_sw_gate_s1em3_t100/figs/hybrid_ringdown_xq10.png}
 \caption{Ringdown waveform at the observer for the benchmark
 configuration, on linear (top) and logarithmic (bottom) scales: the
-hybrid surrogate (dashed) overlaid on the fine finite-difference
-reference (solid) and the $64\times$-cheaper coarse baseline
-(dotted). The QNM parameters are extracted from such time series.}
+Schwarzschild hFNO (dashed) overlaid on the fine finite-difference
+reference (solid) and the coarse prior (dotted).}
 \label{fig:es-ringdown}
 \end{figure}
 
 \begin{figure}[!tb]
 \centering
-\includegraphics[width=\columnwidth]{../outputs/hybrid/fno_sw_gate_s1em3/figs/hybrid_plateau_m4_xq10.png}
+\includegraphics[width=\columnwidth]{../outputs/hybrid/fno_sw_gate_s1em3_t100/figs/hybrid_plateau_m4_xq10.png}
 \caption{The plateau scan underlying the extraction protocol:
 recovered frequency (left) and damping time (right) as the
-fit-window start time is swept, for the hybrid surrogate's benchmark
-waveform. Red markers form the contiguous plateau block that
-supplies the estimate and its window systematic; the dotted line
-marks the exact continued-fraction reference value.}
+fit-window start time is swept for the Schwarzschild hFNO. Red
+markers form the selected contiguous block; dotted lines mark the
+continued-fraction values.}
 \label{fig:es-plateau}
 \end{figure}
 
@@ -106,52 +100,44 @@ marks the exact continued-fraction reference value.}
 
 The reproduction reduces the prior study's waveform error by an
 order of magnitude on both of its benchmark potentials (relative
-$L^{2}$ error $1.30\%$ versus $28.06\%$, and $2.67\%$ versus
+$L^{2}$ error $2.61\%$ versus $28.06\%$, and $2.67\%$ versus
 $23.59\%$). The enhanced forward PINN reaches $0.58\%$, from which
-the suite recovers the fundamental frequency to
-$0.029\%$ (M4) and the damping time to $1.99\%$ (M2); an error budget shows
-the frequency measurement is limited by the window systematic, not
-by the field solution. The inverse PINN recovers the black-hole
-mass to $0.34\%$ under $1\%$ observation noise --- after isolating,
-analytically and empirically, an amplitude--damping-time degeneracy
-of the embedded template that would otherwise bias the damping time
-by ten to twenty percent. The hybrid surrogate cuts the mean-squared
-waveform error by a factor of $46$ relative to its coarse input at
-$1/64$ of the reference cost, with no fine simulation anywhere in
-its training loss; at the common observer it tracks the
-expensive reference's frequency to $0.15\%$ across a
-$100$-black-hole population, its damping-time error ($0.53\%$)
-set by the network's late-ring residual rather than the plateau
-estimator.
+the best-of-suite estimates recover the fundamental frequency to
+$0.029\%$ and damping time to $1.99\%$ relative to Leaver's values.
+
+Across the $100$-configuration Schwarzschild test population, the
+hFNO reduces the mean field error from $13.39\%$ to $1.85\%$ and the
+field MSE by a factor of $46$, without using fine-grid fields in its
+training loss. Its population frequency error is $0.152\%$. After
+adaptation and separate retraining, the Kerr hFNO reduces the median
+field error from $59.5\%$ to $0.78\%$ across $128$ test
+configurations. In the high-spin bin, the median frequency error
+falls from $4.71\%$ for the coarse prior to $0.38\%$. The damping
+time is the exception: its population error increases from $0.52\%$
+to $1.52\%$, consistent with a residual in the low-amplitude late
+ringdown.
 
 \section{Recommendation \& Next Steps}
 
-Three follow-ups are scoped. First, the lift from Schwarzschild to
-rotating (Kerr) black holes --- the astrophysically relevant case
---- for which each component here (solver, extraction protocol,
-hybrid design) was chosen to carry over. Second, wrapping the
-deterministic inverse estimate in a Bayesian posterior, so that
-data noise and network systematics enter a single uncertainty
-budget, with a Cram\'er--Rao bound establishing how close the
-$0.34\%$ mass estimate sits to the information-theoretic limit.
-Third, learning the inverse map directly --- from observed waveform
-to source parameters --- across the hybrid's training population,
-with the plateau diagnostic carrying over as a population-level
-quality flag.
+The immediate priorities are an objective that gives greater weight
+to the late-time envelope, and an end-to-end runtime comparison that
+includes interpolation and neural inference. Tests outside the
+training ranges and under changes of domain and resolution are also
+needed before broader deployment. A later inference study could
+combine the hFNO waveform family with reduced-order likelihood
+methods to test whether rapid field generation produces a practical
+gain in Bayesian parameter estimation.
 
 \section{Research Impact \& Conclusion}
 
-The plateau estimator and its validity flag apply to any
-time-domain ringdown analysis, machine-learning-based or not: they
-replace a hand-tuned window choice with a reproducible procedure
-that reports its own systematic uncertainty, directly relevant as
-next-generation detectors push ringdown spectroscopy towards
-per-mille precision [4]. The hybrid result carries a broader design
-lesson for scientific computing: keeping a cheap classical solver
-responsible for the physics and learning only its discretisation
-error delivered reference-quality waveforms at a fraction of the
-cost. Every result, figure and table in the report regenerates from
-the accompanying code repository.
+The central result is that learning a correction to a coarse
+numerical prior gives accurate fields across the tested
+Schwarzschild and Kerr parameter families without fine-grid fields
+in the training loss. The classical solver retains propagation and
+boundary structure, while the operator concentrates on the
+discretisation defect. The Kerr damping-time result also identifies
+the present limit clearly: global field accuracy does not by itself
+guarantee an accurate low-amplitude late-time envelope.
 
 \begin{thebibliography}{9}
 \footnotesize
@@ -182,6 +168,10 @@ Information Processing Systems}, volume 33, 2020.
 M. P. Brenner, and S. Hoyer. Machine learning-accelerated
 computational fluid dynamics. \emph{Proceedings of the National
 Academy of Sciences}, volume 118, 2021.
+\bibitem{teukolsky73} S. A. Teukolsky. Perturbations of a rotating
+black hole. I. Fundamental equations for gravitational,
+electromagnetic, and neutrino-field perturbations.
+\emph{Astrophysical Journal}, volume 185, 1973.
 \end{thebibliography}
 
 \end{document}

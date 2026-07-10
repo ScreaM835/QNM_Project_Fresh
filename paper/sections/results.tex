@@ -3,32 +3,26 @@
 % =============================================================
 \section{Results}\label{sec:results}
 
-The four experiments below are presented in a single uniform
-format so that the reader can compare the same metrics directly
-across models. Each subsection opens with a short statement of
-the question it addresses and a summary table giving the field
-accuracy (RMSD and relative $L^{2}$ norm against the FD
-reference) together with the best-of-suite QNM error under the
-reporting convention of Sec.~\ref{sec:reporting}, each labelled
-with the estimator of Sec.~\ref{sec:qnm-methods} that attains
-it. Where a coarse prior and a fine reference are defined (the
-hybrid and Kerr surrogates) they appear as additional rows of
-the same table. The supporting plots follow, and each
-subsection closes with a paragraph on the field accuracy and a
-paragraph on the QNM accuracy, the latter carrying the
-per-estimator breakdown, with any model-specific diagnostics
-after them. Sections~\ref{sec:res-repro}--\ref{sec:res-fwd}
-treat one black hole at a time (reproduction, enhanced forward);
-Sec.~\ref{sec:res-hyb} evaluates the hybrid surrogate on the
-canonical BH and on a $100$-BH test population; and
-Sec.~\ref{sec:res-kerr} generalises the hybrid to a population
-of rotating (Kerr) black holes. All QNM errors are relative to
-the Leaver continued-fraction values $M\omega_{0} = 0.3737$,
-$\tau_{0}/M = 11.241$ and are read at the common observer
-$\xq = 10\,M$. Supporting scans and diagnostics are collected in
-Appendix~\ref{app:supp}. Table~\ref{tab:results-summary} collects
-the principal numbers for all models at a glance, and the
-per-model detail follows in the subsections below.
+We report four numerical tests of the pipeline. The first two revisit
+the Schwarzschild finite-radius problem, first as a faithful
+reproduction of \citet{Patel2024pinn} and then with the enhanced
+forward PINN. The third test evaluates the Schwarzschild hFNO on the
+canonical configuration and on a $100$-BH test population. The fourth
+test applies the hFNO construction to the hyperboloidal Kerr
+Teukolsky problem and targets the spin-dependent $(4,2,0)$ mode at
+$\scri$.
+
+Table~\ref{tab:results-summary} summarises the main field and QNM
+errors. Field errors are measured against the FD reference for the
+Schwarzschild experiments and against the fine hyperboloidal solve for
+Kerr. QNM errors are reported under the convention of
+Sec.~\ref{sec:reporting}, with the selected estimator shown in
+parentheses. The Schwarzschild QNM errors use the Leaver values
+$M\omega_0^R = 0.3737$ and $\tau_0/M = 11.241$ at $\xq = 10\,M$.
+The Kerr errors use the spin-dependent Leaver value of the target
+$(4,2,0)$ mode and are read at $\scri$. Per-estimator breakdowns and
+plateau diagnostics are given in the corresponding subsections and in
+Appendix~\ref{app:supp}.
 
 \begin{table}[!ht]
 \centering
@@ -72,35 +66,31 @@ Sec. & Model & Evaluation & Field RMSD & RL2 [\%]
 \subsection{Faithful reproduction of the prior-work baseline}
 \label{sec:res-repro}
 
-We first establish that the pipeline reproduces the prior-work
-baseline of \citet{Patel2024pinn} --- the only previous
-time-domain PINN treatment of these $\ell = 2$ master
-equations --- before any methodological change is introduced;
-it does, improving on the published field errors by an order
-of magnitude. The forward PINN is trained at their exact
-settings (Table~\ref{tab:fwd-hyper}: uniform collocation
-resampling, their loss weights and optimiser budget), i.e.\
-without the enhancements of Sec.~\ref{sec:res-fwd}, on both
-the even-parity (Zerilli) and odd-parity (Regge--Wheeler)
-potentials. Table~\ref{tab:repro-summary} collects the field and
-QNM accuracy for both potentials, and
-Figs.~\ref{fig:repro-zer-field}--\ref{fig:repro-loss} show the
-fields, the ringdown waveforms, and the training histories.
+We first reproduce the prior-work baseline of
+\citet{Patel2024pinn}, the closest previous time-domain PINN study
+of the Schwarzschild $\ell=2$ Regge--Wheeler and Zerilli problems.
+This check is made before introducing the enhanced training schedule
+of Sec.~\ref{sec:res-fwd}. The reproduction keeps the architecture,
+loss weights, optimiser schedule and collocation strategy of
+\citet{Patel2024pinn}, with the implementation-level differences
+stated in Sec.~\ref{sec:fwd-pinn}. It reduces the reported RL2 field
+errors by factors of about $11$ for Zerilli and $9$ for
+Regge--Wheeler. Table~\ref{tab:repro-summary} gives the field and
+QNM errors for both potentials.
 
 \begin{table}[!ht]
 \centering
-\caption{Faithful reproduction summary for both potentials:
-field accuracy against the FD reference (RMSD in field units,
-relative $L^{2}$ norm) and best-of-suite QNM error, each
-labelled with the estimator of Sec.~\ref{sec:qnm-methods} that
-attains it, against the Leaver values $M\omega_{0} = 0.3737$,
-$\tau_{0}/M = 11.241$. The corresponding field errors of
-\citet[Table~2]{Patel2024pinn} are $\mathrm{RL2} = 28.06\%$
-(Zerilli) and $23.59\%$ (Regge--Wheeler). Rows labelled FD
-reference give the extractor floor read from the finite-difference
-solution of the same potential; the per-estimator breakdown and
-the full comparison with \citet{Patel2024pinn} are in
-Table~\ref{tab:repro-qnm}.}
+\caption{Faithful reproduction on the Zerilli and Regge--Wheeler
+potentials. Field errors are measured against the FD reference.
+QNM errors are the best values obtained from the two Patel
+estimators, M1 and M2, and are labelled by the estimator that
+attains them. Errors are relative to the Schwarzschild $\ell=2$
+Leaver values $M\omega_0^R = 0.3737$ and $\tau_0/M = 11.241$.
+For comparison, \citet[Table~2]{Patel2024pinn} report
+$\mathrm{RL2}=28.06\%$ for Zerilli and $23.59\%$ for
+Regge--Wheeler. FD-reference rows give the extraction floor for
+the same potential under M1 and M2. The per-estimator comparison
+with \citet{Patel2024pinn} is given in Table~\ref{tab:repro-qnm}.}
 \label{tab:repro-summary}
 \footnotesize
 \setlength{\tabcolsep}{6pt}
@@ -134,14 +124,16 @@ $3.68\times 10^{-3}$.}
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.88\textwidth]{../outputs/pinn/zerilli_l2_paper/error_heatmap.png}
-\caption{Faithful reproduction on the Zerilli potential:
-global pointwise error $|\Phi_{\mathrm{FD}} - \Phi_{\mathrm{PINN}}|$
-on $x \in [-50,150]\,M$, $t \in [0,50]\,M$, on a logarithmic
-colour scale, peaking at $\sim\!1.6\times 10^{-2}$ on the
+\includegraphics[width=0.80\textwidth]{../outputs/pinn/zerilli_l2_paper/error_heatmap.png}\\[0.4em]
+\includegraphics[width=0.80\textwidth]{../outputs/pinn/regge_wheeler_l2_paper/error_heatmap.png}
+\caption{Faithful reproduction: global pointwise error
+$|\Phi_{\mathrm{FD}} - \Phi_{\mathrm{PINN}}|$ on
+$x \in [-50,150]\,M$, $t \in [0,50]\,M$, on a logarithmic colour
+scale. Top: Zerilli, peaking at $\sim\!1.6\times 10^{-2}$ on the
 outgoing wavefront, consistent with the gridwise RMSD of
-$3.68\times 10^{-3}$.}
-\label{fig:repro-zer-heatmap}
+$3.68\times 10^{-3}$. Bottom: Regge--Wheeler, concentrated on the
+outgoing wavefronts and the left-going late-time characteristic.}
+\label{fig:repro-heatmap}
 \end{figure}
 
 \begin{figure}[!htbp]
@@ -160,45 +152,25 @@ $3.77\times 10^{-3}$.}
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.88\textwidth]{../outputs/pinn/regge_wheeler_l2_paper/error_heatmap.png}
-\caption{Faithful reproduction on the Regge--Wheeler potential:
-global pointwise error $|\Phi_{\mathrm{FD}} - \Phi_{\mathrm{PINN}}|$
-on $x \in [-50,150]\,M$, $t \in [0,50]\,M$, on a logarithmic
-colour scale, concentrated on the outgoing wavefronts and the
-left-going late-time characteristic.}
-\label{fig:repro-rw-heatmap}
-\end{figure}
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=0.80\textwidth]{../outputs/pinn/zerilli_l2_paper/curve_fitting.png}
-\caption{Faithful reproduction on the Zerilli potential:
-ringdown at the observer. $\log_{10}|\Phi(\xq{=}10\,M, t)|$ for
-the reproduced PINN and FD waveforms with the damped-cosine
-reconstructions of the M1 and M2 extractions of
-Table~\ref{tab:repro-qnm} overlaid.}
-\label{fig:repro-zer-ringdown}
-\end{figure}
-
-\begin{figure}[!htbp]
-\centering
+\includegraphics[width=0.80\textwidth]{../outputs/pinn/zerilli_l2_paper/curve_fitting.png}\\[0.4em]
 \includegraphics[width=0.80\textwidth]{../outputs/pinn/regge_wheeler_l2_paper/curve_fitting.png}
-\caption{Faithful reproduction on the Regge--Wheeler potential:
-ringdown at the observer. $\log_{10}|\Phi(\xq{=}10\,M, t)|$ for
-the reproduced PINN and FD waveforms with the damped-cosine
-reconstructions of the M1 and M2 extractions of
-Table~\ref{tab:repro-qnm} overlaid.}
-\label{fig:repro-rw-ringdown}
+\caption{Faithful reproduction ringdown at $\xq=10\,M$, following
+the comparison style of \citet[Fig.~6]{Patel2024pinn}.
+The plotted quantity is $|\Phi(\xq,t)|$ on a logarithmic vertical
+axis. The Leaver damped sinusoid is shown with the M1 and M2
+reconstructions from the FD and PINN fields. Top panel shows
+Zerilli. Bottom panel shows Regge--Wheeler.}
+\label{fig:repro-ringdown}
 \end{figure}
 
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.80\textwidth]{../outputs/pinn/zerilli_l2_paper/loss.png}\\[0.4em]
 \includegraphics[width=0.80\textwidth]{../outputs/pinn/regge_wheeler_l2_paper/loss.png}
-\caption{Faithful-reproduction training histories: total loss
-and the seven unweighted components versus training step, with
-the Adam--L-BFGS transition at iteration $10{,}000$ marked.
-Top: Zerilli. Bottom: Regge--Wheeler.}
+\caption{Faithful-reproduction training histories. Total loss
+and the seven unweighted components are shown versus training
+step. The sharp drop at iteration $10{,}000$ corresponds to the
+Adam to L-BFGS transition. Top: Zerilli. Bottom: Regge--Wheeler.}
 \label{fig:repro-loss}
 \end{figure}
 
@@ -223,8 +195,7 @@ $\sim\!1.6\times 10^{-2}$ on the outgoing wavefront.
 two extraction methods used by \citet{Patel2024pinn} (M1 and M2,
 their ``PINN1''/``PINN2'') to the reproduced fields at
 $\xq = 10\,M$, with the ringdown waveforms and damped-cosine
-reconstructions in Figs.~\ref{fig:repro-zer-ringdown}
-and~\ref{fig:repro-rw-ringdown}. The frequencies agree at the
+reconstructions in Fig.~\ref{fig:repro-ringdown}. The frequencies agree at the
 one-to-two-percent level on both potentials; the damping time,
 the observable most sensitive to field quality, improves
 several-fold, from $14.42\%$ to $1.27\%$ (Zerilli) and from
@@ -261,42 +232,43 @@ Regge--Wheeler & M2 (1-mode NLS) & $1.97$ & $\mathbf{1.56}$ & $2.51$ & $5.39$ \\
 \end{table}
 
 \paragraph{Isospectral consistency.} The two potentials share
-the same QNM spectrum \citep{Chandrasekhar1975}, so a
-consistent pipeline must recover compatible $(\omega,\tau)$
-from both --- and it does: the M2 damping-time errors agree to
-within $0.06$ percentage points ($1.50\%$ versus $1.56\%$),
-against a nine-point spread in \citet[Table~3]{Patel2024pinn}.
-Having established equivalent behaviour on both potentials,
-the remainder of this paper reports on the Zerilli equation.
+the same QNM spectrum \citep{Chandrasekhar1975}. The reproduced
+PINNs recover compatible damping times from both sectors, with M2
+errors of $1.27\%$ for Zerilli and $1.56\%$ for Regge--Wheeler.
+This contrasts with the larger spread in \citet[Table~3]{Patel2024pinn},
+where the corresponding PINN2 errors are $14.42\%$ and $5.39\%$.
+Having established the same behaviour in both sectors, the remainder
+of this paper uses the Zerilli equation as the representative
+Schwarzschild problem.
 
-\clearpage
+\FloatBarrier
 
 % --------------------------------------------------------------
 \subsection{Enhanced forward PINN}
 \label{sec:res-fwd}
 
-How far can the forward field error be driven down at fixed
-architecture, and what QNM accuracy does that buy? Starting
-from the faithful reproduction of Sec.~\ref{sec:res-repro}, the
-enhanced forward PINN doubles the L-BFGS budget and replaces
-uniform resampling with the residual-greedy sampling of
-Sec.~\ref{sec:fwd-pinn}, all other settings unchanged.
-Table~\ref{tab:fwd-summary} collects the field and QNM accuracy,
-and Figs.~\ref{fig:fwd-field}--\ref{fig:fwd-ringdown} show the
-field at the snapshot times, the global error map, the training
-history, and the ringdown at the observer.
+We next test whether improved optimisation and residual-greedy
+sampling reduce the forward-field error at fixed network architecture,
+and whether the improved field yields more accurate QNM extraction.
+Starting from the faithful reproduction of Sec.~\ref{sec:res-repro},
+the enhanced forward PINN doubles the L-BFGS budget and replaces
+uniform resampling with residual-greedy sampling
+(Sec.~\ref{sec:fwd-pinn}), while keeping the architecture and loss
+weights unchanged. Table~\ref{tab:fwd-summary} gives the field and
+QNM errors, and Figs.~\ref{fig:fwd-field}--\ref{fig:fwd-ringdown}
+show the field, training history and observer waveform.
 
 \begin{table}[!ht]
 \centering
-\caption{Enhanced forward PINN summary: field accuracy against
-the FD reference (RMSD in field units, $|\Phi|_{\max}\approx0.7$;
-relative $L^{2}$ norm) and best-of-suite QNM error under the
-reporting convention of Sec.~\ref{sec:reporting}, each labelled
-with the estimator of Sec.~\ref{sec:qnm-methods} that attains it.
-Errors are against the Leaver values $M\omega_{0} = 0.3737$,
-$\tau_{0}/M = 11.241$; the fine reference row is the extractor
-floor from the FD solution of the same equation, and the
-per-estimator breakdown is Table~\ref{tab:fwd-qnm}.}
+\caption{Enhanced forward PINN results. Field accuracy is measured
+against the FD reference using RMSD in field units and the relative
+$L^{2}$ norm. QNM errors are best-of-suite values under the reporting
+convention of Sec.~\ref{sec:reporting}, with the selected estimator
+shown in parentheses. Errors are relative to the Schwarzschild
+$\ell=2$ Leaver values $M\omega_0^R = 0.3737$ and
+$\tau_0/M = 11.241$. The FD-reference row gives the extractor floor
+for the same equation. The per-estimator breakdown is given in
+Table~\ref{tab:fwd-qnm}.}
 \label{tab:fwd-summary}
 \footnotesize
 \setlength{\tabcolsep}{6pt}
@@ -316,13 +288,12 @@ Fine reference & ---                  & ---    & $0.06$~(M4)  & $2.00$~(M2) \\
 \centering
 \includegraphics[width=0.82\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/snapshots.png}\\[0.4em]
 \includegraphics[width=0.82\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/abs_diff_snapshots.png}
-\caption{Forward PINN versus FD reference at the snapshot times.
-Top: snapshots of $\Phi(x,t)$ at four times
-$t/M\in\{10,20,30,40\}$ overlaid for the PINN and the FD
-reference; the two curves are visually indistinguishable on this
-scale. Bottom: pointwise $|\Phi_\theta - \Phi_{\mathrm{FD}}|$
-at the same four times, concentrated near the potential barrier
-and remaining below $\sim\!5\times 10^{-3}$ throughout.}
+\caption{Enhanced forward PINN versus FD reference at the snapshot
+times. Top panels show $\Phi(x,t)$ at
+$t/M\in\{10,20,30,40\}$. The PINN and FD curves are visually
+indistinguishable on this scale. Bottom panels show
+$|\Phi_\theta - \Phi_{\mathrm{FD}}|$ at the same times, with the
+largest snapshot-time differences concentrated near the wavefronts.}
 \label{fig:fwd-field}
 \end{figure}
 
@@ -330,9 +301,11 @@ and remaining below $\sim\!5\times 10^{-3}$ throughout.}
 \centering
 \includegraphics[width=0.92\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/error_heatmap.png}
 \caption{Forward PINN global pointwise error. Heatmap of
-$|\Phi_\theta - \Phi_{\mathrm{FD}}|$ on the full training domain
-$x\in[-50,150]\,M$, $t\in[0,50]\,M$, confirming that the snapshot-time
-bound of Fig.~\ref{fig:fwd-field} holds globally.}
+$|\Phi_\theta - \Phi_{\mathrm{FD}}|$ on
+$x\in[-50,150]$ and $t\in[0,50]$, shown on a shared logarithmic
+colour scale. The largest visible errors follow the wavefront
+characteristics, consistent with the snapshot differences in
+Fig.~\ref{fig:fwd-field}.}
 \label{fig:fwd-heatmap}
 \end{figure}
 
@@ -340,31 +313,25 @@ bound of Fig.~\ref{fig:fwd-field} holds globally.}
 \centering
 \includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/loss.png}
 \caption{Forward PINN training history. Total loss
-$\mathcal{L}_{\mathrm{tot}}$ and the seven weighted components
-($\mathcal{L}_{\mathrm{r}}$, $\mathcal{L}_{\mathrm{rx}}$,
-$\mathcal{L}_{\mathrm{rt}}$, $\mathcal{L}_{\mathrm{ic}}$,
-$\mathcal{L}_{\mathrm{iv}}$, $\mathcal{L}_{\mathrm{bl}}$,
-$\mathcal{L}_{\mathrm{br}}$, weights as in
-Sec.~\ref{sec:fwd-pinn}) versus iteration on a log--log axis. The
-vertical marker at iteration $10{,}000$ separates the Adam phase
-from the L-BFGS phase. The PDE-residual term
-$\mathcal{L}_{\mathrm{r}}$ dominates throughout, with the IC and BC
-terms below it by one to two orders of magnitude.}
+$\mathcal{L}_{\mathrm{tot}}$ and the seven unweighted component
+losses are shown versus iteration on a logarithmic scale. The
+vertical marker at iteration $10{,}000$ separates the Adam and
+L-BFGS phases. The L-BFGS phase reduces the residual and initial-data
+terms by several orders of magnitude before reaching a flat late-time
+plateau.}
 \label{fig:fwd-loss}
 \end{figure}
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/ringdown_overlay.png}\\[0.6em]
-\includegraphics[width=0.85\textwidth]{../outputs/qnm/zerilli_l2_greedy_f03_lbfgs30k/pinn_ringdown.png}
-\caption{Forward PINN ringdown at $\xq = 10\,M$. Top two panels:
+\includegraphics[width=0.85\textwidth]{../outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/ringdown_overlay.png}
+\caption{Forward PINN ringdown at $\xq = 10\,M$.
 $\Phi_\theta(\xq,t)$ from the forward PINN overlaid on the FD
 reference on linear (upper) and logarithmic (lower) vertical
 scales, showing the prompt burst followed by the
-exponentially-damped sinusoidal ringdown. Bottom: the same
-time series isolated from $\Phi_\theta$, on which the five
-extraction methods of Sec.~\ref{sec:qnm-methods} are applied to
-produce the entries of Table~\ref{tab:fwd-qnm}.}
+exponentially-damped sinusoidal ringdown. The five extraction
+methods of Sec.~\ref{sec:qnm-methods} are applied to this time
+series to produce the entries of Table~\ref{tab:fwd-qnm}.}
 \label{fig:fwd-ringdown}
 \end{figure}
 
@@ -377,15 +344,14 @@ against the FD reference (mean-absolute difference
 $4.99\times 10^{-4}$; peak $|\Phi| \approx 0.7$ on the domain).
 This is a factor of $\sim\!50$ below the
 $\mathrm{RL2} = 28.06\%$ of
-\citet[Table~2, Zerilli row]{Patel2024pinn} and a further factor
-of $\sim\!2.2$ below the reproduction of
-Sec.~\ref{sec:res-repro}, a factor of $\sim\!36$ on the
-mean-absolute difference against their $1.82\times 10^{-2}$. The
-snapshots of Fig.~\ref{fig:fwd-field} are visually
-indistinguishable from the reference, and the pointwise error
-stays below $\sim\!5\times 10^{-3}$, concentrated near the
-potential barrier, both at the four snapshot times and across
-the full domain (Fig.~\ref{fig:fwd-heatmap}).
+\citet[Table~2, Zerilli row]{Patel2024pinn}. It also improves on
+the faithful reproduction of Sec.~\ref{sec:res-repro}, reducing the
+RL2 error from $2.61\%$ to $0.58\%$, and lowers the mean-absolute
+difference by a factor of $\sim\!36$ against their
+$1.82\times 10^{-2}$. The snapshots of Fig.~\ref{fig:fwd-field} are
+visually indistinguishable from the reference. The pointwise error is
+concentrated along the wavefronts in the snapshot panels and in the
+global error map of Fig.~\ref{fig:fwd-heatmap}.
 
 \paragraph{QNM accuracy.} We apply the five extraction methods
 of Sec.~\ref{sec:qnm-methods} to the observer time series
@@ -419,78 +385,62 @@ M5 (2-D plateau)      & $0.23$ & $3.91$ & $t_0\in[10,16.7]\,M$, $\tend\in[42,50]
 \end{tabular}
 \end{table}
 
-Two points stand out. The M4 plateau estimate reaches
+The extraction results show two distinct behaviours. The M4 plateau estimate reaches
 $0.029\%$ in $\omega$, an order of magnitude tighter than any
 single-window method and the reported frequency, whereas the
 Leaver-closest damping time is M2 ($1.99\%$), so $\omega$ and
 $\tau$ are taken from different estimators under the selection
-rule of Sec.~\ref{sec:reporting}. M3 returns frequencies at
-machine-precision amplitudes and is unreliable on these
-near-clean waveforms.
+rule of Sec.~\ref{sec:reporting}. M3 is ill-conditioned on this
+waveform, selecting poles whose fitted amplitudes are near numerical
+roundoff.
 
-\paragraph{Error budget.} The two measured contributions to
-the frequency error rank as follows: the M4 bias against the
-Leaver value is $1.1\times 10^{-4}$ in $M\omega$ ($0.029\%$),
-and the fit-window systematic is $\sigma_\omega = 2\times 10^{-4}$
-($0.054\%$; a lower bound, Sec.~\ref{sec:plateau}). The
-frequency measurement is therefore
-window-limited, not field-limited. For the
-M4 damping time the ordering reverses: its plateau scatter
-$\sigma_\tau/\tau \approx 0.2\%$ sits against a $2.65\%$ bias, so
-the M4 $\tau$ is field- and template-limited rather than
-window-limited; the Leaver-closest damping time is instead M2
-($1.99\%$), the value reported in Table~\ref{tab:fwd-summary}.
+\paragraph{Error budget.} For the reported frequency, the M4
+central-value bias is $1.1\times10^{-4}$ in $M\omega$
+($0.029\%$), while the M4 plateau spread is
+$\sigma_\omega = 2.0\times10^{-4}$ ($0.054\%$). The frequency
+measurement is therefore limited by fit-window sensitivity rather
+than by the field error alone. For the M4 damping time the ordering
+is reversed. Its plateau spread is only
+$\sigma_\tau/\tau \simeq 0.2\%$, while the central-value bias is
+$2.65\%$. The M4 damping time is therefore limited by the field and
+template rather than by window selection. The Leaver-closest damping
+time is instead the M2 value, $1.99\%$, as reported in
+Table~\ref{tab:fwd-summary}.
 
-\clearpage
+\FloatBarrier
 
 % --------------------------------------------------------------
-\subsection{Hybrid coarse-FD + neural-residual surrogate}
+\subsection{Schwarzschild hFNO}
 \label{sec:res-hyb}
 
-The final model asks how much of the fine solver's
-accuracy can be recovered from a classical solve at $1/64$ of
-its cost. The hybrid surrogate of Sec.~\ref{sec:hyb-method}
-keeps a coarse-grid FD solve to carry the wave propagation and
-asks the network only for the pointwise coarse-to-fine residual,
-estimated label-free by Richardson extrapolation of two coarse
-solves (Eqs.~\eqref{eq:hyb-richardson}--\eqref{eq:hyb-residual}),
-so that no fine-grid field enters training. The fine solve
-appears only as the evaluation reference below, the true
-high-resolution answer against which the surrogate is measured;
-at deployment neither it nor the Richardson target is needed, the
-trained network correcting a fresh coarse solve in a single pass.
-It is evaluated on the canonical draw
-$(M,x_{0},\sigma) = (1,4,5)$ and on a $100$-BH in-distribution
-Sobol test set (drawn from the hybrid's own training box,
-Sec.~\ref{sec:hyb-method}), at coarsening factor $k = 4$;
-extraction is at the common observer $\xq = 10\,M$ shared with
-the PINNs, over the model's full $[10,100]\,M$ evolution.
-Quintic-spline upsampling of that $k = 4$ coarse solve to the
-fine grid (the \emph{coarse-up baseline}) leaves a large but
-spatially-localised dispersion error, $11.20\%$ in relative
-$L^{2}$ on the canonical draw, for the gated network to repair.
-Table~\ref{tab:hyb-summary} collects the field and QNM accuracy,
-and Figs.~\ref{fig:hyb-snapshots}--\ref{fig:hyb-ringdown-xq2}
-show the field at the snapshot times, the global error maps, the
-training history, and the ringdown at the observer.
+We next evaluate the Schwarzschild hFNO of Sec.~\ref{sec:hyb-method}.
+The model keeps a $k=4$ coarse FD solve as the propagation prior,
+upsamples it to the fine grid and learns only the coarse-to-fine
+residual. The training target is obtained label-free by Richardson
+extrapolation from two coarse solves, and the fine FD solution is used
+only for evaluation. We test the canonical configuration
+$(M,x_0,\sigma)=(1,4,5)$ and a $100$-BH Sobol test population drawn
+from the same parameter ranges as the training set. Extraction is
+performed at $\xq=10\,M$ over the model's $[10,100]\,M$ evolution.
+Table~\ref{tab:hyb-summary} gives the field and QNM errors, and
+Figs.~\ref{fig:hyb-snapshots}--\ref{fig:hyb-ringdown-xq2} show the
+field, training history and observer waveform.
 
 \begin{table}[!ht]
 \centering
-\caption{Hybrid surrogate summary. Field accuracy is against the
-fine FD reference (RMSD in field units, relative $L^{2}$ norm),
-on the canonical BH $(M,x_0,\sigma) = (1,4,5)$ and as the mean
-over the $100$-BH test population; the coarse-up baseline (the
-surrogate's input) is shown for comparison. QNM errors are
-best-of-suite against the Leaver values $M\omega_0 = 0.3737$,
-$\tau_0/M = 11.241$, each labelled with the estimator of
-Sec.~\ref{sec:qnm-methods} that attains it: the canonical row is
-read over the $[10,80]\,M$ usable window and the population row is
-the median over the test set (window $[10,100]\,M$), with the
-fine reference giving the extractor floor. The per-estimator
-breakdown is Table~\ref{tab:hyb-canonical}. The coarse prior is
-the surrogate's input rather than a spectroscopic target, so its
-QNM columns are blank; the remaining dashes denote quantities not
-applicable to that row.}
+\caption{Schwarzschild hFNO results. Field accuracy is measured
+against the fine FD reference using RMSD in field units and the
+relative $L^{2}$ norm. The coarse-up baseline is the quintic-upsampled
+$k=4$ prior supplied to the hFNO. QNM errors are best-of-suite values
+under the reporting convention of Sec.~\ref{sec:reporting}, with the
+selected estimator shown in parentheses. Errors are relative to the
+Schwarzschild $\ell=2$ Leaver values $M\omega_0^R=0.3737$ and
+$\tau_0/M=11.241$. The canonical QNM row combines the M5 frequency
+from the two-edge scan with the M4 damping time obtained using the
+usable-signal cutoff at $t=80\,M$. The population row reports medians
+over the $100$-BH test set using the full $[10,100]\,M$ protocol. The
+per-estimator population breakdown is given in
+Table~\ref{tab:hyb-canonical}.}
 \label{tab:hyb-summary}
 \footnotesize
 \setlength{\tabcolsep}{5pt}
@@ -500,10 +450,10 @@ applicable to that row.}
  & Field RMSD & RL2 [\%] & $|\Delta\omega|/\omega$ [\%]
    & $|\Delta\tau|/\tau$ [\%] \\
 \midrule
-Hybrid (canonical BH)        & $1.70\times 10^{-3}$ & $1.24$  & $0.047$~(M5) & $1.31$~(M4)  \\
-Hybrid ($100$-BH population)  & $2.75\times 10^{-3}$ & $1.85$  & $0.152$~(M4) & $0.528$~(M4) \\
-Coarse prior (canonical)     & $1.53\times 10^{-2}$ & $11.20$ & ---          & ---          \\
-Fine reference (population)   & ---                  & ---     & $0.064$~(M4) & $0.092$~(M4) \\
+hFNO (canonical BH)          & $1.70\times 10^{-3}$ & $1.24$  & $0.047$~(M5) & $1.31$~(M4)  \\
+hFNO ($100$-BH population)    & $2.75\times 10^{-3}$ & $1.85$  & $0.152$~(M4) & $0.528$~(M4) \\
+Coarse prior (canonical)     & $1.53\times 10^{-2}$ & $11.20$ & n/a          & n/a          \\
+Fine reference (population)   & n/a                  & n/a     & $0.064$~(M4) & $0.092$~(M4) \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -512,33 +462,24 @@ Fine reference (population)   & ---                  & ---     & $0.064$~(M4) & 
 \centering
 \includegraphics[width=0.82\textwidth]{../outputs/hybrid/fno_sw_gate_s1em3_t100/figs/hybrid_snapshots.png}\\[0.4em]
 \includegraphics[width=0.82\textwidth]{../outputs/hybrid/fno_sw_gate_s1em3_t100/figs/hybrid_abs_diff_snapshots.png}
-\caption{Hybrid prediction versus fine FD reference on the
-canonical BH at four snapshot times. Top: $\Phi(x,t)$ at
-$t/M \in \{10, 20, 30, 40\}$, with the fine FD reference (blue)
-and the hybrid prediction (orange) overlaid. The two curves
-are visually indistinguishable on this scale. Bottom: pointwise
-$|\Phi^{\mathrm{f}} - \Phi^{\mathrm{hyb}}|$ at the same four
-times, concentrated on the outgoing wavefronts and near-zero
-across the smooth interior and the causal exterior.}
+\caption{Schwarzschild hFNO prediction versus fine FD reference on
+the canonical configuration. Top panels show $\Phi(x,t)$ at
+$t/M\in\{10,20,30,40\}$. The hFNO and fine-reference curves are
+visually indistinguishable on this scale. Bottom panels show
+$|\Phi^{\mathrm{f}}-\Phi^{\mathrm{hyb}}|$ at the same times, with
+the largest snapshot-time differences concentrated on the wavefronts.}
 \label{fig:hyb-snapshots}
 \end{figure}
 
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.92\textwidth]{../outputs/hybrid/fno_sw_gate_s1em3_t100/figs/hybrid_pointwise_error.png}
-\caption{Hybrid surrogate global pointwise error on the
-canonical BH. Heatmap of
-$|\Phi^{\mathrm{f}} - \Phi^{\mathrm{hyb}}|$ on
-$x \in [-50, 150]\,M$, $t \in [0, 100]\,M$ (the full hybrid
-training and evaluation window), plotted on a
-logarithmic $\mathrm{magma\_r}$ colour
-scale. The gradient gate concentrates the residual on the
-prompt-burst region and the outgoing wavefronts, leaving the
-smooth interior and causal exterior at the prior. A weaker
-low-amplitude residual persists in the late-time ring, and this
-is the component that limits the recovered damping time.
-Compare with the coarse-up baseline error on the same
-colour scale in Fig.~\ref{fig:hyb-heatmap-base}.}
+\caption{Schwarzschild hFNO global pointwise error on the canonical
+configuration. The heatmap shows
+$|\Phi^{\mathrm{f}}-\Phi^{\mathrm{hyb}}|$ on
+$x\in[-50,150]$ and $t\in[0,100]$ on the shared logarithmic colour
+scale. The remaining error is concentrated along wavefront
+characteristics and in a low-amplitude late-ring component.}
 \label{fig:hyb-heatmap}
 \end{figure}
 
@@ -546,101 +487,79 @@ colour scale in Fig.~\ref{fig:hyb-heatmap-base}.}
 \centering
 \includegraphics[width=0.92\textwidth]{../outputs/hybrid/fno_sw_gate_s1em3_t100/figs/hybrid_pointwise_error_baseline.png}
 \caption{Coarse-up baseline pointwise error on the canonical
-BH, plotted on the same shared colour scale as
-Fig.~\ref{fig:hyb-heatmap}. The second-order dispersion
-signature of the under-resolved $k = 4$ coarse prior plus
-quintic upsampling is visible as narrow characteristics tracing
-the outgoing-wave caustics; compare the hybrid map of
-Fig.~\ref{fig:hyb-heatmap} on the same scale.}
+configuration, shown on the same logarithmic colour scale as
+Fig.~\ref{fig:hyb-heatmap}. The under-resolved $k=4$ prior leaves
+coherent second-order dispersion bands after quintic upsampling.}
 \label{fig:hyb-heatmap-base}
 \end{figure}
 
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.85\textwidth]{../outputs/hybrid/fno_sw_gate_s1em3_t100/figs/hybrid_loss.png}
-\caption{Hybrid surrogate training history: per-epoch train and
-validation MSE on the gated Richardson residual over $100$ Adam
-epochs.}
+\caption{Schwarzschild hFNO training history. Train and validation
+MSE are shown for the gated Richardson residual over $100$ Adam
+epochs. The best validation MSE is $1.79\times10^{-6}$.}
 \label{fig:hyb-loss}
 \end{figure}
 
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.80\textwidth]{../outputs/hybrid/fno_sw_gate_s1em3_t100/figs/hybrid_ringdown_xq10.png}
-\caption{Observer-slice waveform $\Phi(\xq{=}10, t)$ on the
-canonical BH, both panels overlaying the fine FD reference
-(blue), the coarse-up baseline (grey dotted) and the hybrid
-prediction (orange dashed). Top: linear scale, on which the
-three curves are visually indistinguishable at the observer.
-Bottom: $\log_{10}|\Phi|$ scale, where the coarse prior deviates
-at the deep minima. The canonical plateau extractions of
-Figs.~\ref{fig:hyb-plateau-m4} and~\ref{fig:hyb-plateau-m5}
-are read from these time series, and
-Table~\ref{tab:hyb-canonical} reports the population medians
-of the same three-way comparison.}
+\caption{Observer waveform at $\xq=10\,M$ for the canonical
+configuration. The panels compare the fine FD reference, the
+coarse-up baseline and the hFNO prediction. The lower panel shows
+$|\Phi|$ on a logarithmic vertical axis, where the late-ring
+difference that limits the damping-time extraction becomes visible.
+The canonical plateau diagnostics are shown in
+Figs.~\ref{fig:hyb-plateau-m4} and~\ref{fig:hyb-plateau-m5}.}
 \label{fig:hyb-ringdown-xq2}
 \end{figure}
 
 \FloatBarrier
 
-\paragraph{Field accuracy.} On the canonical BH the hybrid
-reproduces the fine FD reference with gridwise
-$\mathrm{RMSD} = 1.70\times 10^{-3}$ ($\mathrm{RL2} = 1.24\%$),
-against $1.53\times 10^{-2}$ ($11.20\%$) for the coarse-up
-baseline, a factor of $9.0$ in RMSD. Averaged over the $100$-BH
-test population the same comparison is a factor of $46$ in
-mean-square error ($1.85\%$ versus $13.39\%$ in relative
-$L^{2}$), so the gain holds across the training distribution and
-is not an artefact of the canonical draw. The residual is
-concentrated on the outgoing wavefronts where the coarse prior
-dephases (Fig.~\ref{fig:hyb-snapshots}), and the global error
-maps (Figs.~\ref{fig:hyb-heatmap} and~\ref{fig:hyb-heatmap-base})
-show the hybrid suppressing the baseline's dispersion
-characteristics by roughly an order of magnitude while leaving
-the smooth interior and causal exterior at the prior.
+\paragraph{Field accuracy.} On the canonical configuration the
+Schwarzschild hFNO reaches $\mathrm{RMSD}=1.70\times10^{-3}$ and
+$\mathrm{RL2}=1.24\%$ against the fine FD reference, compared with
+$1.53\times10^{-2}$ and $11.20\%$ for the coarse-up baseline. This
+is a factor of $9.0$ in RMSD. Over the $100$-BH test population the
+hFNO has mean $\mathrm{RL2}=1.85\%$, compared with $13.39\%$ for
+the coarse-up baseline, and reduces the mean-square field error by a
+factor of $46$. The error maps show that the hFNO removes most of the
+coherent dispersion bands of the coarse prior, while a smaller
+residual remains along the wavefronts and in the late ring.
 
-\paragraph{QNM accuracy.} The relevant test for a surrogate is
-whether it reproduces the spectroscopy of the fine reference it
-approximates. Table~\ref{tab:hyb-canonical} reports the
-population-median extraction against that reference at the
-common observer over the model's full $[10,100]\,M$ evolution,
-read from the ringdown of Fig.~\ref{fig:hyb-ringdown-xq2}; the
-M4 and M5 plateau constructions are in
-Appendix~\ref{app:supp-plateau}. On the primary M4 plateau the
-hybrid recovers $\omega$ to $0.152\%$ and $\tau$ to $0.528\%$,
-against the reference's own $0.064\%$ and $0.092\%$, the
-\emph{extractor floor} that the method reaches on the exact
-field. The hybrid tracks the reference in frequency to within a
-tenth of a percentage point; its damping-time error sits above
-that floor, because the network's residual leaves a small
-incoherent component in the late ring that the plateau fit
-cannot average out, the same limitation seen in the late-ring
-divergence of Fig.~\ref{fig:hyb-ringdown-xq2}. The M4 plateau is
-read over the usable-signal window up to $t \approx 80\,M$,
-beyond which the ring reaches the noise floor.
+\paragraph{QNM accuracy.} Table~\ref{tab:hyb-canonical} reports
+population-median QNM errors at $\xq=10\,M$ over the $[10,100]\,M$
+evolution. On the M4 plateau the hFNO reaches $0.152\%$ in frequency
+and $0.528\%$ in damping time. The fine FD reference gives the
+extractor floor, $0.064\%$ and $0.092\%$. The hFNO therefore tracks
+the fine-reference frequency closely, but its damping-time error
+remains above the extractor floor. The canonical waveform in
+Fig.~\ref{fig:hyb-ringdown-xq2} shows the same mechanism
+qualitatively, namely a small late-ring residual that the plateau fit
+cannot average out. The canonical QNM entry in
+Table~\ref{tab:hyb-summary} is reported separately. Its M5 frequency
+comes from the two-edge scan, while its M4 damping time uses the
+usable-signal cutoff at $t\simeq80\,M$. The population statistics use
+the full $[10,100]\,M$ extraction protocol.
 
 \begin{table}[!htbp]
 \centering
-\caption{Hybrid QNM extraction at the common observer
-$\xq = 10\,M$, reported as the median percentage error over the
-$100$-BH test population. All errors are against the analytic
-Leaver reference $(\omega_{0} M, \tau_{0}/M) = (0.3737, 11.241)$,
-for the five estimators of Sec.~\ref{sec:qnm-methods} with the
-plateau scans of Sec.~\ref{sec:plateau} for M4 and M5. The
-surrogate trains on the label-free Richardson target
-(Sec.~\ref{sec:hyb-method}); the fine FD solve here is the
-independent validation reference the surrogate approximates, and
-its own extraction is the extractor floor. The hybrid tracks the
-reference in frequency; its damping-time error sits above that
-floor, limited by the residual in the late ring, not by the
-plateau estimator. Bold entries are the primary values under the
-reporting convention of Sec.~\ref{sec:reporting}.}
+\caption{Schwarzschild hFNO QNM extraction at $\xq=10\,M$, reported
+as median percentage error over the $100$-BH test population. Errors
+are relative to the Schwarzschild $\ell=2$ Leaver values
+$M\omega_0^R=0.3737$ and $\tau_0/M=11.241$. The hFNO is compared
+with the fine FD reference, whose extraction gives the estimator
+floor. The hFNO frequency tracks that floor, while the damping-time
+error remains above it because of the residual late-ring error. Bold
+entries are the primary values under the reporting convention of
+Sec.~\ref{sec:reporting}.}
 \label{tab:hyb-canonical}
 \footnotesize
 \setlength{\tabcolsep}{3pt}
 \begin{tabular}{@{}lccccl@{}}
 \toprule
- & \multicolumn{2}{c}{Hybrid}
+ & \multicolumn{2}{c}{hFNO}
  & \multicolumn{2}{c}{Fine FD reference} & \\
 \cmidrule(lr){2-3}\cmidrule(lr){4-5}
 Method & $|\Delta\omega|/\omega$ [\%] & $|\Delta\tau|/\tau$ [\%]
@@ -655,60 +574,50 @@ M5 (2-D plateau)             & $0.250$ & $1.37$ & $0.138$ & $1.09$ & $t_0\in[10,
 \end{tabular}
 \end{table}
 
-\paragraph{The gradient gate.} The gate of
-Eq.~\eqref{eq:hyb-gate} rests on the coarse-prior error being
-large exactly where the prior gradient is large. The per-cell
-scatter confirms this on the canonical BH (log--log Pearson
-$r = 0.921$), and the hybrid's gain follows the gate, reaching a
-factor $14.1$ error reduction in the top gradient decile
-(Appendix~\ref{app:supp-gate}). The scale $s = 10^{-3}$ is fixed
-label-free from the prior gradient distribution
-(Appendix~\ref{app:gate-scale}), and the gate leaves the
-already-resolved interior at the prior floor, so the field gain
-does not pollute the QNM-bearing late-time tail.
+\paragraph{The gradient gate.} The gate of Eq.~\eqref{eq:hyb-gate}
+is justified by the coarse-prior error being largest where the prior
+gradient is large. The canonical scatter plot confirms this relation
+with log-log Pearson $r=0.921$, and the error reduction is strongest
+in the high-gradient region, reaching a factor $14.1$ in the top
+gradient decile (Appendix~\ref{app:supp-gate}). The scale
+$s=10^{-3}$ is fixed label-free from the prior-gradient distribution
+(Appendix~\ref{app:gate-scale}). The gate suppresses unnecessary
+corrections in smooth regions, but it does not remove the residual
+late-ring error that limits the damping-time extraction.
 
-\paragraph{Training history.} A single Adam phase reduces the
-validation MSE on the gated Richardson residual from
-$3.6\times 10^{-4}$ to $1.8\times 10^{-6}$ over $100$ epochs,
-with train and validation tracking together
-(Fig.~\ref{fig:hyb-loss}).
+\paragraph{Training history.} Over $100$ Adam epochs, the validation
+MSE on the gated Richardson residual falls from $3.59\times10^{-4}$
+to a best value of $1.79\times10^{-6}$, with train and validation
+curves tracking closely (Fig.~\ref{fig:hyb-loss}).
 
-\clearpage
+\FloatBarrier
 
 % ==============================================================
-\subsection{Generalisation to Kerr}
+\subsection{Extension to Kerr}
 \label{sec:res-kerr}
 
-The final experiment asks whether the hybrid construction is
-tied to the Schwarzschild geometry. We retrain the surrogate on
-a $128$-black-hole test set drawn from a Sobol sequence in
-dimensionless spin $a/M \in [0, 0.95]$, evolving the
-hyperboloidal Teukolsky field of Sec.~\ref{sec:teukolsky-problem} and
-targeting the fundamental $(\ell, m, n) = (4, 2, 0)$ mode.
-Table~\ref{tab:kerr-summary} collects the field and QNM accuracy
-by spin bin, and
-Figs.~\ref{fig:kerr-ringdown}--\ref{fig:kerr-vs-spin} show the
-ringdown at $\scri$, the pointwise field error, and the accuracy
-versus spin.
+Finally, we evaluate the Kerr hFNO of Sec.~\ref{sec:kerr-method}
+on the hyperboloidal Teukolsky problem. The network is trained on
+$1024$ Sobol configurations, validated on $128$, and evaluated on
+an independent $128$-black-hole test set spanning
+$a/M\in[0,0.95]$. The target is the fundamental
+$(\ell,m,n)=(4,2,0)$ mode read at $\scri$.
+Table~\ref{tab:kerr-summary} reports the field and QNM errors by
+spin bin.
 
 \begin{table}[!ht]
 \centering
-\caption{Kerr hybrid surrogate accuracy by spin bin over the
-$128$-black-hole test set: bin medians, with the final row the
-population median. Field errors are relative $L^{2}$ against the
-fine solve, for the coarse prior, the hybrid, and the label-free
-Richardson target the surrogate trains toward; the Richardson
-column therefore reports the training target's own fidelity to
-the fine solve (the surrogate never sees a fine field). Frequency
-($|\Delta\omega|/\omega$) and damping-time ($|\Delta\tau|/\tau$)
-errors are against the analytic Leaver value, best-of-suite, each
-hybrid entry labelled by the estimator that attains it and the
-fine solve giving the extractor floor; the Richardson target
-reaches the same $0.05\%$ frequency floor as the fine solve, so
-spectroscopy is benchmarked against the fine solve throughout.
-Estimators: M3 $=$ selective ESPRIT, cES $=$ complex ESPRIT,
-c$\Phi$ $=$ complex-phase fit
-(Algorithms~\ref{alg:m3}, \ref{alg:cphi} and~\ref{alg:ces}).}
+\caption{Kerr hFNO accuracy over the $128$-black-hole test set.
+Rows report spin-bin medians, with the final row giving the
+population median. The field columns compare the coarse prior,
+hFNO and label-free Richardson target with the fine solve. The
+frequency and damping-time columns compare the coarse prior, hFNO
+and fine solve using best-of-suite errors relative to the
+spin-dependent Leaver values of the target $(4,2,0)$ mode. The
+fine-solve extraction gives the estimator floor. The estimator in
+parentheses is the one selected most often among the per-sample best
+estimates in that bin. The high-spin damping-time bin has a tie
+between c$\Phi$ and M3.}
 \label{tab:kerr-summary}
 \footnotesize
 \setlength{\tabcolsep}{3pt}
@@ -719,8 +628,8 @@ c$\Phi$ $=$ complex-phase fit
    & \multicolumn{3}{c}{$|\Delta\tau|/\tau$ [\%]} \\
 \cmidrule(lr){3-5}\cmidrule(lr){6-8}\cmidrule(lr){9-11}
 $a/M$ & $n$ & prior & hybrid & Rich.
-      & prior & hybrid & fine
-      & prior & hybrid & fine \\
+  & prior & hFNO & fine
+  & prior & hFNO & fine \\
 \midrule
 $[0.0,0.3]$  & $41$ & $51.2$ & $0.70$ & $0.004$ & $0.63$ & $0.53$~(cES) & $0.06$ & $0.56$ & $1.79$~(cES) & $0.46$ \\
 $[0.3,0.6]$  & $40$ & $59.1$ & $0.70$ & $0.006$ & $0.44$ & $0.27$~(M3)  & $0.08$ & $0.29$ & $1.67$~(cES) & $0.42$ \\
@@ -735,18 +644,14 @@ All (median) & $128$ & $59.5$ & $0.78$ & $0.008$ & $0.59$ & $0.33$~(M3) & $0.05$
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.82\textwidth]{../outputs/kerr/figs/hybrid_ringdown_scri.png}
-\caption{Kerr ringdown at null infinity $\scri$ for a
-representative $a/M = 0.7$ black hole, overlaying the fine
-reference (blue, solid), the coarse prior (grey, dotted) and the
-hybrid (orange, dashed). Top: $\mathrm{Re}\,\Psi$ on a linear
-scale, where the coarse prior departs from the fine reference in
-amplitude and phase through the peak of the burst while the
-hybrid tracks it. Bottom: $|\Psi|$ on a logarithmic scale; the
-hybrid follows the fine solve through the burst but leaves a
-residual that plateaus near $|\Psi| \sim 10^{-2}$ in the
-late-time tail, where the fine solve and the coarse prior both
-decay cleanly, the mechanism that limits the recovered damping
-time (Sec.~\ref{sec:res-kerr}).}
+\caption{Kerr ringdown at $\scri$ for the test configuration nearest
+$a/M=0.7$. The upper panel compares $\mathrm{Re}\,\Psi$ from the
+fine solve, coarse prior and hFNO. The lower panel shows $|\Psi|$ on
+a logarithmic scale. Beyond $\tau\simeq100\,M$, the hFNO no longer
+follows the exponential decay and fluctuates between approximately
+$10^{-3}$ and $10^{-2}$, while the fine solve and coarse prior
+continue to decay. This late-time residual limits the recovered
+damping time.}
 \label{fig:kerr-ringdown}
 \end{figure}
 
@@ -763,12 +668,12 @@ time (Sec.~\ref{sec:res-kerr}).}
 \includegraphics[width=\textwidth]{../outputs/kerr/figs/hybrid_pointwise_error_hybrid.png}
 \subcaption{Hybrid.}
 \end{subfigure}
-\caption{Pointwise field error over the compactified domain
-$(\sigma, \tau)$, both panels on the same logarithmic colour
-scale. The coarse prior (a) concentrates its error in the
-high-amplitude burst phase (early $\tau$); the residual FNO (b)
-removes that burst-phase structure, leaving a much lower
-residual across the domain.}
+\caption{Pointwise magnitude error for the test configuration nearest
+$a/M=0.7$. Both panels show
+$\bigl||\Psi|-|\Psi^{\mathrm f}|\bigr|$ on the same logarithmic
+colour scale. The coarse prior has its largest errors during the
+high-amplitude burst. The hFNO removes most of this burst error but
+leaves a lower-amplitude residual throughout the later evolution.}
 \label{fig:kerr-pointwise}
 \end{figure}
 
@@ -794,67 +699,49 @@ residual across the domain.}
 \end{subfigure}
 \caption{Best-of-suite accuracy versus spin (coarse prior grey,
 hybrid orange; fine reference blue in (b) and (c), label-free
-Richardson target green in (a)). (a)~The hybrid field error is
-flat across $a/M$ while the coarse prior grows towards
-extremality. (b)~The prior frequency error spikes for
-$a/M \gtrsim 0.8$, where the hybrid recovers more than an order
-of magnitude and approaches the fine-solve floor. (c)~The
-damping time is the exception: the hybrid does not improve on
-the prior and stays well above the fine floor, as discussed in
-the text.}
+Richardson target green in (a)). (a)~The hFNO field error stays near
+$1\%$ across the sampled spin range while the coarse-prior error
+increases with spin. (b)~The prior frequency error spikes for
+$a/M \gtrsim 0.8$, where the hFNO recovers more than an order of
+magnitude but remains above the fine-solve floor. (c)~The damping
+time is the exception: the hFNO does not improve on the prior and
+stays well above the fine floor, as discussed in the text.}
 \label{fig:kerr-vs-spin}
 \end{figure}
 
 \FloatBarrier
 
-\paragraph{Field accuracy.} Across the test set the coarse prior
-carries a median relative $L^{2}$ field error of $59.5\%$: at
-low resolution the hyperboloidal wavefront is badly
-under-resolved. The hybrid reduces this to $0.78\%$, a factor of
-$77$, and the error stays nearly flat across spin, from $0.70\%$
-at low spin to $1.08\%$ near extremality
-(Table~\ref{tab:kerr-summary}), so a single amortised operator
-absorbs almost the entire spin dependence of the field. The
-label-free Richardson target itself sits at $0.008\%$,
-confirming that the FNO, not the reference, sets the floor. The
-coarse solve's error is concentrated in the high-amplitude burst
-(Fig.~\ref{fig:kerr-pointwise}), which the residual correction
-removes, and the reconstructed ringdown at $\scri$ overlays the
-fine reference through the burst (Fig.~\ref{fig:kerr-ringdown}).
+\paragraph{Field accuracy.} Across the test set, the median relative
+$L^{2}$ error decreases from $59.5\%$ for the coarse prior to
+$0.78\%$ for the Kerr hFNO. The ratio of the population medians is
+$77$. The hFNO bin median rises modestly from $0.70\%$ at low spin
+to $1.08\%$ in the high-spin bin. The Richardson target has a median
+error of $0.008\%$, well below the hFNO error, showing that the
+remaining discrepancy is set by the learned model rather than by
+the accuracy of the training target.
 
-\paragraph{QNM accuracy.} The amortisation is clearest at high
-spin, where the coarse prior degrades fastest. For
-$a/M \ge 0.8$ ($20$ black holes) the best-of-suite prior
-frequency error is $4.71\%$, which the hybrid cuts to $0.38\%$,
-a $12\times$ improvement approaching the fine-solve floor of
-$0.02\%$ (Table~\ref{tab:kerr-summary},
-Fig.~\ref{fig:kerr-vs-spin}b). Pooled over all spins the median
-frequency error falls from $0.59\%$ to $0.33\%$, with the fine
-solve at $0.05\%$; near extremality, where the near-horizon
-oscillation of Eq.~\eqref{eq:kerr-rescale} is strongest and the
-coarse grid fails, the hybrid recovers more than an order of
-magnitude. The damping time is the harder channel
-(Fig.~\ref{fig:kerr-vs-spin}c), exactly as for the Zerilli
-surrogate (Sec.~\ref{sec:res-hyb}): pooled over spin the hybrid
-$\tau$ error ($1.52\%$) exceeds that of the coarse prior
-($0.52\%$), while the fine solve ($0.27\%$) shows that the
-residual correction, tuned to the field and its leading
-oscillation, does not consistently sharpen the exponential
-envelope. The operator restores the phase and amplitude of the
-field far better than its slowly varying decay rate, so $\tau$
-remains a fine-solve quantity and the surrogate is a
-frequency-and-field accelerator rather than a damping-time
-estimator.
+\paragraph{QNM accuracy.} The frequency improves in every spin bin.
+In the high-spin bin, its median error decreases from $4.71\%$ for
+the coarse prior to $0.38\%$ for the hFNO, a factor of $12$. The
+fine-solve extraction reaches $0.02\%$, so the hFNO remains above
+the estimator floor. Across the full test set, the median frequency
+error decreases from $0.59\%$ to $0.33\%$, compared with $0.05\%$
+for the fine solve.
 
-\paragraph{Verdict.} Taken together, the Kerr experiment shows
-that the hybrid concept is geometry-agnostic. The same
-coarse-plus-residual construction, retrained without a single
-fine-grid field in its loss, transfers from a static
-Schwarzschild wave equation to a rotating, complex,
-hyperboloidal Teukolsky field and still delivers an
-order-of-magnitude field improvement and sub-percent
-frequencies across the astrophysical spin range --- a
-generalisation that a per-black-hole PINN, retrained from
-scratch for every spin, does not provide.
+The damping time does not show the same improvement. Its median
+error increases from $0.52\%$ for the coarse prior to $1.52\%$ for
+the hFNO, and the hFNO is less accurate than the prior in every spin
+bin. The late-time floor in Fig.~\ref{fig:kerr-ringdown} is
+consistent with the gridwise MSE giving greater weight to the
+high-amplitude burst than to the low-amplitude exponential tail.
+
+\paragraph{Framework extension.} Taken together, these results show that
+this hybrid concept can also be applied to Kerr after retraining on
+Teukolsky data and adapting the model to the complex hyperboloidal
+field. The Kerr hFNO reduces the median field error in every spin bin
+and gives sub-percent median frequency errors across the sampled spin
+range without using fine-grid fields in its training loss. It does
+not improve the damping time, which remains limited by the late-time
+residual.
 
 \FloatBarrier

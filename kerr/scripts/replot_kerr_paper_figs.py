@@ -6,6 +6,7 @@ per_sample.json. Fields for the ringdown/pointwise are reconstructed from the
 downloaded test corpus + model.pt (no eval re-run).
 """
 from __future__ import annotations
+import argparse
 import json
 import os
 import sys
@@ -26,11 +27,10 @@ import torch
 from kerr.src.hybrid_data_pipe import load_split, build_upsample_matrix, assemble
 from kerr.src.hybrid_fno import build_hybrid_fno
 
-NPZ = r"C:\Users\jonat\Downloads\dataset_test_n128.npz"
-MODEL = r"C:\Users\jonat\Downloads\model.pt"
-PER_SAMPLE = os.path.join(_ROOT, "kerr", "outputs", "_run2_download", "per_sample.json")
-FIGS = os.path.join(_ROOT, "outputs", "kerr", "figs")
-os.makedirs(FIGS, exist_ok=True)
+DEFAULT_PER_SAMPLE = os.path.join(
+    _ROOT, "kerr", "outputs", "_run2_download", "per_sample.json"
+)
+DEFAULT_FIGS = os.path.join(_ROOT, "outputs", "kerr", "figs")
 
 # Schwarzschild plotting convention (matches outputs/hybrid + outputs/pinn):
 C_FINE = "C0"      # reference / fine  -> blue solid
@@ -43,8 +43,8 @@ CFG = {"fno": {"modes_tau": 64, "modes_sigma": 24, "hidden_channels": 48,
                "positional_embedding": "grid"}}
 
 
-def reconstruct_canonical():
-    te = load_split(NPZ, "test")
+def reconstruct_canonical(dataset_path, model_path):
+    te = load_split(dataset_path, "test")
     W_k4 = build_upsample_matrix(te["sigma_k4"], te["sigma_fine"], k=5)
     W_k2 = build_upsample_matrix(te["sigma_k2"], te["sigma_fine"], k=5)
     W_k8 = build_upsample_matrix(te["sigma_k8"], te["sigma_fine"], k=5)
@@ -55,7 +55,7 @@ def reconstruct_canonical():
     ic = int(np.argmin(np.abs(aM - 0.7)))
 
     model = build_hybrid_fno(CFG)
-    sd = torch.load(MODEL, map_location="cpu", weights_only=False)
+    sd = torch.load(model_path, map_location="cpu", weights_only=False)
     model.load_state_dict(sd)
     model.eval()
     with torch.no_grad():
@@ -71,7 +71,7 @@ def reconstruct_canonical():
                 hyb_re=hyb_re, hyb_im=hyb_im)
 
 
-def plot_ringdown(f):
+def plot_ringdown(f, fig_dir):
     tau, scri = f["tau"], f["scri"]
     fine = f["fine_re"][:, scri]
     prior = f["up4_re"][:, scri]
@@ -97,11 +97,11 @@ def plot_ringdown(f):
     ax2.legend(frameon=False)
     ax2.grid(True, alpha=0.3)
     fig.tight_layout()
-    fig.savefig(os.path.join(FIGS, "hybrid_ringdown_scri.png"), dpi=200)
+    fig.savefig(os.path.join(fig_dir, "hybrid_ringdown_scri.png"), dpi=200)
     plt.close(fig)
 
 
-def plot_pointwise(f):
+def plot_pointwise(f, fig_dir):
     def cmag(are, aim, bre, bim):
         return np.abs(np.sqrt(are ** 2 + aim ** 2) - np.sqrt(bre ** 2 + bim ** 2))
     ep = cmag(f["up4_re"], f["up4_im"], f["fine_re"], f["fine_im"])
@@ -117,16 +117,16 @@ def plot_pointwise(f):
         plt.ylabel(r"$\tau/M$")
         plt.title(rf"Kerr {name} pointwise error ($a/M={f['aM']:.2f}$)")
         plt.tight_layout()
-        plt.savefig(os.path.join(FIGS, f"hybrid_pointwise_error_{name}.png"), dpi=200)
+        plt.savefig(os.path.join(fig_dir, f"hybrid_pointwise_error_{name}.png"), dpi=200)
         plt.close()
 
 
-def load_rows():
-    with open(PER_SAMPLE) as fh:
+def load_rows(per_sample_path):
+    with open(per_sample_path) as fh:
         return json.load(fh)
 
 
-def plot_vs_spin(rows):
+def plot_vs_spin(rows, fig_dir):
     aM = np.array([r["a_over_M"] for r in rows])
 
     # field rel-L2 vs spin (best-of-suite is not applicable to the field; the
@@ -142,7 +142,7 @@ def plot_vs_spin(rows):
     plt.legend(frameon=False, fontsize=8)
     plt.title(r"Field accuracy vs spin")
     plt.tight_layout()
-    plt.savefig(os.path.join(FIGS, "hybrid_field_vs_spin.png"), dpi=200)
+    plt.savefig(os.path.join(fig_dir, "hybrid_field_vs_spin.png"), dpi=200)
     plt.close()
 
     # M-omega error vs spin (best-of-suite, matches the results table)
@@ -156,7 +156,7 @@ def plot_vs_spin(rows):
     plt.legend(frameon=False, fontsize=8)
     plt.title(r"Frequency accuracy vs spin (at $\mathcal{I}^{+}$)")
     plt.tight_layout()
-    plt.savefig(os.path.join(FIGS, "hybrid_qnm_vs_spin.png"), dpi=200)
+    plt.savefig(os.path.join(fig_dir, "hybrid_qnm_vs_spin.png"), dpi=200)
     plt.close()
 
     # tau error vs spin (best-of-suite)
@@ -170,7 +170,7 @@ def plot_vs_spin(rows):
     plt.legend(frameon=False, fontsize=8)
     plt.title(r"Damping-time accuracy vs spin (at $\mathcal{I}^{+}$)")
     plt.tight_layout()
-    plt.savefig(os.path.join(FIGS, "hybrid_tau_vs_spin.png"), dpi=200)
+    plt.savefig(os.path.join(fig_dir, "hybrid_tau_vs_spin.png"), dpi=200)
     plt.close()
 
 
@@ -226,12 +226,27 @@ def print_table(rows):
           Counter(r["qnm"]["hybrid"]["best_tau_method"] for r in rows).most_common())
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Regenerate Kerr paper figures from saved test and model artifacts."
+    )
+    parser.add_argument("--dataset", required=True, help="Path to dataset_test.npz")
+    parser.add_argument("--model", required=True, help="Path to model.pt")
+    parser.add_argument("--per-sample", default=DEFAULT_PER_SAMPLE,
+                        help="Path to per_sample.json")
+    parser.add_argument("--fig-dir", default=DEFAULT_FIGS,
+                        help="Output directory for regenerated figures")
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    rows = load_rows()
+    args = parse_args()
+    os.makedirs(args.fig_dir, exist_ok=True)
+    rows = load_rows(args.per_sample)
     print_table(rows)
-    plot_vs_spin(rows)
+    plot_vs_spin(rows, args.fig_dir)
     print("[replot] vs-spin figures written")
-    f = reconstruct_canonical()
-    plot_ringdown(f)
-    plot_pointwise(f)
-    print("[replot] ringdown + pointwise figures written ->", FIGS)
+    f = reconstruct_canonical(args.dataset, args.model)
+    plot_ringdown(f, args.fig_dir)
+    plot_pointwise(f, args.fig_dir)
+    print("[replot] ringdown + pointwise figures written ->", args.fig_dir)

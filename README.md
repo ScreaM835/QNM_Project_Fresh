@@ -1,128 +1,154 @@
-# A Unified Physics-Informed Neural Network Framework for Schwarzschild Quasi-Normal Modes Extraction
+# Hybrid Neural Methods for Black-Hole Ringdown
 
-*(Project 32 — Even parity Zerilli, ℓ=2)*
+This repository accompanies the project report
+*A Unified Deep-Learning Framework for Schwarzschild Quasi-Normal-Mode
+Extraction*. It reproduces the time-domain PINN calculation of Patel,
+Aykutalp and Laguna, improves that PINN, and develops a hybrid Fourier neural
+operator (hFNO) for Schwarzschild and Kerr perturbations.
 
-This repository is a **reproducibility-first** implementation of the time-domain
-Schwarzschild perturbation problem used in Project 32, focusing on the **even-parity
-(Zerilli) potential** with **ℓ = 2**, and extracting the corresponding quasi-normal mode (QNM)
-frequency and damping time from the ringdown.
+## Scientific Scope
 
-The implementation follows the methodology and parameter choices described in:
+The report contains four numerical tests:
 
-- Nirmal Patel, Aycin Aykutalp, Pablo Laguna, *Calculating Quasi-Normal Modes of Schwarzschild Black Holes with Physics Informed Neural Networks* (time-domain PINN + FD reference)
+1. A faithful PINN reproduction on the Schwarzschild `l=2` Zerilli and
+   Regge-Wheeler equations.
+2. An enhanced Zerilli PINN using residual-greedy sampling and a longer
+   L-BFGS phase.
+3. A Schwarzschild hFNO that corrects a coarse finite-difference trajectory
+   towards a label-free Richardson target across `(M, x0, sigma)`.
+4. A Kerr hFNO adapted to the complex hyperboloidal Teukolsky field and
+   trained across `(a/M, r0, w)` for the `(l,m,n)=(4,2,0)` mode.
 
-## What you get
+All fields are analysed with the post-hoc QNM extraction framework in
+`src/qnm.py` and `kerr/src/qnm_ensemble_kerr.py`. The reported errors are
+benchmarked against Leaver values supplied directly or through the `qnm`
+package.
 
-- A **finite-difference (FD)** time-domain solver for the 1+1 master equation.
-- A **PyTorch PINN** solver with:
-  - PDE residual loss,
-  - **gradient-enhanced** residual losses (∂x residual and ∂t residual),
-  - initial condition + initial velocity losses,
-  - radiative (Sommerfeld) boundary losses.
-- QNM extraction tools:
-  - Method 1: FFT for ω + log-peak linear fit for τ,
-  - Method 2: direct nonlinear least-squares fit of `A exp(-t/τ) cos(ω t + φ)`.
+## Main Results
 
-## Quickstart
+| Test | Principal result |
+|---|---|
+| Faithful PINN reproduction | RL2 `2.61%` (Zerilli) and `2.67%` (Regge-Wheeler), versus `28.06%` and `23.59%` reported by Patel et al. |
+| Enhanced PINN | RL2 `0.58%`; best-of-suite QNM errors `0.029%` in frequency and `1.99%` in damping time |
+| Schwarzschild hFNO | Mean RL2 `13.39% -> 1.85%`; field MSE reduced by `46x` over 100 test configurations |
+| Kerr hFNO | Median RL2 `59.5% -> 0.78%`; high-spin frequency error `4.71% -> 0.38%` over 128 test configurations |
 
-**Important:** the config defaults to an *outgoing* Gaussian pulse initial velocity (\(\Phi_t = -\Phi_x\)) because this reproduces the expected \(\ell=2\) QNM parameters. The paper’s printed Eq. (23) appears to contain a squared term; if you want to follow it literally, set `initial_data.velocity_profile: paper`.
+The Kerr damping-time error increases from `0.52%` for the prior to `1.52%`
+for the hFNO. This is retained as a measured limitation of the present global
+field objective.
 
+## Environment
 
-### 1) Create an environment
-
-You can use either `venv` or `conda`. Example with `venv`:
-
-```bash
+```text
 python -m venv .venv
-# Linux/macOS:
-source .venv/bin/activate
-# Windows (PowerShell):
-# .venv\Scripts\Activate.ps1
+```
 
+Activate the environment, then install dependencies:
+
+```text
 pip install -r requirements.txt
 ```
 
-### 2) Run a quick sanity check (recommended first)
+On Windows PowerShell, PINN runs also require UTF-8 console output:
 
-```bash
+```powershell
+$env:DDE_BACKEND = "pytorch"
+$env:PYTHONIOENCODING = "utf-8"
+```
+
+Run the small end-to-end check before any full experiment:
+
+```text
 python scripts/run_pinn.py --config configs/quick_test.yaml
 python scripts/extract_qnm.py --config configs/quick_test.yaml --source fd
 ```
 
-### 3) Run the FD baseline (ground truth)
+## Schwarzschild PINNs
 
-
-```bash
-python scripts/run_fd.py --config configs/zerilli_l2.yaml
+```text
+python scripts/run_pinn.py --config configs/zerilli_l2_paper.yaml
+python scripts/run_pinn.py --config configs/regge_wheeler_l2_paper.yaml
+python scripts/run_pinn.py --config configs/zerilli_l2_greedy_f03_lbfgs30k.yaml
 ```
 
-This writes an `.npz` file to `outputs/fd/` containing `x`, `t`, `phi`, and the potential data.
+These commands generate the FD comparison, trained PINN fields, metrics and
+paper-style plots under `outputs/pinn/`. QNM extraction can be rerun with
+`scripts/extract_qnm.py`; use `--help` for the optional ESPRIT and plateau
+scans.
 
-### FD refinement diagnostic (isolates FD dispersion / phase error)
+## Schwarzschild hFNO
 
-If you want to check whether a visible FD–PINN mismatch (commonly near the leading edge around the
-potential barrier, e.g. near **x≈0** at **t/M=30**) could be partly due to **FD dispersion**, run the
-FD solver on a refined grid.
+Build the two nested-grid corpora:
 
-This repo includes a refinement config that halves the mesh spacings while keeping the CFL factor
-fixed (dt/dx = 0.5):
-
-```bash
-# coarse (dx=0.2, dt=0.1)
-python scripts/run_fd.py --config configs/zerilli_l2.yaml
-
-# refined (dx=0.1, dt=0.05)
-python scripts/run_fd.py --config configs/zerilli_l2_fd_refined.yaml
+```text
+python scripts/build_hybrid_dataset.py --config configs/hybrid_sw_dataset_t100.yaml --k 4 --out outputs/hybrid/dataset_sw_k4_t100.npz
+python scripts/build_hybrid_dataset.py --config configs/hybrid_sw_dataset_t100.yaml --k 2 --out outputs/hybrid/dataset_sw_k2_t100.npz
 ```
 
-Then compare **FD(coarse)** vs **FD(refined)**:
+Train, evaluate and regenerate figures:
 
-```bash
-python scripts/compare_fd_refinement.py \
-  --fd_coarse  outputs/fd/zerilli_l2_fd.npz \
-  --fd_refined outputs/fd/zerilli_l2_fd_refined_fd.npz \
-  --times 10,20,30,40 \
-  --xlim -20 20
+```text
+python scripts/train_hybrid_fno.py --config configs/hybrid_sw_gate_s1em3_t100.yaml
+python scripts/eval_hybrid_sw.py --config configs/hybrid_sw_gate_s1em3_t100.yaml --xq 10 --t_end 100
+python scripts/eval_hybrid_protocol1.py --config configs/hybrid_sw_gate_s1em3_t100.yaml --dataset-config configs/hybrid_sw_dataset_t100.yaml --t_end_m4 100
+python scripts/make_hybrid_paper_figs.py --config configs/hybrid_sw_gate_s1em3_t100.yaml --dataset-cfg configs/hybrid_sw_dataset_t100.yaml
 ```
 
-Plots and a small metrics summary are written to `outputs/diagnostics/`.
+The fine evolution has `1001 x 1000` spatial point/time-step updates and the
+deployed `k=4` prior has `251 x 250`, a finite-difference point-update ratio of
+`15.95`. This is not an end-to-end runtime measurement because interpolation
+and FNO evaluation are additional deployment costs.
 
-### 4) Train the PINN and evaluate against FD
+## Kerr hFNO
 
-```bash
-python scripts/run_pinn.py --config configs/zerilli_l2.yaml
+The Kerr pipeline and its artifact requirements are documented in
+[`kerr/README.md`](kerr/README.md). The principal entry points are:
+
+```text
+python kerr/scripts/build_kerr_dataset_lscan.py --help
+python kerr/scripts/train_eval_hybrid_kerr.py --config kerr/configs/hybrid_kerr_l4_decoupled.yaml
 ```
 
-By default this:
-- samples training points,
-- trains with Adam then LBFGS,
-- evaluates the trained PINN on the FD grid,
-- writes metrics + plots to `outputs/pinn/`.
+## Artifact Availability
 
-### 5) Extract QNMs from the ringdown
+The tracked Schwarzschild hFNO directory
+`outputs/hybrid/fno_sw_gate_s1em3_t100/` contains its checkpoints, metrics and
+figures. The tracked Kerr directory `kerr/outputs/_run2_download/` contains the
+reported `history.json`, `report.json`, `per_sample.json` and figure set.
 
-```bash
-python scripts/extract_qnm.py --config configs/zerilli_l2.yaml --source fd
-python scripts/extract_qnm.py --config configs/zerilli_l2.yaml --source pinn
+The full Kerr training/validation/test corpora and `model.pt` are too large for
+this repository and are not present in the current checkout. They can be rebuilt
+with `kerr/scripts/build_kerr_dataset_lscan.py` and
+`kerr/scripts/train_eval_hybrid_kerr.py`. Consequently, the reported Kerr
+metrics and figures are auditable from the tracked JSON files, while complete
+field regeneration requires rebuilding or separately supplying those large
+artifacts.
+
+## Build the Report
+
+From `paper/`, run:
+
+```text
+pdflatex main.tex
+bibtex main
+pdflatex main.tex
+pdflatex main.tex
 ```
 
-Outputs are saved under `outputs/qnm/`.
+The separate executive summary is built with:
 
-## Notes on reproducibility
+```text
+pdflatex executive_summary.tex
+```
 
-- PINNs are sensitive to random seeds and optimizer settings. The config exposes:
-  - number of residual/IC/BC points,
-  - network widths,
-  - Adam/LBFGS iteration counts,
-  - loss weights (λ vector),
-  - residual resampling period.
+## Repository Layout
 
-## Repository layout
-
-- `src/` — library code
-- `scripts/` — runnable entry points
-- `configs/` — experiment configs
-- `report/` — dissertation-style draft text you can extend
-- `outputs/` — generated output (created when you run scripts)
+- `src/`: Schwarzschild solvers, PINNs, neural operators and extractors
+- `scripts/`: dataset, training, evaluation and plotting entry points
+- `configs/`: reproducible Schwarzschild experiment configurations
+- `kerr/`: hyperboloidal Teukolsky solver and Kerr hFNO pipeline
+- `outputs/`: tracked report metrics, figures and selected checkpoints
+- `paper/`: report, executive summary and bibliography
+- `results/`: consolidated metric records used for consistency checks
 
 

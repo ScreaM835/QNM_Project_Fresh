@@ -17,8 +17,13 @@ from .utils import ensure_dir
 # models). Callers may override per plot, but the defaults are the house scale.
 ABS_DIFF_YMAX = 0.02           # abs-difference snapshot y-axis top (RW max 1.84e-2)
 SNAPSHOT_YLIM = (-0.85, 0.6)   # field-snapshot y-range
-HEATMAP_VMIN = 1.0e-6          # pointwise-error log colour floor
-HEATMAP_VMAX = 2.1e-2          # pointwise-error log colour ceiling (RW max 2.09e-2)
+# Pointwise-error heatmap colour scale. Pinned to the irreplaceable HPC-trained
+# enhanced-forward PINN heatmap (outputs/pinn/zerilli_l2_greedy_f03_lbfgs30k/
+# error_heatmap.png, CSD3 SLURM run, HPC access now gone) since that figure
+# cannot be regenerated -- every other heatmap is matched to it instead, not
+# the other way around. Also used verbatim by scripts/make_hybrid_paper_figs.py.
+HEATMAP_VMAX = 1.11e-1         # pointwise-error log colour ceiling
+HEATMAP_VMIN = HEATMAP_VMAX * 1e-4   # pointwise-error log colour floor (1.11e-5)
 
 
 def plot_snapshots(
@@ -259,7 +264,10 @@ def plot_error_heatmap(
             norm=LogNorm(vmin=vmin, vmax=vmax),
         )
         cbar = fig.colorbar(im, ax=ax, pad=0.02)
-        cbar.set_label(rf"$|\Phi_{{\mathrm{{FD}}}} - \Phi_{{\mathrm{{{model_label}}}}}|$ (log scale)")
+        cbar.set_label(
+            rf"$|\Phi_{{\mathrm{{FD}}}} - \Phi_{{\mathrm{{{model_label}}}}}|$"
+            rf"  (shared log scale, max={vmax:.2e})"
+        )
 
     ax.set_xlabel(r"$x_* / M$")
     ax.set_ylabel("t / M")

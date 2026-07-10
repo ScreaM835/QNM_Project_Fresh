@@ -246,13 +246,11 @@ def fig_abs_diff_snapshots():
     c = load_cache()
     x = c["x"]; t = c["t"]; pf = c["psi_fine"]; ph = c["psi_hybrid"]
     times = [tj for tj in SNAP_TIMES if tj <= float(t.max()) + 1e-6]
-    tstr = r",\,".join(f"{tj:.0f}" for tj in times)
     out = OUT_DIR / "hybrid_abs_diff_snapshots.png"
     pinn_plot.plot_abs_diff_snapshots(
         x=x, t=t, phi_fd=pf, phi_pinn=ph, times=times,
         outpath=str(out),
-        title=(r"$|\Phi_{\mathrm{FD\,fine}} - \Phi_{\mathrm{Hybrid}}|$  "
-               r"at $t/M \in \{" + tstr + r"\}$ (canonical BH)"),
+        title="Absolute difference — Hybrid surrogate (canonical BH)",
     )
     print(f"[fig] {out}")
 
