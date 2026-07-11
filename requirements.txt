@@ -5,3 +5,5 @@ torch>=2.1
 tqdm>=4.66
 pyyaml>=6.0
 deepxde>=1.11.0
+neuraloperator>=2.0.0
+qnm>=0.4.4

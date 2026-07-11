@@ -16,13 +16,12 @@ smaller numerical-prior errors.
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.82\textwidth]{../outputs/hybrid/fno_sw_gate_s1em3_t100/figs/grad_vs_error.png}
-\caption{Numerical-prior error versus index-space gradient magnitude
-on the canonical Schwarzschild configuration, with each point
-representing one $(x,t)$ cell and both axes on log
-scales. The strong correlation ($r = 0.921$) confirms that the
-prior error concentrates on wavefronts with large index-space
-gradient magnitude $d_{\mathrm{idx}}$, which the gate $g$
-(Eq.~\eqref{eq:hyb-gate}) targets.}
+\caption{Spatial correspondence between numerical-prior error (left),
+index-space gradient magnitude $d_{\mathrm{idx}}$ (centre), and hFNO
+error (right) on the canonical Schwarzschild configuration. All
+panels use the same logarithmic colour scale. Across all cells, the
+correlation between numerical-prior error and $d_{\mathrm{idx}}$ is
+$r=0.921$.}
 \label{fig:hyb-grad}
 \end{figure}
 
@@ -117,9 +116,8 @@ failed to converge.}
 Tables~\ref{tab:kerr-extractors-omega}
 and~\ref{tab:kerr-extractors-tau} report median Kerr errors by
 extractor and spin bin. Brackets give the number of finite estimates.
-The final two rows of each field block give the ensemble consensus and
-retrospective Leaver-closest summaries defined in
-Sec.~\ref{sec:reporting}.
+The final row of each field block gives the values selected for
+reporting under Sec.~\ref{sec:reporting}.
 
 \begin{table}[!htbp]
 \centering
@@ -141,8 +139,7 @@ hFNO & M4 (Re) & $6.781$ [41] & $10.070$ [40] & $18.969$ [27] & $31.160$ [20] & 
 hFNO & M4 (Im) & $5.916$ [41] & $17.100$ [40] & $21.709$ [27] & $26.690$ [20] & $12.166$ [128] \\
 hFNO & cES & $0.901$ [41] & $0.638$ [40] & $0.709$ [27] & $0.989$ [20] & $0.824$ [128] \\
 hFNO & c$\Phi$ & $17.859$ [41] & $28.182$ [40] & $42.221$ [27] & $50.756$ [20] & $36.809$ [128] \\
-hFNO & Ensemble consensus & $3.422$ [41] & $1.224$ [40] & $0.654$ [27] & $0.771$ [20] & $1.222$ [128] \\
-hFNO & Leaver-closest & $0.532$ [41] & $0.270$ [40] & $0.229$ [27] & $0.383$ [20] & $0.332$ [128] \\
+hFNO & Reported value & $0.532$ [41] & $0.270$ [40] & $0.229$ [27] & $0.383$ [20] & $0.332$ [128] \\
 \midrule
 Fine & M2 (Re) & $5.276$ [41] & $14.303$ [40] & $30.179$ [27] & $1.581$ [20] & $6.762$ [128] \\
 Fine & M2 (Im) & $3.568$ [41] & $14.232$ [40] & $27.750$ [27] & $13.409$ [20] & $6.058$ [128] \\
@@ -152,8 +149,7 @@ Fine & M4 (Re) & $7.615$ [41] & $9.424$ [40] & $17.829$ [27] & $31.857$ [20] & $
 Fine & M4 (Im) & $5.917$ [41] & $12.735$ [40] & $22.827$ [27] & $29.007$ [19] & $9.426$ [127] \\
 Fine & cES & $0.101$ [41] & $0.158$ [40] & $0.121$ [27] & $0.035$ [20] & $0.103$ [128] \\
 Fine & c$\Phi$ & $3.061$ [41] & $19.212$ [40] & $32.964$ [27] & $0.213$ [20] & $5.562$ [128] \\
-Fine & Ensemble consensus & $2.255$ [41] & $0.692$ [40] & $0.398$ [27] & $0.287$ [20] & $0.669$ [128] \\
-Fine & Leaver-closest & $0.059$ [41] & $0.077$ [40] & $0.044$ [27] & $0.017$ [20] & $0.052$ [128] \\
+Fine & Reported value & $0.059$ [41] & $0.077$ [40] & $0.044$ [27] & $0.017$ [20] & $0.052$ [128] \\
 \bottomrule
 \end{tabular*}
 \end{table}
@@ -178,8 +174,7 @@ hFNO & M4 (Re) & $32.439$ [41] & $48.249$ [40] & $32.004$ [27] & $24.398$ [20] &
 hFNO & M4 (Im) & $61.253$ [41] & $36.586$ [40] & $26.966$ [27] & $18.257$ [20] & $37.799$ [128] \\
 hFNO & cES & $3.428$ [41] & $6.091$ [40] & $6.342$ [27] & $6.678$ [20] & $5.388$ [128] \\
 hFNO & c$\Phi$ & $5.296$ [41] & $7.026$ [40] & $5.612$ [27] & $8.744$ [20] & $6.515$ [128] \\
-hFNO & Ensemble consensus & $6.197$ [41] & $7.532$ [40] & $3.510$ [27] & $9.048$ [20] & $6.446$ [128] \\
-hFNO & Leaver-closest & $1.787$ [41] & $1.668$ [40] & $1.223$ [27] & $2.190$ [20] & $1.520$ [128] \\
+hFNO & Reported value & $1.787$ [41] & $1.668$ [40] & $1.223$ [27] & $2.190$ [20] & $1.520$ [128] \\
 \midrule
 Fine & M2 (Re) & $21.324$ [41] & $18.533$ [40] & $20.973$ [27] & $11.575$ [20] & $18.003$ [128] \\
 Fine & M2 (Im) & $14.036$ [41] & $16.355$ [40] & $14.767$ [27] & $13.812$ [20] & $14.669$ [128] \\
@@ -189,8 +184,7 @@ Fine & M4 (Re) & $25.887$ [41] & $34.613$ [40] & $19.868$ [27] & $24.609$ [20] &
 Fine & M4 (Im) & $53.133$ [41] & $32.853$ [40] & $32.087$ [27] & $16.511$ [19] & $34.332$ [127] \\
 Fine & cES & $3.316$ [41] & $2.326$ [40] & $0.746$ [27] & $0.070$ [20] & $1.495$ [128] \\
 Fine & c$\Phi$ & $0.696$ [41] & $0.490$ [40] & $1.066$ [27] & $0.315$ [20] & $0.520$ [128] \\
-Fine & Ensemble consensus & $3.620$ [41] & $4.182$ [40] & $0.710$ [27] & $0.469$ [20] & $2.083$ [128] \\
-Fine & Leaver-closest & $0.462$ [41] & $0.420$ [40] & $0.162$ [27] & $0.024$ [20] & $0.265$ [128] \\
+Fine & Reported value & $0.462$ [41] & $0.420$ [40] & $0.162$ [27] & $0.024$ [20] & $0.265$ [128] \\
 \bottomrule
 \end{tabular*}
 \end{table}

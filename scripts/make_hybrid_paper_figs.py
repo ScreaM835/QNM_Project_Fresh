@@ -343,16 +343,16 @@ def fig_grad_vs_error():
 
     fig, axes = plt.subplots(1, 3, figsize=(16, 5), sharey=True)
     _panel(axes[0], err_base,
-           r"(1) baseline err  $|\Phi_{\rm fine}-\Phi_{\rm coarse\text{-}up}|$")
+            r"(1) numerical-prior error  $|\Phi_{\rm fine}-\Phi_{\rm prior}|$")
     im = _panel(axes[1], g,
-                r"(2) FNO feature  $|\nabla\Phi_{\rm prior}|$ (unit spacing)")
+              r"(2) gradient magnitude  $d_{\rm idx}$ (unit spacing)")
     _panel(axes[2], err_hyb,
-           r"(3) hybrid err  $|\Phi_{\rm fine}-\Phi_{\rm hybrid}|$")
+            r"(3) hFNO error  $|\Phi_{\rm fine}-\Phi_{\rm hFNO}|$")
     axes[0].set_ylabel("t / M")
     cbar = fig.colorbar(im, ax=axes, pad=0.015, fraction=0.025)
     cbar.set_label(f"shared log scale  [{vmin:.2e}, {vmax:.2e}]")
-    fig.suptitle("grad-channel diagnostic: pointwise error vs |grad prior| "
-                 "(canonical BH)", fontsize=12)
+    fig.suptitle("Gradient-gate diagnostic, canonical Schwarzschild configuration",
+                 fontsize=12)
     out = OUT_DIR / "grad_vs_error.png"
     fig.savefig(out, dpi=200, bbox_inches="tight"); plt.close(fig)
     print(f"[fig] {out}")

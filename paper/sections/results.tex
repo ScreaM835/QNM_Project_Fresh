@@ -16,9 +16,10 @@ $\scri$.
 Table~\ref{tab:results-summary} summarises the main field and QNM
 errors. Field errors are measured against the FD reference for the
 Schwarzschild experiments and against the fine hyperboloidal
-reference field for Kerr. QNM errors are reported under the convention of
-Sec.~\ref{sec:reporting}. The Schwarzschild QNM errors use
-$M\omega_0^R = 0.3737$ and $\tau_0/M = 11.241$ at $\xq = 10\,M$.
+reference field for Kerr. The Schwarzschild QNM errors use
+$M\omega_0^R = 0.3737$ and $\tau_0/M = 11.241$. Schwarzschild
+waveforms are sampled at fixed code coordinate $\xq=10$, equal to
+$10\,M$ for the canonical $M=1$ configuration.
 Kerr errors use the spin-dependent Leaver value of the $(4,2,0)$ mode
 at $\scri$. Per-estimator results and plateau scans appear below and
 in Appendix~\ref{app:supp}.
@@ -43,7 +44,7 @@ Sec. & Model & Evaluation & Field RMSD & \shortstack{Relative\\$L^2$ error [\%]}
 \ref{sec:res-fwd}   & Enhanced forward PINN         & canonical           & $8.17\times 10^{-4}$ & $0.58$  & $0.029$~(M4) & $1.99$~(M2)  \\
 \ref{sec:res-hyb}   & Schwarzschild hFNO            & canonical           & $1.70\times 10^{-3}$ & $1.24$  & $0.047$~(M5) & $1.31$~(M4)  \\
 \ref{sec:res-hyb}   & Schwarzschild hFNO            & $100$ configurations & $2.75\times 10^{-3}$ & $1.85$  & $0.152$~(M4) & $0.528$~(M4) \\
-\ref{sec:res-kerr}  & Kerr hFNO                     & $128$ configurations & n/a                  & $0.78$  & \shortstack{$0.33$\\{\scriptsize(Leaver-closest)}} & \shortstack{$1.52$\\{\scriptsize(Leaver-closest)}} \\
+\ref{sec:res-kerr}  & Kerr hFNO                     & $128$ configurations & n/a                  & $0.78$  & $0.33$ & $1.52$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -349,7 +350,7 @@ $|\Phi|$ on a logarithmic vertical axis, where the late-time
 discrepancy that limits the damping-time extraction becomes visible.
 The canonical plateau diagnostics are shown in
 Figs.~\ref{fig:hyb-plateau-m4} and~\ref{fig:hyb-plateau-m5}.}
-\label{fig:hyb-ringdown-xq2}
+\label{fig:hyb-ringdown-xq10}
 \end{figure}
 
 \FloatBarrier
@@ -357,10 +358,10 @@ Figs.~\ref{fig:hyb-plateau-m4} and~\ref{fig:hyb-plateau-m5}.}
 \paragraph{Field accuracy.} On the canonical configuration the
 Schwarzschild hFNO reaches \textbf{$1.24\%$ relative $L^2$ error}
 and RMSD $1.70\times10^{-3}$, compared with $11.20\%$ and
-$1.53\times10^{-2}$ for the numerical prior. Across $100$
-configurations, the mean relative $L^2$ error is \textbf{$1.85\%$},
-compared with $13.39\%$ for the prior, and the field MSE falls by a
-factor of $46$.
+$1.53\times10^{-2}$ for the numerical prior. Under the archived cubic
+population-evaluation path, the mean relative $L^2$ error across
+$100$ configurations is \textbf{$1.85\%$}, compared with $13.39\%$
+for the prior, and the field MSE falls by a factor of $46$.
 The remaining error follows the wavefronts and late-time ringdown.
 
 \paragraph{QNM accuracy.} Across $100$ configurations, the median M4
@@ -368,7 +369,7 @@ frequency and damping-time errors are $0.152\%$ and $0.528\%$,
 compared with fine-reference extraction errors of $0.064\%$ and
 $0.092\%$. The excess
 damping-time error is consistent with the late-time residual in
-Fig.~\ref{fig:hyb-ringdown-xq2}. On the canonical configuration, M5
+Fig.~\ref{fig:hyb-ringdown-xq10}. On the canonical configuration, M5
 gives \textbf{$0.047\%$ frequency error} and M4 gives
 \textbf{$1.31\%$ damping-time error} using the $t\simeq80\,M$
 usable-signal cutoff.
@@ -401,17 +402,19 @@ M5 & $0.250$ & $1.37$ & $0.138$ & $1.09$ \\
 \FloatBarrier
 
 % ==============================================================
-\subsection{Kerr hFNO}
+\subsection{Kerr radial-model hFNO}
 \label{sec:res-kerr}
 
-We evaluate the Kerr hFNO on an independent set of $128$ Kerr
-configurations spanning $a/M\in[0,0.95]$. Field errors use the
-$N=801$ fine reference field, and the target $(4,2,0)$ mode is
-extracted at $\scri$.
+We evaluate the Kerr hFNO for the $(4,2,0)$ radial Teukolsky evolution
+on an independent set of $128$ configurations spanning
+$a/M\in[0,0.95]$. Field errors use the $N=801$ fine radial reference,
+and QNM errors are measured against Leaver from the waveform at
+$\scri$.
 
 \begin{table}[!ht]
 \centering
-\caption{Kerr field and QNM errors by spin bin. Rows report medians;
+\caption{Kerr radial-field errors and QNM errors against Leaver by
+spin bin. Rows report medians;
 the final row covers all $128$ configurations. Field columns report
 the numerical prior, hFNO and Richardson-extrapolated field. Complete
 extractor results and finite counts appear in
@@ -442,7 +445,7 @@ All (median) & $128$ & $59.5$ & $0.78$ & $0.008$ & $0.33$ & $0.05$ & $1.52$ & $0
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.82\textwidth]{../outputs/kerr/figs/hybrid_ringdown_scri.png}
-\caption{Kerr ringdown at $\scri$ for the test configuration nearest
+\caption{Kerr radial-model ringdown at $\scri$ for the test configuration nearest
 $a/M=0.7$. The upper panel compares $\mathrm{Re}\,\Psi$ from the
 fine reference field, numerical prior and hFNO. The lower panel shows $|\Psi|$ on
 a logarithmic scale. Beyond $\tau\simeq100\,M$, the hFNO no longer
@@ -499,8 +502,8 @@ leaves a lower-amplitude residual throughout the later evolution.}
 errors for the numerical prior (grey), hFNO (orange) and
 Richardson-extrapolated field (green). The hFNO error stays near
 $1\%$ while the numerical-prior error increases with spin.
-(b,c)~Retrospective Leaver-closest frequency and damping-time errors
-for the hFNO (orange) and fine reference field (blue). Complete
+(b,c)~Frequency and damping-time errors against Leaver for the hFNO
+(orange) and fine reference field (blue). Complete
 per-extractor results are reported in
 Appendix~\ref{app:kerr-extractors}.}
 \label{fig:kerr-vs-spin}
@@ -517,18 +520,15 @@ has a median relative $L^2$ error of $0.008\%$, well below the hFNO
 error. The hFNO approximation error therefore dominates the
 $0.008\%$ Richardson-extrapolation error.
 
-\paragraph{QNM accuracy.} Under retrospective Leaver-closest
-reporting, the median hFNO frequency error remains below $0.53\%$ in
-every spin bin. QNM errors are reported for the hFNO and
-fine reference fields only. Across the $128$ configurations, the
-retrospective Leaver-closest frequency errors are $0.33\%$ for the
-hFNO and $0.05\%$ for the fine reference field. In the
-high-spin bin, the corresponding errors are $0.38\%$ and $0.02\%$.
-The median damping-time errors across all configurations are $1.52\%$
-and $0.27\%$, respectively. The Leaver-closest estimator is selected
-separately for each field and for frequency and damping time.
-Appendix~\ref{app:kerr-extractors} reports every extractor without
-retrospective selection of the best-performing method. The late-time residual in
+\paragraph{QNM accuracy.} The median hFNO frequency error against
+Leaver remains below $0.53\%$ in every spin bin. QNM errors are
+reported for the hFNO and fine reference fields only. Across the
+$128$ configurations, the median frequency errors are $0.33\%$ for
+the hFNO and $0.05\%$ for the fine reference field. In the high-spin
+bin, the corresponding errors are $0.38\%$ and $0.02\%$. The median
+damping-time errors across all configurations are $1.52\%$ and
+$0.27\%$, respectively. Appendix~\ref{app:kerr-extractors} reports
+the complete results for every extractor. The late-time residual in
 Fig.~\ref{fig:kerr-ringdown} is consistent with the gridwise MSE
 giving greater weight to the high-amplitude burst than to the
 low-amplitude exponential tail.

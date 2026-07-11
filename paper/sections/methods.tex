@@ -11,8 +11,9 @@ on Schwarzschild mass and initial-data configurations and on Kerr spin
 and initial-pulse configurations. For each configuration, the
 finite-difference solver first computes a coarse-grid solution, after
 which an FNO returns an additive correction on the output grid. QNM
-parameters are extracted from the Schwarzschild waveform at
-$\xq=10\,M$ and from the Kerr waveform at $\scri$. The Schwarzschild
+parameters are extracted from the Schwarzschild waveform at the fixed
+code coordinate $\xq=10$ and from the Kerr waveform at $\scri$.
+For the canonical $M=1$ configuration, $\xq=10\,M$. The Schwarzschild
 analysis uses M1--M5, while the Kerr analysis also uses estimators
 defined directly for a complex waveform.
 
@@ -375,6 +376,15 @@ does not enter the optimisation objective and is used only to evaluate
 the reconstructed field. At inference, the $k=2$ solve, Richardson
 construction and fine reference field are absent. A new configuration requires
 one $k=4$ solve, quintic upsampling and one FNO evaluation.
+The training tensors and canonical evaluation use quintic
+interpolation. The archived $100$-configuration population evaluation
+uses the legacy cubic interpolation path; its reported field and QNM
+statistics therefore refer to that evaluation path.
+
+The coordinate grid, $x_0$, $\sigma$ and $\xq$ are fixed code
+coordinates while $M$ varies. Only the canonical $M=1$ configuration
+identifies these numerical coordinate values directly with units of
+$M$.
 
 \begin{table}[!htbp]
 \centering
@@ -387,7 +397,7 @@ dataset.}
 \toprule
  & Schwarzschild hFNO \\
 \midrule
-Domain $x/M \times t/M$ & $[-50,150]\times[0,100]$ \\
+Domain $x\times t$ (code coordinates) & $[-50,150]\times[0,100]$ \\
 Grid $N_{x}\times N_{t}$ (fine) & $1001\times 1001$ \\
 Coarse grids & $k{=}4$ prior; $k{=}2,4$ Richardson pair \\
 Input channels & $5$ \\
@@ -396,11 +406,12 @@ Fourier modes $(K_{t},K_{x})$ & $(16,32)$ \\
 Domain padding & $0.10$ \\
 Parameters & $1.13\times 10^{6}$ \\
 $M$ & $\mathrm{Unif}[0.8,1.2]$ \\
-$x_{0}/M$ & $\mathrm{Unif}[2,6]$ \\
-$\sigma/M$ & $\mathrm{Unif}[3,7]$ \\
-Split (seed $1234$) & $1000/100/100$ \\
+$x_{0}$ & $\mathrm{Unif}[2,6]$ \\
+$\sigma$ & $\mathrm{Unif}[3,7]$ \\
+Samples (Sobol seed $0$) & $1000/100/100$ \\
+Training seed & $1234$ \\
 Loss & Eq.~\eqref{eq:hyb-loss} \\
-Observer $\xq$ & $10\,M$ \\
+Observer $\xq$ (code coordinate) & $10$ \\
 Canonical $(M,x_{0},\sigma)$ & $(1,4,5)$ \\
 \bottomrule
 \end{tabular}
@@ -770,11 +781,12 @@ $x_0$ and $\sigma$ keep the prompt burst within the simulation window
 for all sampled configurations.
 
 % --------------------------------------------------------------
-\subsection{Kerr Teukolsky numerical setup}
+\subsection{Kerr radial Teukolsky evolution}
 \label{sec:teukolsky-numerics}
 
-The Kerr extension uses the spin-$-2$ Teukolsky equation in
-minimal-gauge horizon-penetrating hyperboloidal coordinates
+The Kerr calculation uses a $1+1$ radial model for the $(4,2,0)$ mode
+derived from the spin-weight $s=-2$ Teukolsky equation in minimal-gauge
+horizon-penetrating hyperboloidal coordinates
 \citep{Zenginoglu2011,Harms2013,PanossoMacedo2020}. The compactified
 radial coordinate is
 \begin{equation}
@@ -868,27 +880,27 @@ endpoints are outflow boundaries, so no boundary data are imposed.}
 \label{fig:kerr-slicing}
 \end{figure}
 
-\paragraph{Reference field and target mode.} The reference field is
-obtained by evolving the spin-$-2$ Teukolsky equation on this
-hyperboloidal slice. After factoring out $e^{im\varphi}$, each
-azimuthal number $m$ gives a $1+1$ evolution in $(\tau,\sigma)$.
-We integrate this system with a fourth-order Runge--Kutta method of
-lines and Kreiss--Oliger dissipation, following the hyperboloidal
-Teukolsky scheme of \citet{Harms2013}. It is the Kerr reference
-solution, analogous to the Schwarzschild FD reference of
-Sec.~\ref{sec:fwd-problem}. Reference frequencies and damping times
-are computed at each spin using Leaver's continued-fraction method
-\citep{Leaver1985} through the \texttt{qnm} package
-\citep{Stein2019qnm}. These values define the percentage errors
-reported below, in the same way as Eq.~\eqref{eq:qnm-ref} does for
-Schwarzschild. We target the fundamental $(\ell,m,n)=(4,2,0)$ mode.
+\paragraph{Radial Teukolsky evolution for the $(4,2,0)$ mode.} For
+each spin, the angular sector is fixed at the spheroidal eigenvalue
+${}_{-2}A_{42}(a\omega_{\mathrm{ref}})$ evaluated at the
+spin-dependent Leaver frequency of the fundamental mode. The resulting
+separation constant defines a $1+1$ radial evolution in
+$(\tau,\sigma)$; it is not the generic $2+1$ time-domain Teukolsky
+initial-value problem \citep{Harms2013,PanossoMacedo2020}. We
+integrate the radial equation with a fourth-order Runge--Kutta method
+of lines and Kreiss--Oliger dissipation. Leaver's continued-fraction
+values are obtained through the \texttt{qnm} package
+\citep{Leaver1985,Stein2019qnm}. Because the target frequency enters
+the separation constant, the fitted Kerr QNM values are compared
+against Leaver but are not independent spectral predictions. The
+radial field is the Kerr reference solution used for the hFNO field
+errors.
 The choice $\ell=4$ rather than $\ell=2$ is deliberate. Its
 shorter-wavelength perturbation provides a more stringent test of
 spatial under-resolution and of the hFNO's ability to recover the
 corresponding wavefront structure (Fig.~\ref{fig:kerr-spectrum}a).
 
-The $N=201$ and $N=401$ fields are computed independently
-of the $N=801$ fine reference field.
+The $N=201$ and $N=401$ fields do not use the $N=801$ reference.
 
 \begin{table}[!htbp]
 \centering
@@ -900,7 +912,7 @@ of the $N=801$ fine reference field.
 \toprule
 Property & Value \\
 \midrule
-Field and target mode & $s=-2$, $(\ell,m,n)=(4,2,0)$, $M=1$ \\
+Radial model and target mode & $s=-2$, $(\ell,m,n)=(4,2,0)$, $M=1$ \\
 Domain and readout & $\sigma\in[0,1]$, $\tau/M\in[0,220]$, $\scri$ at $\sigma=0$ \\
 Initial data & $\Psi(0,r)=\exp[-(r-r_0)^2/(2w^2)]$, $\partial_\tau\Psi(0,r)=0$ \\
 Parameter ranges & $a/M\in[0,0.95]$, $r_0/M\in[8,11]$, $w/M\in[1,1.5]$ \\
@@ -1127,7 +1139,8 @@ At inference the right-hand path is absent.}
 \label{sec:qnm-methods}
 
 QNM parameters $(\omega,\tau)$ are extracted from the Schwarzschild
-waveform at $\xq=10\,M$ and the Kerr waveform at $\scri$. Between the
+waveform at the fixed code coordinate $\xq=10$ and the Kerr waveform
+at $\scri$. Between the
 prompt response and late-time tail, a real signal is modelled as a
 sum of damped sinusoids,
 \begin{equation}
@@ -1281,8 +1294,10 @@ are population values.
 
 \begin{table}[!htbp]
 \centering
-\caption{Schwarzschild QNM extraction windows at $\xq=10\,M$. The
-reproduction uses only M1 and M2, following \citet{Patel2024pinn}.}
+\caption{Schwarzschild QNM extraction windows. The reproduction,
+enhanced PINN and canonical hFNO have $M=1$ and $\xq=10\,M$; the
+$100$-configuration population uses fixed code coordinate $\xq=10$.
+The reproduction uses only M1 and M2, following \citet{Patel2024pinn}.}
 \label{tab:qnm-windows}
 \footnotesize
 \setlength{\tabcolsep}{3pt}
@@ -1298,9 +1313,9 @@ Enhanced PINN and FD
 hFNO canonical configuration
  & $[10,80]M$ & $t_0\in[10,25]M$, $\tend=80M$
  & $t_0\in[10,25]M$, $\tend\in[30,100]M$ \\
-hFNO ($100$ configurations)
- & $[10,100]M$ & $t_0\in[10,25]M$, $\tend=100M$
- & $t_0\in[10,25]M$, $\tend\in[30,100]M$ \\
+hFNO ($100$ configurations; code times)
+ & $[10,100]$ & $t_0\in[10,25]$, $\tend=100$
+ & $t_0\in[10,25]$, $\tend\in[30,100]$ \\
 \bottomrule
 \end{tabular*}
 \end{table}
@@ -1405,9 +1420,9 @@ Kerr extraction introduces a mode-identification problem in addition
 to fit-window sensitivity. The labelled $(4,2,0)$ pole can become
 subdominant to more slowly decaying late-time components, so a valid
 fit need not correspond to the mode being evaluated. We therefore
-separate candidate generation, mode identification and robust
-aggregation. The Leaver pole is used only for identification; it does
-not replace any fitted value.
+separate candidate generation from mode identification. Within the
+extraction procedure, the Leaver pole identifies the labelled mode but
+does not replace any fitted value.
 
 \paragraph{Complex estimators.} For the estimator formulas, let $u$
 denote hyperboloidal time and $\tau_{\mathrm d}$ the damping time. A
@@ -1449,8 +1464,8 @@ Hilbert transform.
 \end{algorithmic}
 \end{algorithm}
 
-\paragraph{Candidate selection and consensus.} The Leaver damping
-time $\tau_{\mathrm{ref}}$ sets all window scales. Targeted M3
+\paragraph{Candidate generation and mode identification.} The Leaver
+damping time $\tau_{\mathrm{ref}}$ sets all window scales. Targeted M3
 ($K=6$) and M4 fits are applied separately to
 $\operatorname{Re}\Psi$ and $\operatorname{Im}\Psi$ on a
 $3\times3$ grid with
@@ -1464,26 +1479,28 @@ $u_{\mathrm{end}}/\tau_{\mathrm{ref}}\in[10,14]$, with an
 envelope-slope upper cutoff. Multi-mode fits retain the pole nearest
 the labelled Leaver pole, and each scan is reduced to its median
 candidate. Candidates more than $12\%$ from
-$\omega_{R,\mathrm{ref}}$ are rejected. Frequency and damping-time
-candidates are filtered independently using the larger of $12\%$ of
-their median and three scaled median absolute deviations. The median
-survivors are reported; their population standard deviation measures
-inter-estimator spread rather than statistical uncertainty. Complete
-per-estimator results are reported in Appendix~\ref{app:kerr-extractors}.
+$\omega_{R,\mathrm{ref}}$ are rejected. Complete per-estimator
+results are reported in Appendix~\ref{app:kerr-extractors}.
 % --------------------------------------------------------------
 \subsection{Reporting convention}
 \label{sec:reporting}
 
-Frequency and damping time are reported separately because phase
-evolution primarily constrains $\omega$, whereas amplitude decay
-constrains $\tau$ \citep{Berti2007ringdown,Patel2024pinn}.
+Ringdown parameter recovery is sensitive to the waveform model, fit
+interval and extraction procedure, and frequency and damping time can
+exhibit markedly different biases, so averaging across the estimator
+suite would combine stable fits with identifiable failures
+\citep{Berti2007matched,Isi2021priors}. The reported summaries
+therefore give the smallest Leaver error attained for each quantity
+and record the best accuracy achieved by the suite, not the expected
+performance of a fixed estimator.
 No Schwarzschild fit uses Leaver values. For the Schwarzschild summary
 statistics, the estimator with the smallest Leaver error is selected
 separately for frequency and damping time after extraction. The reproduction
 comparison is restricted to M1 and M2, while M4 scatter measures
 fit-window sensitivity only.
 For Kerr, Leaver values identify the $(4,2,0)$ candidate among
-multi-mode fits. We report both the pre-specified target-mode
-ensemble and the retrospective Leaver-closest summary, with complete
-extractor results in Appendix~\ref{app:kerr-extractors}. Each reported
+multi-mode fits. After extraction, the candidate with the smallest
+frequency error and the candidate with the smallest damping-time error
+against Leaver are reported separately. Complete per-estimator results
+are given in Appendix~\ref{app:kerr-extractors}, and each reported
 quantity identifies the selected estimator.

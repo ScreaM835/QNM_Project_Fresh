@@ -5,7 +5,12 @@ build/
 dist/
 .venv/
 venv*/
-outputs/
+outputs/*
+!outputs/_run2_download/
+outputs/_run2_download/*
+!outputs/_run2_download/history.json
+!outputs/_run2_download/report.json
+!outputs/_run2_download/per_sample.json
 *.h5
 *.hdf5
 *.pt

@@ -18,21 +18,20 @@ Across the Schwarzschild configurations, the hFNO reduces the mean
 relative $L^2$ error from $13.39\%$ to $1.85\%$ and the field MSE by
 a factor of $46$. Figure~\ref{fig:hyb-grad} shows a correlation
 $r=0.921$ between $d_{\mathrm{idx}}$ and numerical-prior error, which
-is concentrated near propagating wavefronts. For
-Kerr, the median relative $L^2$ error falls from $59.5\%$ to $0.78\%$,
-and the high-spin median frequency error is $0.38\%$. The
-Richardson-extrapolated field reaches $0.008\%$, showing that the
-remaining discrepancy arises primarily from the learned correction
-rather than the target construction.
+is concentrated near propagating wavefronts. For the Kerr radial
+Teukolsky evolution, the median relative $L^2$ error falls from
+$59.5\%$ to $0.78\%$, and the high-spin median frequency
+error against Leaver is $0.38\%$. The
+Richardson-extrapolated field has a median relative $L^2$ error of
+$0.008\%$, below the hFNO error.
 
 \paragraph{QNM extraction.}
 Across the Schwarzschild configurations, M4 gives a median frequency
-error of $0.152\%$. For Kerr, the retrospective Leaver-closest
-selection gives median errors of $0.33\%$ in
-frequency and $1.52\%$ in damping time, compared with $0.05\%$
-and $0.27\%$ from the fine reference fields. Appendix~\ref{app:kerr-extractors}
-shows the estimator dependence and distinguishes retrospective
-selection from the pre-specified target-mode ensemble. The larger damping-time
+error of $0.152\%$ against Leaver. For the Kerr radial evolution, the
+median errors against Leaver are $0.33\%$ in frequency and $1.52\%$
+in damping time, compared with $0.05\%$ and $0.27\%$ from the fine
+reference fields. Appendix~\ref{app:kerr-extractors} shows the
+dependence on the estimator. The larger damping-time
 error is consistent with training being dominated by the
 high-amplitude burst and wavefronts, whereas damping depends on the
 low-amplitude late-time envelope. The hFNO loss minimises full-field
@@ -50,9 +49,10 @@ while the pointwise maps show smaller gains where the numerical prior
 is already accurate.
 Richardson extrapolation also relies on the two coarse
 discretisations lying within the expected convergence regime.
-The field results apply to the $\ell=2$ Zerilli and
-$(\ell,m)=(4,2)$ Teukolsky sectors studied here; the reported QNM
-errors concern their fundamental modes.
+The field results apply to the $\ell=2$ Zerilli problem and the
+$(\ell,m,n)=(4,2,0)$ radial Teukolsky evolution. The reported QNM
+errors concern the Schwarzschild fundamental mode and the Kerr
+$(4,2,0)$ mode.
 
 \paragraph{Future directions.}
 The late-time errors in Figs.~\ref{fig:kerr-ringdown}

@@ -13,11 +13,11 @@ Atilim~Gunes Baydin, Barak~A. Pearlmutter, Alexey~Andreyevich Radul, and
 \newblock \emph{Journal of Machine Learning Research}, 18\penalty0
   (153):\penalty0 1--43, 2018.
 
-\bibitem[Berti et~al.(2006)Berti, Cardoso, and Will]{Berti2007ringdown}
-Emanuele Berti, Vitor Cardoso, and Clifford~M. Will.
-\newblock On gravitational-wave spectroscopy of massive black holes with the
-  space interferometer {LISA}.
-\newblock \emph{Phys. Rev. D}, 73:\penalty0 064030, 2006.
+\bibitem[Berti et~al.(2007)Berti, Cardoso, Cardoso, and
+  Cavagli{\`a}]{Berti2007matched}
+Emanuele Berti, Jaime Cardoso, Vitor Cardoso, and Marco Cavagli{\`a}.
+\newblock Matched filtering and parameter estimation of ringdown waveforms.
+\newblock \emph{Phys. Rev. D}, 76:\penalty0 104044, 2007.
 
 \bibitem[Berti et~al.(2009)Berti, Cardoso, and Starinets]{Berti2009review}
 Emanuele Berti, Vitor Cardoso, and Andrei~O. Starinets.
