@@ -1,8 +1,8 @@
 # Hybrid Neural Methods for Black-Hole Ringdown
 
 This repository accompanies the project report
-*A Unified Deep-Learning Framework for Schwarzschild Quasi-Normal-Mode
-Extraction*. It reproduces the time-domain PINN calculation of Patel,
+*Hybrid Fourier Neural Operators for Time-Domain Black-Hole Perturbations
+and Quasinormal-Mode Extraction*. It reproduces the time-domain PINN calculation of Patel,
 Aykutalp and Laguna, improves that PINN, and develops a hybrid Fourier neural
 operator (hFNO) for Schwarzschild and Kerr perturbations.
 
@@ -16,11 +16,12 @@ The report contains four numerical tests:
    L-BFGS phase.
 3. A Schwarzschild hFNO that corrects a coarse finite-difference trajectory
    towards a label-free Richardson target across `(M, x0, sigma)`.
-4. A Kerr hFNO adapted to the complex hyperboloidal Teukolsky field and
-   trained across `(a/M, r0, w)` for the `(l,m,n)=(4,2,0)` mode.
+4. The hybrid framework extended to the complex hyperboloidal Teukolsky
+   field and retrained across `(a/M, r0, w)` for the `(l,m,n)=(4,2,0)` mode.
 
-All fields are analysed with the post-hoc QNM extraction framework in
-`src/qnm.py` and `kerr/src/qnm_ensemble_kerr.py`. The reported errors are
+QNMs are extracted from the PINN, hFNO and fine-reference fields using
+`src/qnm.py` and `kerr/src/qnm_ensemble_kerr.py`. The coarse Kerr solve is
+reported only as the hFNO input and field-accuracy baseline. QNM errors are
 benchmarked against Leaver values supplied directly or through the `qnm`
 package.
 
@@ -31,11 +32,12 @@ package.
 | Faithful PINN reproduction | RL2 `2.61%` (Zerilli) and `2.67%` (Regge-Wheeler), versus `28.06%` and `23.59%` reported by Patel et al. |
 | Enhanced PINN | RL2 `0.58%`; best-of-suite QNM errors `0.029%` in frequency and `1.99%` in damping time |
 | Schwarzschild hFNO | Mean RL2 `13.39% -> 1.85%`; field MSE reduced by `46x` over 100 test configurations |
-| Kerr hFNO | Median RL2 `59.5% -> 0.78%`; high-spin frequency error `4.71% -> 0.38%` over 128 test configurations |
+| Kerr hFNO | Median RL2 `59.5% -> 0.78%`; high-spin hFNO frequency error `0.38%` over 128 test configurations |
 
-The Kerr damping-time error increases from `0.52%` for the prior to `1.52%`
-for the hFNO. This is retained as a measured limitation of the present global
-field objective.
+For Kerr, the retrospective Leaver-closest errors are `0.33%` in frequency
+and `1.52%` in damping time for the hFNO fields, compared with `0.05%` and
+`0.27%` for the fine fields. The report also gives every extractor separately
+because these summary values depend on post-selection.
 
 ## Environment
 
@@ -140,6 +142,20 @@ The separate executive summary is built with:
 ```text
 pdflatex executive_summary.tex
 ```
+
+## Use of Auto-Generation Tools
+
+### GitHub Copilot
+
+GitHub Copilot was used supportively for code completion, debugging and
+documentation, and for drafting assistance, proofreading and wording
+suggestions during preparation of the report.
+
+### ChatGPT
+
+ChatGPT was consulted occasionally for technical explanations and plotting
+suggestions. All suggestions from auto-generation tools were reviewed by the
+author and, where applicable, tested and revised before inclusion.
 
 ## Repository Layout
 

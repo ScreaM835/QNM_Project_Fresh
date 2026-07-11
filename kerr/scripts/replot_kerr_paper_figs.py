@@ -1,16 +1,15 @@
 """Regenerate the Kerr paper figures locally in the Schwarzschild plotting
 convention (reference = C0 blue solid, hybrid = C1 orange dashed, coarse prior
-= grey dotted) with LaTeX/mathtext labels, and print the by-spin summary table
-(field / M-omega / tau, best-of-suite, with estimator labels) from the full-run
-per_sample.json. Fields for the ringdown/pointwise are reconstructed from the
-downloaded test corpus + model.pt (no eval re-run).
+= grey dotted) with LaTeX/mathtext labels, and print the by-spin summary table.
+The coarse solve is retained only in field comparisons; QNM panels and table
+entries compare the hFNO and fine fields. Fields for the ringdown/pointwise are
+reconstructed from the downloaded test corpus + model.pt (no eval re-run).
 """
 from __future__ import annotations
 import argparse
 import json
 import os
 import sys
-from collections import Counter
 
 import numpy as np
 import matplotlib
@@ -23,7 +22,6 @@ _ROOT = os.path.abspath(os.path.join(_THIS, "..", ".."))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-import torch
 from kerr.src.hybrid_data_pipe import load_split, build_upsample_matrix, assemble
 from kerr.src.hybrid_fno import build_hybrid_fno
 
@@ -44,6 +42,8 @@ CFG = {"fno": {"modes_tau": 64, "modes_sigma": 24, "hidden_channels": 48,
 
 
 def reconstruct_canonical(dataset_path, model_path):
+    import torch
+
     te = load_split(dataset_path, "test")
     W_k4 = build_upsample_matrix(te["sigma_k4"], te["sigma_fine"], k=5)
     W_k2 = build_upsample_matrix(te["sigma_k2"], te["sigma_fine"], k=5)
@@ -81,18 +81,18 @@ def plot_ringdown(f, fig_dir):
     mag_prior = np.sqrt(f["up4_re"][:, scri] ** 2 + f["up4_im"][:, scri] ** 2)
     mag_hyb = np.sqrt(f["hyb_re"][:, scri] ** 2 + f["hyb_im"][:, scri] ** 2)
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(7, 6), sharex=True)
-    ax1.plot(tau, fine, color=C_FINE, ls="-", lw=1.4, label="FD (fine)")
-    ax1.plot(tau, prior, color=C_PRIOR, ls=":", lw=1.2, label="coarse prior")
-    ax1.plot(tau, hyb, color=C_HYB, ls="--", lw=1.3, label="hybrid")
-    ax1.set_ylabel(r"$\mathrm{Re}\,\psi$ at $\mathcal{I}^{+}$")
+    ax1.plot(tau, fine, color=C_FINE, ls="-", lw=1.4, label="Fine reference")
+    ax1.plot(tau, prior, color=C_PRIOR, ls=":", lw=1.2, label="Numerical prior")
+    ax1.plot(tau, hyb, color=C_HYB, ls="--", lw=1.3, label="Kerr hFNO")
+    ax1.set_ylabel(r"$\mathrm{Re}\,\Psi$ at $\mathcal{I}^{+}$")
     ax1.legend(frameon=False)
     ax1.set_title(rf"Kerr ringdown at $\mathcal{{I}}^{{+}}$ ($a/M={f['aM']:.2f}$)")
     ax1.grid(True, alpha=0.3)
-    ax2.semilogy(tau, mag_fine + 1e-30, color=C_FINE, ls="-", lw=1.4, label="FD (fine)")
-    ax2.semilogy(tau, mag_prior + 1e-30, color=C_PRIOR, ls=":", lw=1.2, label="coarse prior")
-    ax2.semilogy(tau, mag_hyb + 1e-30, color=C_HYB, ls="--", lw=1.3, label="hybrid")
+    ax2.semilogy(tau, mag_fine + 1e-30, color=C_FINE, ls="-", lw=1.4, label="Fine reference")
+    ax2.semilogy(tau, mag_prior + 1e-30, color=C_PRIOR, ls=":", lw=1.2, label="Numerical prior")
+    ax2.semilogy(tau, mag_hyb + 1e-30, color=C_HYB, ls="--", lw=1.3, label="Kerr hFNO")
     ax2.set_xlabel(r"$\tau/M$")
-    ax2.set_ylabel(r"$|\psi|$ at $\mathcal{I}^{+}$")
+    ax2.set_ylabel(r"$|\Psi|$ at $\mathcal{I}^{+}$")
     ax2.set_ylim(1e-5, None)
     ax2.legend(frameon=False)
     ax2.grid(True, alpha=0.3)
@@ -145,13 +145,13 @@ def plot_vs_spin(rows, fig_dir):
     plt.savefig(os.path.join(fig_dir, "hybrid_field_vs_spin.png"), dpi=200)
     plt.close()
 
-    # M-omega error vs spin (best-of-suite, matches the results table)
+    # M-omega error vs spin (retrospective best-of-suite).
     plt.figure(figsize=(6, 4))
-    for key, c, lab in (("prior", C_PRIOR, "prior"), ("hybrid", C_HYB, "hybrid"), ("fine", C_FINE, "fine")):
+    for key, c, lab in (("hybrid", C_HYB, "hFNO"), ("fine", C_FINE, "fine")):
         plt.scatter(aM, [r["qnm"][key]["best_Mw_err_pct"] for r in rows], s=16, color=c, label=lab)
     plt.axhline(1.0, color="k", ls="--", lw=0.8, label="1% gate")
     plt.xlabel(r"$a/M$")
-    plt.ylabel(r"$M\omega$ error (%)")
+    plt.ylabel(r"$|\Delta\omega|/\omega$ (\%)")
     plt.yscale("log")
     plt.legend(frameon=False, fontsize=8)
     plt.title(r"Frequency accuracy vs spin (at $\mathcal{I}^{+}$)")
@@ -159,13 +159,13 @@ def plot_vs_spin(rows, fig_dir):
     plt.savefig(os.path.join(fig_dir, "hybrid_qnm_vs_spin.png"), dpi=200)
     plt.close()
 
-    # tau error vs spin (best-of-suite)
+    # tau error vs spin (retrospective best-of-suite).
     plt.figure(figsize=(6, 4))
-    for key, c, lab in (("prior", C_PRIOR, "prior"), ("hybrid", C_HYB, "hybrid"), ("fine", C_FINE, "fine")):
+    for key, c, lab in (("hybrid", C_HYB, "hFNO"), ("fine", C_FINE, "fine")):
         plt.scatter(aM, [r["qnm"][key]["best_tau_err_pct"] for r in rows], s=16, color=c, label=lab)
     plt.axhline(5.0, color="k", ls="--", lw=0.8, label="5% gate")
     plt.xlabel(r"$a/M$")
-    plt.ylabel(r"$\tau/M$ error (\%)")
+    plt.ylabel(r"$|\Delta\tau|/\tau$ (\%)")
     plt.yscale("log")
     plt.legend(frameon=False, fontsize=8)
     plt.title(r"Damping-time accuracy vs spin (at $\mathcal{I}^{+}$)")
@@ -182,15 +182,10 @@ def print_table(rows):
         vals = [v for v in vals if v is not None and np.isfinite(v)]
         return float(np.median(vals)) if vals else float("nan")
 
-    def modal_method(idx, who, key):
-        labs = [rows[i]["qnm"][who][key] for i in idx if rows[i]["qnm"][who][key]]
-        return Counter(labs).most_common(1)[0][0] if labs else "-"
-
-    print("\n=== BY-SPIN (medians; best-of-suite for QNM) ===")
+    print("\n=== BY-SPIN (field medians; retrospective QNM lower envelope) ===")
     hdr = ("bin", "n", "fld_pri", "fld_hyb", "fld_rich",
-           "Mw_pri", "Mw_hyb", "Mw_fine", "Mw_meth",
-           "tau_pri", "tau_hyb", "tau_fine", "tau_meth")
-    print("{:>10} {:>3} {:>7} {:>7} {:>8} {:>6} {:>6} {:>7} {:>8} {:>6} {:>6} {:>7} {:>8}".format(*hdr))
+           "Mw_hyb", "Mw_fine", "tau_hyb", "tau_fine")
+    print("{:>10} {:>3} {:>7} {:>7} {:>8} {:>7} {:>7} {:>8} {:>8}".format(*hdr))
     for lo, hi in bins:
         idx = [i for i in range(len(rows)) if lo <= aM[i] < hi]
         if not idx:
@@ -198,32 +193,23 @@ def print_table(rows):
         f_pri = med([100 * rows[i]["field_rl2_prior"] for i in idx])
         f_hyb = med([100 * rows[i]["field_rl2_hybrid"] for i in idx])
         f_ric = med([100 * rows[i]["field_rl2_richardson"] for i in idx])
-        mw_pri = med([rows[i]["qnm"]["prior"]["best_Mw_err_pct"] for i in idx])
         mw_hyb = med([rows[i]["qnm"]["hybrid"]["best_Mw_err_pct"] for i in idx])
         mw_fin = med([rows[i]["qnm"]["fine"]["best_Mw_err_pct"] for i in idx])
-        tau_pri = med([rows[i]["qnm"]["prior"]["best_tau_err_pct"] for i in idx])
         tau_hyb = med([rows[i]["qnm"]["hybrid"]["best_tau_err_pct"] for i in idx])
         tau_fin = med([rows[i]["qnm"]["fine"]["best_tau_err_pct"] for i in idx])
-        print("{:>10} {:>3d} {:7.2f} {:7.3f} {:8.4f} {:6.2f} {:6.3f} {:7.4f} {:>8} {:6.2f} {:6.3f} {:7.4f} {:>8}".format(
-            f"[{lo},{hi}]", len(idx), f_pri, f_hyb, f_ric, mw_pri, mw_hyb, mw_fin,
-            modal_method(idx, "hybrid", "best_Mw_method"),
-            tau_pri, tau_hyb, tau_fin, modal_method(idx, "hybrid", "best_tau_method")))
+        print("{:>10} {:>3d} {:7.2f} {:7.3f} {:8.4f} {:7.3f} {:7.3f} {:8.3f} {:8.3f}".format(
+            f"[{lo},{hi}]", len(idx), f_pri, f_hyb, f_ric,
+            mw_hyb, mw_fin, tau_hyb, tau_fin))
 
     allidx = list(range(len(rows)))
-    print("\n=== POPULATION MEDIANS (best-of-suite) ===")
+    print("\n=== POPULATION MEDIANS (retrospective QNM lower envelope) ===")
     print("field: prior {:.2f}  hybrid {:.3f}  richardson {:.4f}".format(
         med([100 * rows[i]["field_rl2_prior"] for i in allidx]),
         med([100 * rows[i]["field_rl2_hybrid"] for i in allidx]),
         med([100 * rows[i]["field_rl2_richardson"] for i in allidx])))
     for q in ("Mw", "tau"):
-        print(f"{q}: prior {med([rows[i]['qnm']['prior'][f'best_{q}_err_pct'] for i in allidx]):.3f}  "
-              f"hybrid {med([rows[i]['qnm']['hybrid'][f'best_{q}_err_pct'] for i in allidx]):.3f}  "
+        print(f"{q}: hybrid {med([rows[i]['qnm']['hybrid'][f'best_{q}_err_pct'] for i in allidx]):.3f}  "
               f"fine {med([rows[i]['qnm']['fine'][f'best_{q}_err_pct'] for i in allidx]):.3f}")
-    # method frequency (hybrid)
-    print("\nhybrid best_Mw_method counts:",
-          Counter(r["qnm"]["hybrid"]["best_Mw_method"] for r in rows).most_common())
-    print("hybrid best_tau_method counts:",
-          Counter(r["qnm"]["hybrid"]["best_tau_method"] for r in rows).most_common())
 
 
 def parse_args():

@@ -48,15 +48,20 @@ Configuration: `configs/hybrid_kerr_l4_decoupled.yaml`
 
 Held-out test medians:
 
-| Quantity | Prior | hFNO | Fine or Richardson reference |
+| Field quantity | Prior | hFNO | Richardson reference |
 |---|---:|---:|---:|
-| Field RL2 | `59.5%` | `0.78%` | Richardson `0.008%` |
-| Frequency error | `0.59%` | `0.33%` | Fine `0.05%` |
-| Damping-time error | `0.52%` | `1.52%` | Fine `0.27%` |
+| Relative L2 error | `59.5%` | `0.78%` | `0.008%` |
 
-For the high-spin bin `a/M in [0.8,0.95]`, the frequency error decreases from
-`4.71%` to `0.38%`. The damping-time regression is retained in the report as
-the principal limitation of the global field loss.
+QNM extraction is reported for the hFNO and fine-evaluation fields only:
+
+| Extracted quantity | hFNO | Fine reference |
+|---|---:|---:|
+| Frequency error | `0.33%` | `0.05%` |
+| Damping-time error | `1.52%` | `0.27%` |
+
+For the high-spin bin `a/M in [0.8,0.95]`, the hFNO frequency error is
+`0.38%`. These QNM values are retrospective Leaver-closest summaries. The
+report gives the full per-extractor results and finite-result counts.
 
 ## Build the Corpus
 

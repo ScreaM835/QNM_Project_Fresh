@@ -2,48 +2,41 @@
 \section{Supplementary scans and diagnostics}
 \label{app:supp}
 
-This appendix collects the parameter scans and
-diagnostics that justify the configuration choices reported in
-Sec.~\ref{sec:results}.
+This appendix presents the parameter scans used to select the
+gradient-gate scale and QNM fit windows.
 
-\subsection{Hybrid: gradient-gate diagnostics}
+\subsection{Schwarzschild hFNO gradient-gate diagnostics}
 \label{app:supp-gate}
 
-Figure~\ref{fig:hyb-grad} (log--log Pearson $r = 0.921$) and
-Table~\ref{tab:hyb-gate-decile} are the empirical basis of the
-gate: the correction cuts the mean error by $14.1\times$ in the
-top gradient decile, falling to $2.6\times$ by the sixth, with
-the sub-median cells left at the prior floor. The scale is fixed
-label-free in Appendix~\ref{app:gate-scale}.
+Figure~\ref{fig:hyb-grad} relates numerical-prior error to
+$d_{\mathrm{idx}}$. Table~\ref{tab:hyb-gate-decile} reports the error
+reduction in the four highest deciles; lower deciles have substantially
+smaller numerical-prior errors.
 
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.82\textwidth]{../outputs/hybrid/fno_sw_gate_s1em3_t100/figs/grad_vs_error.png}
-\caption{Coarse-prior error versus prior gradient on the
-canonical BH, each point one $(x,t)$ cell with both axes on log
+\caption{Numerical-prior error versus index-space gradient magnitude
+on the canonical Schwarzschild configuration, with each point
+representing one $(x,t)$ cell and both axes on log
 scales. The strong correlation ($r = 0.921$) confirms that the
-prior error concentrates on the high-gradient wavefronts, which
-the gate $g$ (Eq.~\eqref{eq:hyb-gate}) targets.}
+prior error concentrates on wavefronts with large index-space
+gradient magnitude $d_{\mathrm{idx}}$, which the gate $g$
+(Eq.~\eqref{eq:hyb-gate}) targets.}
 \label{fig:hyb-grad}
 \end{figure}
 
 \begin{table}[!htbp]
 \centering
-\caption{Hybrid error reduction stratified by coarse-prior
-gradient on the canonical BH. Cells are sorted into deciles of
-$|\nabla\mathcal{U}\Phi^{\mathrm{c}}|$; for the top four
-deciles (the wavefront-bearing cells) the table lists the
-decile-mean gradient, the mean coarse-up baseline error, the
-mean hybrid error, and their ratio. Below the median the prior
-gradient is $\lesssim 10^{-12}$ (smooth interior and causal
-exterior) and both errors are at the field floor.}
+\caption{Schwarzschild hFNO error reduction in the four highest
+$d_{\mathrm{idx}}$ deciles.}
 \label{tab:hyb-gate-decile}
-\small
+\footnotesize
 \setlength{\tabcolsep}{6pt}
 \begin{tabular}{@{}lcccc@{}}
 \toprule
-Gradient decile & $\overline{|\nabla\mathcal{U}\Phi^{\mathrm{c}}|}$
- & baseline err & hybrid err & ratio \\
+Difference decile & $\overline{d_{\mathrm{idx}}}$
+ & numerical-prior error & hFNO error & ratio \\
 \midrule
 90--100\% (wavefronts) & $3.15\times 10^{-2}$ & $1.30\times 10^{-2}$ & $9.22\times 10^{-4}$ & $14.1$ \\
 80--90\%               & $1.01\times 10^{-2}$ & $4.37\times 10^{-3}$ & $4.42\times 10^{-4}$ & $9.9$  \\
@@ -60,9 +53,7 @@ The M4 and M5 plateau constructions of Sec.~\ref{sec:plateau}
 underpin the frequency and damping-time entries of
 Tables~\ref{tab:fwd-qnm} and~\ref{tab:hyb-canonical}.
 Figures~\ref{fig:fwd-plateau-m4}--\ref{fig:hyb-plateau-m5}
-collect the scans for the forward PINN and the hybrid surrogate.
-The canonical hybrid M5 scan recovers the frequency to
-$0.047\%$, consistent with the hybrid M4 plateau.
+show the scans for the forward PINN and the Schwarzschild hFNO.
 
 \begin{figure}[!htbp]
 \centering
@@ -90,8 +81,8 @@ cells are NLS fits that failed to converge.}
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.80\textwidth]{../outputs/hybrid/fno_sw_gate_s1em3_t100/figs/hybrid_plateau_m4_xq10.png}
-\caption{M4 1-D plateau scan on the hybrid prediction at the
-canonical BH and $\xq = 10\,M$. Per-window two-mode NLS fits
+\caption{M4 1-D plateau scan on the Schwarzschild hFNO prediction at the
+canonical Schwarzschild configuration and $\xq = 10\,M$. Per-window two-mode NLS fits
 (blue circles) on $t_{0} \in [10, 25]\,M$ at the fixed
 usable-signal cutoff $\tend = 80\,M$. The red circles mark the
 contiguous plateau block on $t_{0} \in [13, 20]\,M$ that forms
@@ -105,8 +96,8 @@ and $\tau = 11.241\,M$.}
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.95\textwidth]{../outputs/hybrid/fno_sw_gate_s1em3_t100/figs/hybrid_plateau_m5_xq10.png}
-\caption{M5 2-D plateau scan on the hybrid prediction at the
-canonical BH and $\xq = 10\,M$. Heatmaps of the fitted
+\caption{M5 2-D plateau scan on the Schwarzschild hFNO prediction at the
+canonical Schwarzschild configuration and $\xq = 10\,M$. Heatmaps of the fitted
 $\omega$ (left) and $\tau$ (right) over a $10 \times 6$ grid in
 $(t_{0}, \tend)$ with $t_{0} \in [10, 25]\,M$ and
 $\tend \in [30, 100]\,M$, on the shared colour scales
@@ -117,3 +108,89 @@ $\tend \in [44.0, 72.0]\,M$). White cells are NLS fits that
 failed to converge.}
 \label{fig:hyb-plateau-m5}
 \end{figure}
+
+\FloatBarrier
+
+\subsection{Kerr extractor breakdown}
+\label{app:kerr-extractors}
+
+Tables~\ref{tab:kerr-extractors-omega}
+and~\ref{tab:kerr-extractors-tau} report median Kerr errors by
+extractor and spin bin. Brackets give the number of finite estimates.
+The final two rows of each field block give the ensemble consensus and
+retrospective Leaver-closest summaries defined in
+Sec.~\ref{sec:reporting}.
+
+\begin{table}[!htbp]
+\centering
+\caption{Median Kerr $(4,2,0)$ frequency error by extractor and spin
+bin, in percent; brackets give finite-estimate counts.}
+\label{tab:kerr-extractors-omega}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}llccccc@{}}
+\toprule
+Field & Extractor & $[0.0,0.3]$ & $[0.3,0.6]$ & $[0.6,0.8]$
+ & $[0.8,0.95]$ & All \\
+\midrule
+hFNO & M2 (Re) & $6.222$ [41] & $14.441$ [40] & $33.126$ [27] & $44.049$ [20] & $10.833$ [128] \\
+hFNO & M2 (Im) & $5.315$ [41] & $20.647$ [40] & $35.371$ [27] & $45.169$ [20] & $13.966$ [128] \\
+hFNO & M3 (Re) & $1.717$ [41] & $0.535$ [40] & $0.630$ [27] & $0.789$ [20] & $0.766$ [128] \\
+hFNO & M3 (Im) & $2.038$ [41] & $0.654$ [40] & $0.656$ [27] & $0.801$ [20] & $0.892$ [128] \\
+hFNO & M4 (Re) & $6.781$ [41] & $10.070$ [40] & $18.969$ [27] & $31.160$ [20] & $9.773$ [128] \\
+hFNO & M4 (Im) & $5.916$ [41] & $17.100$ [40] & $21.709$ [27] & $26.690$ [20] & $12.166$ [128] \\
+hFNO & cES & $0.901$ [41] & $0.638$ [40] & $0.709$ [27] & $0.989$ [20] & $0.824$ [128] \\
+hFNO & c$\Phi$ & $17.859$ [41] & $28.182$ [40] & $42.221$ [27] & $50.756$ [20] & $36.809$ [128] \\
+hFNO & Ensemble consensus & $3.422$ [41] & $1.224$ [40] & $0.654$ [27] & $0.771$ [20] & $1.222$ [128] \\
+hFNO & Leaver-closest & $0.532$ [41] & $0.270$ [40] & $0.229$ [27] & $0.383$ [20] & $0.332$ [128] \\
+\midrule
+Fine & M2 (Re) & $5.276$ [41] & $14.303$ [40] & $30.179$ [27] & $1.581$ [20] & $6.762$ [128] \\
+Fine & M2 (Im) & $3.568$ [41] & $14.232$ [40] & $27.750$ [27] & $13.409$ [20] & $6.058$ [128] \\
+Fine & M3 (Re) & $1.159$ [41] & $0.347$ [40] & $0.186$ [27] & $0.324$ [20] & $0.444$ [128] \\
+Fine & M3 (Im) & $0.988$ [41] & $0.474$ [40] & $0.313$ [27] & $0.417$ [20] & $0.533$ [128] \\
+Fine & M4 (Re) & $7.615$ [41] & $9.424$ [40] & $17.829$ [27] & $31.857$ [20] & $9.640$ [128] \\
+Fine & M4 (Im) & $5.917$ [41] & $12.735$ [40] & $22.827$ [27] & $29.007$ [19] & $9.426$ [127] \\
+Fine & cES & $0.101$ [41] & $0.158$ [40] & $0.121$ [27] & $0.035$ [20] & $0.103$ [128] \\
+Fine & c$\Phi$ & $3.061$ [41] & $19.212$ [40] & $32.964$ [27] & $0.213$ [20] & $5.562$ [128] \\
+Fine & Ensemble consensus & $2.255$ [41] & $0.692$ [40] & $0.398$ [27] & $0.287$ [20] & $0.669$ [128] \\
+Fine & Leaver-closest & $0.059$ [41] & $0.077$ [40] & $0.044$ [27] & $0.017$ [20] & $0.052$ [128] \\
+\bottomrule
+\end{tabular*}
+\end{table}
+
+\begin{table}[!htbp]
+\centering
+\caption{Median Kerr $(4,2,0)$ damping-time error by extractor and
+spin bin, in percent; brackets give finite-estimate counts.}
+\label{tab:kerr-extractors-tau}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}llccccc@{}}
+\toprule
+Field & Extractor & $[0.0,0.3]$ & $[0.3,0.6]$ & $[0.6,0.8]$
+ & $[0.8,0.95]$ & All \\
+\midrule
+hFNO & M2 (Re) & $22.897$ [41] & $17.540$ [40] & $14.370$ [27] & $19.616$ [20] & $17.996$ [128] \\
+hFNO & M2 (Im) & $24.625$ [41] & $18.144$ [40] & $12.210$ [27] & $17.428$ [20] & $18.454$ [128] \\
+hFNO & M3 (Re) & $14.114$ [41] & $10.419$ [40] & $3.809$ [27] & $8.070$ [20] & $8.835$ [128] \\
+hFNO & M3 (Im) & $19.342$ [41] & $10.024$ [40] & $6.435$ [27] & $10.438$ [20] & $10.765$ [128] \\
+hFNO & M4 (Re) & $32.439$ [41] & $48.249$ [40] & $32.004$ [27] & $24.398$ [20] & $32.453$ [128] \\
+hFNO & M4 (Im) & $61.253$ [41] & $36.586$ [40] & $26.966$ [27] & $18.257$ [20] & $37.799$ [128] \\
+hFNO & cES & $3.428$ [41] & $6.091$ [40] & $6.342$ [27] & $6.678$ [20] & $5.388$ [128] \\
+hFNO & c$\Phi$ & $5.296$ [41] & $7.026$ [40] & $5.612$ [27] & $8.744$ [20] & $6.515$ [128] \\
+hFNO & Ensemble consensus & $6.197$ [41] & $7.532$ [40] & $3.510$ [27] & $9.048$ [20] & $6.446$ [128] \\
+hFNO & Leaver-closest & $1.787$ [41] & $1.668$ [40] & $1.223$ [27] & $2.190$ [20] & $1.520$ [128] \\
+\midrule
+Fine & M2 (Re) & $21.324$ [41] & $18.533$ [40] & $20.973$ [27] & $11.575$ [20] & $18.003$ [128] \\
+Fine & M2 (Im) & $14.036$ [41] & $16.355$ [40] & $14.767$ [27] & $13.812$ [20] & $14.669$ [128] \\
+Fine & M3 (Re) & $11.574$ [41] & $8.180$ [40] & $1.688$ [27] & $1.204$ [20] & $3.650$ [128] \\
+Fine & M3 (Im) & $7.492$ [41] & $7.942$ [40] & $2.512$ [27] & $2.168$ [20] & $5.050$ [128] \\
+Fine & M4 (Re) & $25.887$ [41] & $34.613$ [40] & $19.868$ [27] & $24.609$ [20] & $25.496$ [128] \\
+Fine & M4 (Im) & $53.133$ [41] & $32.853$ [40] & $32.087$ [27] & $16.511$ [19] & $34.332$ [127] \\
+Fine & cES & $3.316$ [41] & $2.326$ [40] & $0.746$ [27] & $0.070$ [20] & $1.495$ [128] \\
+Fine & c$\Phi$ & $0.696$ [41] & $0.490$ [40] & $1.066$ [27] & $0.315$ [20] & $0.520$ [128] \\
+Fine & Ensemble consensus & $3.620$ [41] & $4.182$ [40] & $0.710$ [27] & $0.469$ [20] & $2.083$ [128] \\
+Fine & Leaver-closest & $0.462$ [41] & $0.420$ [40] & $0.162$ [27] & $0.024$ [20] & $0.265$ [128] \\
+\bottomrule
+\end{tabular*}
+\end{table}

@@ -3,32 +3,33 @@
 % =============================================================
 \section{Methods}\label{sec:methods}
 
-We state the Schwarzschild FD reference (Sec.~\ref{sec:fwd-problem}),
-the forward PINN (Sec.~\ref{sec:fwd-pinn}), the Schwarzschild hFNO
-(Sec.~\ref{sec:hyb-method}), the Kerr Teukolsky numerical setup and
-Kerr hFNO (Secs.~\ref{sec:teukolsky-numerics}--\ref{sec:kerr-method}),
-the five extraction methods M1--M5 (Sec.~\ref{sec:qnm-methods}), the
-plateau criterion (Sec.~\ref{sec:plateau}), and the reporting
-convention (Sec.~\ref{sec:reporting}). M3--M5 and the Kerr
-complex-signal extractors are introduced here; M1 and M2 reproduce
-the two estimators used by \citet{Patel2024pinn}.
-Table~\ref{tab:train-config} lists the training configuration of the
-two Schwarzschild networks.
+We consider a forward Schwarzschild PINN, a Schwarzschild hFNO and a
+Kerr hFNO. The forward PINN approximates one solution of the Zerilli
+initial-boundary-value problem by minimising the equation, initial-data
+and boundary-condition residuals. The two hFNOs are trained separately
+on Schwarzschild mass and initial-data configurations and on Kerr spin
+and initial-pulse configurations. For each configuration, the
+finite-difference solver first computes a coarse-grid solution, after
+which an FNO returns an additive correction on the output grid. QNM
+parameters are extracted from the Schwarzschild waveform at
+$\xq=10\,M$ and from the Kerr waveform at $\scri$. The Schwarzschild
+analysis uses M1--M5, while the Kerr analysis also uses estimators
+defined directly for a complex waveform.
 
 \begin{table}[!htbp]
 \centering
-\caption{Training configuration of the two Schwarzschild networks. The
-hFNO trains with weight decay $10^{-6}$ and gradient
-clipping at unit norm; all learning rates are $10^{-3}$.}
+\caption{Training configurations for the forward PINN and
+Schwarzschild hFNO. All learning rates are $10^{-3}$; hFNO weight
+decay is $10^{-6}$.}
 \label{tab:train-config}
-\small
+\footnotesize
 \setlength{\tabcolsep}{5pt}
 \begin{tabular}{@{}lcc@{}}
 \toprule
- & Forward PINN & Hybrid FNO \\
+ & Forward PINN & Schwarzschild hFNO \\
 \midrule
 Parameters & $4{,}521$ & $1.13\times 10^{6}$ \\
-Optimiser  & Adam${\to}$L-BFGS & Adam \\
+Optimiser  & Adam${\to}$L-BFGS & AdamW \\
 Budget     & $10^{4} + 3{\times}10^{4}$ it. & $100$ ep. \\
 Batch size & full & $8$ \\
 Precision  & \texttt{float64} & \texttt{float32} \\
@@ -78,17 +79,19 @@ centre to the two boundaries are
   t_{L} = x_0 - x_{\min} = 54\,M,
   \label{eq:bc-arrival}
 \end{equation}
-Both times exceed the reported window. The PINN boundary losses therefore
-mainly regularise a causally remote part of the domain, while the FD
-reference is insensitive to the boundaries over the times used below.
+Both times exceed the PINN evaluation window. The PINN boundary losses
+therefore enforce the Sommerfeld conditions outside the domain of
+dependence of the observer waveform over $0\leq t\leq50\,M$, while the
+FD reference is insensitive to the boundaries over this interval.
 
-The Zerilli reference solution (Fig.~\ref{fig:waveform-3d}) is a
-method-of-lines finite-difference (FD) solve with second-order centred
+The Zerilli reference field (Fig.~\ref{fig:waveform-3d}) is computed
+with a method-of-lines finite-difference (FD) scheme using second-order centred
 spatial differences, second-order one-sided boundary closures and
 fourth-order Runge--Kutta time stepping, using $\Delta x = 0.2\,M$
 and $\Delta t = 0.1\,M$. It is used as the numerical reference for
-the Zerilli PINN field errors and as an FD signal for checking the
-extraction suite. The Leaver values $M\omega_0^R = 0.3737$,
+the Zerilli PINN field errors and as the finite-difference waveform
+used to evaluate the QNM estimators. The Leaver values
+$M\omega_0^R = 0.3737$,
 $\tau_0/M = 11.241$ (fundamental) and $M\omega_1^R = 0.3467$,
 $\tau_1/M = 3.651$ (first overtone) of Eq.~\eqref{eq:qnm-ref}
 are used for percentage-error reporting.
@@ -96,7 +99,8 @@ The Regge--Wheeler reproduction uses the same domain, initial data,
 boundary conditions, FD scheme and extraction protocol with
 $V_{\ell}^{\mathrm{Z}}$ replaced by the axial Regge--Wheeler
 potential. The later Schwarzschild extensions use the Zerilli
-problem as the representative isospectral sector.
+equation. The Regge--Wheeler and Zerilli equations have the same QNM
+spectrum.
 
 \begin{figure}[!htbp]
 \centering
@@ -134,26 +138,21 @@ reference.}
 \subsection{Forward PINN}
 \label{sec:fwd-pinn}
 
-We approximate the solution of Sec.~\ref{sec:fwd-problem} with a
-fully connected feed-forward PINN \citep{Raissi2017}, implemented in
-DeepXDE \citep{Lu2021deepxde} with the PyTorch backend
-\citep{Paszke2019pytorch}.
+We implement the forward PINN \citep{Raissi2017} in DeepXDE
+\citep{Lu2021deepxde} with the PyTorch backend
+\citep{Paszke2019pytorch}. Following \citet{Patel2024pinn}, it uses a
+fully connected $[80,40,20,10]$ $\tanh$ network with Glorot-uniform
+initialisation, coordinates scaled linearly to $[-1,1]^2$, and the
+bounded output $\Phi_\theta=A_0\tanh\hat y$. The architecture is held
+fixed between the reproduction and enhanced runs, so their comparison
+isolates the training schedule, collocation sampling and extraction
+protocol. The network has $4{,}521$ trainable parameters.
 
-The dense architecture, Glorot-uniform initialiser and bounded output
-transform follow \citet{Patel2024pinn}. This keeps the network class
-fixed across the reproduction and enhanced runs, so the later
-differences isolate the training schedule, collocation sampling and
-extraction protocol. The network has hidden widths $[80,40,20,10]$
-with $\tanh$ activations. The physical coordinates $(x,t)$ are
-linearly normalised to $[-1,1]^2$ before entering the network, and the
-scalar output is mapped through
-$\Phi_\theta(x,t)=A\tanh\bigl(\hat y(x,t)\bigr)$ with $A=A_0=1$,
-giving $4{,}521$ trainable
-parameters.\footnote{$2{\cdot}80 + 80 + 80{\cdot}40 + 40 +
-40{\cdot}20 + 20 + 20{\cdot}10 + 10 + 10{\cdot}1 + 1 = 4521$.}
-The architecture is summarised in Fig.~\ref{fig:fwd-pinn-arch},
-together with the automatic-differentiation pipeline that
-produces the residual losses defined below.
+At each coordinate pair $(x,t)$, the network returns the field value
+$\Phi_\theta(x,t)$. Automatic differentiation supplies the derivatives
+used to evaluate the Zerilli, initial-data and boundary residuals.
+Consequently, no FD field values enter the PINN loss; the FD solution
+is retained only for evaluation.
 
 \begin{figure}[!htbp]
 \centering
@@ -304,15 +303,12 @@ The seven mean-squared component losses are
   & &
   \label{eq:loss-components}
 \end{align}
-mirroring the formulation of \citet[Eqs.~(4)--(10)]{Patel2024pinn}.
-The two gradient terms $\mathcal{L}_{\partial_x r},
-\mathcal{L}_{\partial_t r}$ penalise spatial and temporal variation of the
-PDE residual, following the gradient-enhanced PINN construction of
-\citet{Yu2022gpinn}. The collocation sizes are listed in
-Table~\ref{tab:fwd-hyper}. We use DeepXDE with $N_r=32{,}000$,
-$N_i=800$ and $N_b=400$ total boundary points, whereas
-\citet{Patel2024pinn} describe $400$ points per boundary. This is the
-only collocation-count difference in the reproduction setup. The
+These terms follow \citet[Eqs.~(4)--(10)]{Patel2024pinn}. We use
+$N_r=32{,}000$, $N_i=800$ and $N_b=400$ total boundary points.
+\citet{Patel2024pinn} describe $400$ points per boundary, which is the
+only collocation-count difference in the reproduction. The two
+gradient terms penalise spatial and temporal variation of the PDE
+residual, following \citet{Yu2022gpinn}. The
 forward-PINN weight vector is
 \begin{equation}
   \boldsymbol{\lambda}
@@ -344,48 +340,48 @@ $0.7N_r$ uniformly drawn points. The uniform component preserves
 coverage away from the wavefront.
 
 % --------------------------------------------------------------
-\subsection{Schwarzschild hFNO: coarse-FD prior and FNO residual}
+\subsection{The Schwarzschild hFNO}
 \label{sec:hyb-method}
 
-The forward PINN is trained separately for each Zerilli initial-value
-problem. Changing the Gaussian parameters or the mass parameter in
-the numerical setup requires a new optimisation run with
-$\mathcal{O}(10^4)$ iterations. A neural operator
-(Sec.~\ref{sec:bg-fno}) instead amortises training across a family of
-problems. Once trained, it can evaluate a new parameter configuration
-without retraining. Here the learned component is not asked to replace
-the solver. It corrects a coarse FD solution.
+Unlike the per-instance PINN, the hFNO is trained on the sampled
+$(M,x_0,\sigma)$ configurations to approximate the
+discretisation-error correction for each configuration. For a
+parameter triple
+$q=(M,x_0,\sigma)$, let $\Phi_k^{\mathrm c}(q)$ denote the full FD
+field computed with grid factor $k$, and define the upsampled
+deployment prior $P(q)=\mathcal U\Phi_4^{\mathrm c}(q)$. The
+corresponding map is
+\begin{equation}
+  \mathcal G_\theta^{\mathrm{hyb}}(q)
+  =P(q)+g[P(q)]\,\mathcal H_\theta(X(q)),
+  \label{eq:hyb-map}
+\end{equation}
+where $\mathcal H_\theta$ returns an additive correction on the
+same fine $(t,x)$ grid as $P$.
 
-A preliminary direct-operator model, trained to predict the full
-field from the initial data and potential, contained $77{,}970{,}529$
-trainable parameters. The deployed Schwarzschild residual FNO contains
-$1{,}127{,}521$, a factor of $69$ fewer, which motivated retaining the
-coarse solver as an additive propagation prior.
+The FNO does not advance the Zerilli equation in time. The FD solver
+computes the coarse-grid finite-difference solution on the full
+$(t,x)$ domain before the FNO returns its correction in a single
+forward pass. This differs from
+recurrent solver-in-the-loop training, which modifies each numerical
+step \citep{Um2020solverloop,Kochkov2021mlcfd}. The FD fields are
+precomputed and no gradients pass through the solver.
 
-Learned corrections coupled to classical solvers have proved effective
-in differentiable solver-in-the-loop training and under-resolved fluid
-simulation \citep{Um2020solverloop,Kochkov2021mlcfd}. The
-Schwarzschild hFNO follows this coarse-solver-plus-correction design.
-It uses a single coarse-grid FD solve as the propagation prior,
-upsamples that field to the fine grid, and applies a 2-D FNO residual
-operator $\mathcal{H}_{\theta}$ with $1.13\times 10^{6}$ parameters to
-predict the coarse-to-fine discretisation residual. During training,
-the target is estimated label-free from the $k=4$ and $k=2$ coarse
-solves by Richardson extrapolation. No fine-grid field appears in the
-training loss. A deterministic gradient gate confines the correction to
-the under-resolved wavefronts, leaving low-gradient regions equal, or
-nearly equal, to the upsampled coarse prior. The extractors and
-reporting convention of Secs.~\ref{sec:qnm-methods}--\ref{sec:reporting}
-apply unchanged. The pipeline is summarised in
-Fig.~\ref{fig:hyb-arch}, and its configuration in
-Table~\ref{tab:surrogate-config}.
+During training, for each parameter triple, the corresponding $k=4$
+and $k=2$ fields form a Richardson-extrapolated field. The
+gated FNO output is fitted to the difference between that estimate
+and $P$. The fine FD reference field
+does not enter the optimisation objective and is used only to evaluate
+the reconstructed field. At inference, the $k=2$ solve, Richardson
+construction and fine reference field are absent. A new configuration requires
+one $k=4$ solve, quintic upsampling and one FNO evaluation.
 
 \begin{table}[!htbp]
 \centering
-\caption{Configuration of the Schwarzschild hFNO. Optimiser
-settings are listed in Table~\ref{tab:train-config}.}
+\caption{Schwarzschild hFNO architecture, parameter domain and
+dataset.}
 \label{tab:surrogate-config}
-\small
+\footnotesize
 \setlength{\tabcolsep}{5pt}
 \begin{tabular}{@{}lc@{}}
 \toprule
@@ -393,7 +389,7 @@ settings are listed in Table~\ref{tab:train-config}.}
 \midrule
 Domain $x/M \times t/M$ & $[-50,150]\times[0,100]$ \\
 Grid $N_{x}\times N_{t}$ (fine) & $1001\times 1001$ \\
-Coarse grids & $k{=}4$ prior; $k{=}2$ Richardson target \\
+Coarse grids & $k{=}4$ prior; $k{=}2,4$ Richardson pair \\
 Input channels & $5$ \\
 Hidden channels $h$ & $32$ \\
 Fourier modes $(K_{t},K_{x})$ & $(16,32)$ \\
@@ -469,7 +465,7 @@ Canonical $(M,x_{0},\sigma)$ & $(1,4,5)$ \\
     \textbf{five-channel input on fine grid}\;
     $X\in\mathbb{R}^{5\times N_{t}\times N_{x}}$};
   \node[inp, below=2mm of stackhdr]
-        (c0) {ch~0: $\mathcal{U}\Phi^{\mathrm{c}}(x,t)$ --- quintic-upsampled $k{=}4$ prior};
+      (c0) {ch~0: $\mathcal{U}\Phi^{\mathrm{c}}(x,t)$, quintic-upsampled $k{=}4$ prior};
   \node[inp, below=1mm of c0]
         (c1) {ch~1: $\Phi^{\mathrm{c}}(x,0)$ broadcast in $t$};
   \node[inp, below=1mm of c1]
@@ -485,11 +481,11 @@ Canonical $(M,x_{0},\sigma)$ & $(1,4,5)$ \\
 
   \draw[arr] (upbox) -- (stackbg.north);
 
-  % ============ FNO residual operator ============
+  % ============ FNO correction operator ============
   \node[fnoblock, below=8mm of stackbg.south] (fnohdr) {%
     \begin{minipage}{96mm}
       \centering
-      \textbf{neural residual operator $\mathcal{H}_{\theta}$ --- four-layer 2-D FNO}\\[1mm]
+      \textbf{neural correction operator $\mathcal{H}_{\theta}$, four-layer 2-D FNO}\\[1mm]
       hidden channels $h=32$,\;
       Fourier modes $(K_{t},K_{x})=(16,32)$,\;
       domain padding $0.10$
@@ -513,11 +509,10 @@ Canonical $(M,x_{0},\sigma)$ & $(1,4,5)$ \\
 
   \draw[arr] (stackbg.south) -- (fnoall.north);
 
-  % ============ output residual + reconstruction ============
+    % ============ output correction + reconstruction ============
   \node[outn, below=8mm of fnoall.south]
-        (delta) {$g\,\delta\Phi_{\theta}(x,t)$ --- gated residual\\
-                 $g=|\nabla\mathcal{U}\Phi^{\mathrm{c}}|/
-                 (|\nabla\mathcal{U}\Phi^{\mathrm{c}}|+s),\;s{=}10^{-3}$\\
+      (delta) {$g\,\delta\Phi_{\theta}(x,t)$, gated correction\\
+           $g=d_{\mathrm{idx}}/(d_{\mathrm{idx}}+s),\;s{=}10^{-3}$\\
                  (Eq.~\eqref{eq:hyb-gate})};
   \draw[arr] (fnoall.south) -- (delta.north);
 
@@ -533,12 +528,12 @@ Canonical $(M,x_{0},\sigma)$ & $(1,4,5)$ \\
   % skip connection from upsample (long curve down the left)
   \draw[arrs] (upbox.west) -- ++(-3.6,0) |-
               node[pos=0.10, anchor=south, rotate=90, font=\scriptsize, blue!55!black, yshift=2pt]
-                      {coarse prior: $\mathcal{U}\Phi^{\mathrm{c}}$}
+                      {numerical prior: $\mathcal{U}\Phi^{\mathrm{c}}$}
               (sumn.west);
 
   % training-only target + loss (right side, dashed)
   \node[outn, fill=red!18, right=22mm of delta]
-        (target){label-free Richardson target\\
+        (target){Richardson correction target from coarse solves\\
                  $\delta\Phi_{\mathrm{R}}=\Phi^{\mathrm{R}}-\mathcal{U}\Phi^{\mathrm{c}}$\\
                  (Eqs.~\eqref{eq:hyb-richardson},\eqref{eq:hyb-residual})};
   \node[loss, below=4mm of target]
@@ -546,14 +541,14 @@ Canonical $(M,x_{0},\sigma)$ & $(1,4,5)$ \\
                  =\mathrm{MSE}\bigl(g\,\delta\Phi_{\theta},\,\delta\Phi_{\mathrm{R}}\bigr)$\\
                  (Eq.~\eqref{eq:hyb-loss})};
   \draw[arrt] (delta.east) --
-              node[pos=0.35, above, font=\scriptsize, gray!55!black] {training only}
+              node[pos=0.60, above, font=\scriptsize, gray!55!black] {training only}
               (target.west);
   \draw[arr]  (target) -- (lhyb);
 
   % gradient backflow from loss to FNO (training only)
   \draw[arrt, gray!65!black] (lhyb.east) -- ++(0.5,0) |-
               node[pos=0.25, anchor=south, rotate=90, font=\scriptsize, gray!55!black, yshift=2pt]
-                   {gradient $\nabla_{\theta}\mathcal{L}_{\mathrm{hyb}}$}
+            {$\nabla_{\theta}\mathcal{L}_{\mathrm{hyb}}$}
               (fnoall.east);
 \end{tikzpicture}
 }
@@ -572,16 +567,15 @@ potential $V_{\ell}(x;M)$ and broadcast mass $M$. A four-layer
 2-D FNO $\mathcal{H}_{\theta}$ with hidden channel count
 $h = 32$ and retained Fourier modes $(K_{t},K_{x}) = (16,32)$
 predicts an additive correction, which is multiplied by the
-parameter-free gradient gate
-$g=|\nabla\mathcal{U}\Phi^{\mathrm{c}}|/
-(|\nabla\mathcal{U}\Phi^{\mathrm{c}}|+s)$
+deterministic fixed-scale gradient gate
+$g=d_{\mathrm{idx}}/(d_{\mathrm{idx}}+s)$
 (Eq.~\eqref{eq:hyb-gate}, $s = 10^{-3}$, a deterministic
 function of the prior) before being added back; the hybrid
 prediction Eq.~\eqref{eq:hyb-reconstruct} adds the
 quintic-upsampled coarse field explicitly (blue dashed),
 and the gate confines the correction to the under-resolved
 wavefronts. The dashed grey path on the right depicts the
-training-only, label-free Richardson target
+training-only Richardson correction target
 $\delta\Phi_{\mathrm{R}} = \Phi^{\mathrm{R}} -
 \mathcal{U}\Phi^{\mathrm{c}}$
 (Eqs.~\eqref{eq:hyb-richardson},\eqref{eq:hyb-residual}), built
@@ -600,56 +594,43 @@ Appendix~\ref{app:fd}, with the same second-order centred stencil.
 The fine evolution has $N_x=1001$ points and $N_{\mathrm{step}}=1000$
 time steps, while the $k=4$ prior has $N_x=251$ and
 $N_{\mathrm{step}}=250$. Since every RK4 stage is linear in $N_x$,
-the ratio of finite-difference point updates is
+the coarse-to-fine ratio of finite-difference point updates is
 \begin{equation}
-  \frac{N_x^{\mathrm f}N_{\mathrm{step}}^{\mathrm f}}
-       {N_x^{\mathrm c}N_{\mathrm{step}}^{\mathrm c}}
-  = \frac{1001\times1000}{251\times250}
-  = 15.95.
+  \frac{N_x^{\mathrm c}N_{\mathrm{step}}^{\mathrm c}}
+       {N_x^{\mathrm f}N_{\mathrm{step}}^{\mathrm f}}
+  = \frac{251\times250}{1001\times1000}
+  \approx \frac{1}{16}.
   \label{eq:hyb-work-ratio}
 \end{equation}
-This operation count excludes interpolation and FNO evaluation, so it
-does not constitute an end-to-end wall-clock speedup.
 
-\paragraph{Label-free Richardson target.} At $k = 4$ the
-second-order stencil leaves a large
-$\mathcal{O}(\Delta x_{\mathrm{c}}^{2})$ dispersion error in the
-upsampled prior, measured in Sec.~\ref{sec:res-hyb}. We therefore
-run the same problem at $k = 4$ and $k = 2$, upsample both to the fine grid with the
-operator $\mathcal{U}$ of Eq.~\eqref{eq:hyb-upsample}, and form
+\paragraph{Richardson-extrapolated field and correction target.} For the second-order
+stencil, the leading coarse-grid error is
+$\mathcal{O}(\Delta x_{\mathrm{c}}^2)$. We upsample the $k=4$ and
+$k=2$ fields with $\mathcal{U}$ and form the Richardson-extrapolated field in
+Eq.~\eqref{eq:hyb-richardson}.
 \begin{equation}
   \Phi^{\mathrm{R}}
   \;=\; \frac{4\,\mathcal{U}\Phi^{\mathrm{c}}_{2}
               - \mathcal{U}\Phi^{\mathrm{c}}}{3},
   \label{eq:hyb-richardson}
 \end{equation}
-the standard $p = 2$ Richardson combination: the
-$\mathcal{O}(\Delta x_{\mathrm{c}}^{2})$ terms cancel and
-$\Phi^{\mathrm{R}} = \Phi + \mathcal{O}(\Delta x_{\mathrm{c}}^{4})$
-up to the quintic-interpolation error of the upsample. The
-network is trained to predict
-the Richardson-estimated residual
+This cancels the leading error, giving
+$\Phi^{\mathrm{R}}=\Phi+\mathcal{O}(\Delta x_{\mathrm{c}}^4)$ up to
+interpolation error. The correction target is
 \begin{equation}
   \delta\Phi_{\mathrm{R}}(x, t)
   \;=\; \Phi^{\mathrm{R}}(x, t) - \mathcal{U}\Phi^{\mathrm{c}}(x, t),
   \label{eq:hyb-residual}
 \end{equation}
-which agrees with the true error
-$\Phi^{\mathrm{f}} - \mathcal{U}\Phi^{\mathrm{c}}$ by the remaining
-fourth-order Richardson and interpolation errors. The entire
-supervision signal is thus built from coarse solves. The fine solve is
-retained only for evaluation, and at inference only the single
-$k = 4$ solve is required. The target is largest
-on the under-resolved wavefronts, where the stencil dephases the
-high-wavenumber content of the prompt burst, and near zero
-elsewhere. This defines a localized residual-learning problem rather
-than full-field synthesis, whose spatial localisation the gate of
-Eq.~\eqref{eq:hyb-gate} exploits.
+and agrees with the true coarse-grid error up to the remaining
+fourth-order Richardson and interpolation errors. It is obtained
+entirely from coarse solves. The fine reference field is used only for
+evaluation, while inference requires only the $k=4$ solve. The target
+is concentrated on under-resolved wavefronts, motivating the gate in
+Eq.~\eqref{eq:hyb-gate}.
 
-\paragraph{Upsample operator.} The operator $\mathcal{U}$ used
-in Eqs.~\eqref{eq:hyb-richardson}--\eqref{eq:hyb-residual} and as
-the channel-0 prior is implemented with a degree-five tensor-product
-spline on the rectangular grid:
+\paragraph{Upsample operator.} The operator $\mathcal{U}$ is the
+degree-five tensor-product spline
 \begin{equation}
   (\mathcal{U}\Phi^{\mathrm{c}})(x, t)
   \;=\; \sum_{i, j} c_{ij}\,
@@ -657,32 +638,32 @@ spline on the rectangular grid:
         B_{5}\!\Bigl(\tfrac{x - x_{j}}{\Delta x_{\mathrm{c}}}\Bigr),
   \label{eq:hyb-upsample}
 \end{equation}
-with $B_{5}$ the quintic B-spline basis and $\{c_{ij}\}$ fixed
-by interpolation at the coarse nodes. The quintic interpolant was used
-so that interpolation error is smaller than the Richardson residual in
-the regimes tested. For smooth data, the degree-five spline has a
-higher formal order than the fourth-order Richardson remainder. The
-same $\mathcal{U}$ is applied to both coarse solves.
+Here $B_5$ is the quintic B-spline basis and the coefficients
+interpolate the coarse nodes. The same operator is applied to both
+coarse fields. For smooth data, its formal order exceeds the
+fourth-order Richardson remainder, and its interpolation error is
+smaller than the correction target in the tested regime.
 
-\paragraph{Input stack.} The five input channels are listed in
-Fig.~\ref{fig:hyb-arch}: the upsampled prior
-$\mathcal{U}\Phi^{\mathrm{c}}$ (the coarse dynamical prior), the initial datum
-$\Phi^{\mathrm{c}}(x, 0)$, the potential $V_{\ell}(x; M)$ of
-Eq.~\eqref{eq:V-zerilli}, which supplies the mass-dependent spatial
-operator, the broadcast scalar $M$, included as an explicit parameter
-channel, and the initial velocity
+\paragraph{Input stack.} The input contains the upsampled prior,
+initial displacement, Zerilli potential, broadcast mass and the
+initial velocity estimate
 \begin{equation}
   \Pi^{\mathrm{c}}_{0}(x)
   \;=\; \frac{\Phi^{\mathrm{c}}(x, \Delta t_{\mathrm{c}}) -
               \Phi^{\mathrm{c}}(x, 0)}{\Delta t_{\mathrm{c}}},
   \label{eq:hyb-pi0}
 \end{equation}
-forward-Euler differenced on the coarse grid and linearly
-resampled onto the fine $x$-grid. This channel is used only as an
-auxiliary input, not as a supervised target.
+computed on the coarse grid and linearly resampled to the fine $x$
+grid. The velocity is an auxiliary input rather than a supervised
+target. The prior channel supplies the coarse evolution.
+The parameters $x_0$ and $\sigma$ are encoded by the initial
+displacement and velocity fields, while $M$ is supplied explicitly
+and through the potential. Thus $X$ identifies both the initial-value
+problem and the spatial operator whose discretisation error is being
+corrected.
 
-\paragraph{Residual operator, gradient gate, and reconstruction.}
-The neural residual operator
+\paragraph{Correction operator, gradient gate, and reconstruction.}
+The neural correction operator
 \begin{equation}
   \mathcal{H}_{\theta}\colon\;
   X = \bigl[\mathcal{U}\Phi^{\mathrm{c}},\,\Phi^{\mathrm{c}}(\cdot, 0),\,
@@ -691,25 +672,27 @@ The neural residual operator
   \delta\Phi_{\theta}(x, t)
   \label{eq:hyb-operator}
 \end{equation}
-is modulated by a parameter-free gradient gate before it is
-added to the prior. The gate
+is modulated by a deterministic fixed-scale gradient gate before it is
+added to the prior. For $P_{ij}=P(x_j,t_i)$, the implementation forms
+the index-space gradient magnitude
 \begin{equation}
-  g(x, t)
-  \;=\; \frac{|\nabla\mathcal{U}\Phi^{\mathrm{c}}(x, t)|}
-             {|\nabla\mathcal{U}\Phi^{\mathrm{c}}(x, t)| + s},
+  d_{\mathrm{idx},ij}
+  = \sqrt{(\Delta_i P_{ij})^2+(\Delta_j P_{ij})^2},
   \qquad
-  |\nabla\mathcal{U}\Phi^{\mathrm{c}}|
-  = \sqrt{(\partial_{t}\mathcal{U}\Phi^{\mathrm{c}})^{2}
-          + (\partial_{x}\mathcal{U}\Phi^{\mathrm{c}})^{2}},
+  g_{ij}=\frac{d_{\mathrm{idx},ij}}{d_{\mathrm{idx},ij}+s},
   \label{eq:hyb-gate}
 \end{equation}
-is a deterministic function of the prior alone, with a single
-scale $s = 10^{-3}$ whose label-free selection from the prior
-gradient distribution is derived in App.~\ref{app:gate-scale}:
-$g \to 1$ on the high-gradient wavefronts where the prior
-carries its dispersion error, and $g \to 0$ in the smooth
-interior and causal exterior. The hybrid prediction is the
-gated additive skip
+where $\Delta_i$ and $\Delta_j$ are the finite differences returned
+with unit grid-index spacing. On the fixed $1001\times1001$ grid, we
+set $s=Q_{0.68}(d_{\mathrm{idx}})=10^{-3}$ using only the deployment
+prior. The gate is a deterministic function of the prior alone. It
+approaches one on wavefronts with large
+$d_{\mathrm{idx}}$, where the numerical prior has its largest
+dispersion error, and
+zero in smooth regions away
+from the wavefronts, including the numerically zero region ahead of
+the outgoing signal. The corrected field is reconstructed by adding
+the gated FNO correction to the interpolated coarse solution,
 \begin{equation}
   \Phi^{\mathrm{hyb}}(x, t)
   \;=\; \mathcal{U}\Phi^{\mathrm{c}}(x, t)
@@ -718,12 +701,10 @@ gated additive skip
 \end{equation}
 which confines the correction to the under-resolved regions by
 construction and reduces to the quintic-upsampled coarse solve
-(the ``coarse-up'' baseline of Sec.~\ref{sec:res-hyb}) wherever
-$g = 0$ or $\mathcal{H}_{\theta} \equiv 0$. The gate strongly
-suppresses the correction in low-gradient regions and uses the stable
-coarse solve as an explicit additive prior.
+(the upsampled numerical prior of Sec.~\ref{sec:res-hyb}) wherever
+$g = 0$ or $\mathcal{H}_{\theta} \equiv 0$.
 
-\paragraph{FNO architecture.} The residual operator
+\paragraph{FNO architecture.} The correction operator
 $\mathcal{H}_{\theta}$ is a 2-D Fourier neural operator
 \citep{Li2021fno,Kovachki2023neuralop} on the fine $(t, x)$
 grid: a $1\times 1$ lift to $h = 32$ hidden channels, $L = 4$
@@ -740,21 +721,27 @@ Fourier layers of the form
 and a $1\times 1$ projection back to one channel, where
 $\mathcal{F}$ is the 2-D DFT along $(t, x)$, $R^{(\ell)}$ the
 complex spectral-weight tensor truncated to
-$(K_{t}, K_{x}) = (16, 32)$ retained modes (the grid's natural
-$2{:}1$ mode ratio, resolving
+$(K_{t}, K_{x}) = (16, 32)$ retained modes (matching the $2{:}1$
+spatial-to-temporal domain-length ratio and resolving
 $k_{x} \lesssim 1.0\,M^{-1}$), $\odot$ mode-by-mode matrix
 multiplication across channels, and $W^{(\ell)}$ a pointwise
-residual path. Each axis is pre-padded by $p = 0.10$ against
+linear path. Each axis is pre-padded by $p = 0.10$ against
 periodic wraparound, and positional $(x, t)$ encodings break
 translation equivariance to distinguish the source region from
 the wave zones. The total parameter count is $1.13\times 10^{6}$ under the
 \texttt{neuraloperator} implementation \citep{Kovachki2023neuralop}.
-This smaller width is chosen because the FNO acts on the residual rather
-than the full field.
+The lift first maps the five physical inputs to $h$ feature fields.
+Within each layer, the Fourier path couples retained modes and feature
+channels globally over the complete space-time domain, while
+$W^{(\ell)}$ supplies a local pointwise update. The inverse transform
+returns the global update to physical space, GELU combines the two
+paths nonlinearly, and the final projection returns one correction
+field. The smaller width is used because the FNO predicts a
+correction rather than the full field.
 
 \paragraph{Loss.} The training loss is the gridwise mean
 squared error between the gated network output and the
-label-free Richardson residual,
+Richardson correction target built from coarse solves,
 \begin{equation}
   \mathcal{L}_{\mathrm{hyb}}(\theta)
   \;=\; \frac{1}{B}\sum_{b=1}^{B}
@@ -766,44 +753,30 @@ label-free Richardson residual,
          \bigr]^{2},
   \label{eq:hyb-loss}
 \end{equation}
-averaged over the batch of size $B$. We use no auxiliary loss terms.
-The target is lower-amplitude and spatially localized, so we therefore
-train with a uniform MSE on the gated output.
+Because the gate is part of the forward map, the loss trains the
+correction after gating rather than the raw FNO output. No auxiliary,
+spatially weighted or sample-normalisation terms are used.
 
-\paragraph{Optimiser.} The hFNO is trained with Adam for $100$ epochs
-using the settings in Table~\ref{tab:train-config}. A trial L-BFGS
-phase did not improve the validation loss. The per-epoch validation
-history is shown in Sec.~\ref{sec:res-hyb}.
+\paragraph{Optimiser.} The hFNO is trained with AdamW for $100$ epochs
+using the settings in Table~\ref{tab:train-config}. The checkpoint
+with the lowest validation MSE is used for evaluation.
 
-\paragraph{Training distribution.} The Sobol parameter ranges, data
-split and canonical configuration are listed in
+\paragraph{Training data.} The Sobol parameter ranges, dataset sizes
+and canonical configuration are listed in
 Table~\ref{tab:surrogate-config}. The fine, $k = 4$ and $k = 2$
-solves are precomputed and cached per triple. The ranges of $x_0$ and
-$\sigma$ keep the prompt burst within the simulation window for all
-sampled configurations.
-
-\paragraph{Observer location.} Schwarzschild hFNO quantities are
-reported at $\xq = 10\,M$, the same observer used for the PINN
-fields, so every Schwarzschild model in this report is compared at a
-single observer position;
-the Kerr hFNO of Sec.~\ref{sec:kerr-method} instead reads
-its waveform at null infinity, the natural observer of its
-hyperboloidal slice.
+solves are precomputed and cached for the same Sobol triples, so each
+Richardson pair represents one initial-value problem. The ranges of
+$x_0$ and $\sigma$ keep the prompt burst within the simulation window
+for all sampled configurations.
 
 % --------------------------------------------------------------
 \subsection{Kerr Teukolsky numerical setup}
 \label{sec:teukolsky-numerics}
 
-The Kerr extension uses the spin-$-2$ Teukolsky problem reviewed in
-Sec.~\ref{sec:teukolsky-problem}. The numerical setup must specify the
-radial coordinate, time coordinate and waveform readout. The
-Schwarzschild calculations use a finite-radius readout in the tortoise
-coordinate. For the radiative Kerr problem we instead use a
-horizon-penetrating hyperboloidal foliation, following the geometric
-programme of \citet{Zenginoglu2011} and the Kerr Teukolsky formulation
-of \citet{Harms2013}. We use the minimal-gauge compactification
-developed for Kerr by \citet{PanossoMacedo2020}. The radial coordinate
-is compactified onto the unit interval,
+The Kerr extension uses the spin-$-2$ Teukolsky equation in
+minimal-gauge horizon-penetrating hyperboloidal coordinates
+\citep{Zenginoglu2011,Harms2013,PanossoMacedo2020}. The compactified
+radial coordinate is
 \begin{equation}
   \sigma = \frac{r_{+}}{r} \in [0, 1],
   \qquad
@@ -895,7 +868,7 @@ endpoints are outflow boundaries, so no boundary data are imposed.}
 \label{fig:kerr-slicing}
 \end{figure}
 
-\paragraph{Reference solution and target mode.} The reference field is
+\paragraph{Reference field and target mode.} The reference field is
 obtained by evolving the spin-$-2$ Teukolsky equation on this
 hyperboloidal slice. After factoring out $e^{im\varphi}$, each
 azimuthal number $m$ gives a $1+1$ evolution in $(\tau,\sigma)$.
@@ -909,27 +882,19 @@ are computed at each spin using Leaver's continued-fraction method
 \citep{Stein2019qnm}. These values define the percentage errors
 reported below, in the same way as Eq.~\eqref{eq:qnm-ref} does for
 Schwarzschild. We target the fundamental $(\ell,m,n)=(4,2,0)$ mode.
-The choice $\ell=4$ rather than $\ell=2$ is deliberate. For the
-$\ell=2$ fundamental, the coarse prior already resolves the frequency
-near the extractor floor, leaving little spectroscopic headroom for
-the correction. The faster $\ell=4$ mode
-(Fig.~\ref{fig:kerr-spectrum}a) is more sensitive to the coarse-grid
-wavefront error that the hFNO is designed to reduce.
+The choice $\ell=4$ rather than $\ell=2$ is deliberate. Its
+shorter-wavelength perturbation provides a more stringent test of
+spatial under-resolution and of the hFNO's ability to recover the
+corresponding wavefront structure (Fig.~\ref{fig:kerr-spectrum}a).
 
-Table~\ref{tab:kerr-numerics} gives the numerical configuration used
-to generate the Kerr corpus. The $N=201$ and $N=401$ fields are
-evolved independently of the $N=801$ reference. Their Richardson
-combination differs from that reference by a median field RL2 of
-$0.008\%$ (Sec.~\ref{sec:res-kerr}), providing a three-resolution
-consistency check on the numerical fields used for learning and
-evaluation.
+The $N=201$ and $N=401$ fields are computed independently
+of the $N=801$ fine reference field.
 
 \begin{table}[!htbp]
 \centering
-\caption{Numerical configuration of the Kerr corpus. The stored time
-cadence is distinct from the smaller CFL-limited RK4 step.}
+\caption{Kerr dataset and numerical configuration.}
 \label{tab:kerr-numerics}
-\small
+\footnotesize
 \setlength{\tabcolsep}{5pt}
 \begin{tabular}{@{}ll@{}}
 \toprule
@@ -939,60 +904,137 @@ Field and target mode & $s=-2$, $(\ell,m,n)=(4,2,0)$, $M=1$ \\
 Domain and readout & $\sigma\in[0,1]$, $\tau/M\in[0,220]$, $\scri$ at $\sigma=0$ \\
 Initial data & $\Psi(0,r)=\exp[-(r-r_0)^2/(2w^2)]$, $\partial_\tau\Psi(0,r)=0$ \\
 Parameter ranges & $a/M\in[0,0.95]$, $r_0/M\in[8,11]$, $w/M\in[1,1.5]$ \\
-Fine evaluation field & $N=801$, fourth-order centred differences \\
-Richardson fields & $N=401,201$, fourth-order centred differences \\
+Fine reference field & $N=801$, fourth-order centred differences \\
+Richardson pair & $N=401,201$, fourth-order centred differences \\
 Deployment prior & $N=101$, second-order centred differences \\
 Time integration & RK4, CFL safety $0.4$, stored every $0.25\,M$ \\
 Dissipation & KO strength $0.2$, matched fourth- or sixth-difference operator \\
-Data split & Sobol seed $0$, $1024/128/128$ \\
+Training/validation/test samples & Sobol seed $0$, $1024/128/128$ \\
 Training seed & $1234$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Because the Teukolsky field is complex, the estimator suite of
-Sec.~\ref{sec:qnm-methods} is applied to the real and imaginary parts
-separately and augmented with complex ESPRIT (cES) and a complex-phase
-fit (c$\Phi$), defined in Algorithms~\ref{alg:cphi}
-and~\ref{alg:ces}. For the labelled Kerr corpus, the Leaver frequency
-is used to identify the target pole among multi-mode candidates. The
-reported value is the best-of-suite estimate for the target
-$(4,2,0)$ mode, read at $\scri$.
+QNM extraction is reported for the hFNO and fine reference fields.
+The $N=101$ field is the numerical prior and field-accuracy baseline.
+QNM extraction is not reported separately for it.
 
 % --------------------------------------------------------------
 \subsection{The Kerr hFNO}
 \label{sec:kerr-method}
 
-The hFNO is the coarse-solve-plus-residual-FNO
-construction of Sec.~\ref{sec:hyb-method}
-(Fig.~\ref{fig:hyb-arch}), retrained on the Teukolsky problem
-with four adaptations dictated by the hyperboloidal geometry
-(Fig.~\ref{fig:kerr-arch}). (i)~Because the hyperboloidal Kerr
-corpus is built on smooth nested spatial grids, we use a fourth-order
-Richardson target
+The Kerr hFNO extends the Schwarzschild correction operator of
+Sec.~\ref{sec:hyb-method} to the complex Teukolsky field. For each
+$q_{\mathrm K}=(a/M,r_0,w)$, the deployment prior is the full
+$N=101$ field upsampled along the compactified radial direction,
+\begin{equation}
+  P_{\mathrm K}(q_{\mathrm K})
+  =\mathcal U_\sigma\Psi_{101}^{\mathrm c}(q_{\mathrm K}).
+  \label{eq:kerr-prior}
+\end{equation}
+All resolutions share the same stored $\tau$ grid, so no temporal
+interpolation is required.
+
+The Richardson-extrapolated field is constructed from independently
+evolved $N=401$ and $N=201$ fields. Both are computed with
+fourth-order spatial differences and form an exact $2{:}1$ refinement
+pair, giving
 \begin{equation}
   u^{\star} = \frac{16\, u_{401} - u_{201}}{15},
   \label{eq:kerr-richardson}
 \end{equation}
 where $u_{401}$ and $u_{201}$ denote the $N = 401$ and $N = 201$
-coarse fields after spatial upsampling to the fine $\sigma$ grid.
-(ii)~The deployment prior is a single $N = 101$ hyperboloidal solve,
-upsampled to the fine $\sigma$ grid before entering the FNO. The
-Richardson grids are used only to build the training target, so
-deployment cost is set by the $N = 101$ prior solve and the fixed-grid
-FNO evaluation. (iii)~The complex prior is represented by its real and
-imaginary parts, and the FNO also receives the broadcast spin $a/M$ and
-the initial real pulse as input channels. The residual output has two
-channels, representing $\mathrm{Re}\,\delta\Psi$ and
-$\mathrm{Im}\,\delta\Psi$. (iv)~The gradient gate is removed because the Kerr residual is not confined to
-high-gradient wavefronts on the hyperboloidal slice. In particular, phase
-and damping errors at $\scri$ persist through the ringdown, so a prior-gradient
-gate would suppress corrections in the low-amplitude late-time signal used for
-QNM extraction. The network has $7.7 \times 10^{6}$ parameters and trains for
-$200$ epochs on Sobol samples in $a/M\in[0,0.95]$, $r_0\in[8,11]$ and
-$w\in[1,1.5]$; as for Schwarzschild no fine-grid field enters its loss,
-and it reaches a best validation MSE of $1.4\times10^{-4}$ on the
-normalised residual target.
+fields after spatial upsampling to the fine $\sigma$ grid. This
+cancels the leading $\mathcal O(\Delta\sigma^4)$ spatial error. The
+different Richardson coefficients in Eqs.~\eqref{eq:hyb-richardson}
+and~\eqref{eq:kerr-richardson} follow directly from the second-order
+Schwarzschild and fourth-order Kerr stencils. The $N=101$ deployment
+prior is deliberately separate from this finer target pair. It
+retains a cheap inference solve while the two finer fields are
+needed only during training.
+
+The field amplitude varies substantially across the parameter family.
+Each sample is therefore scaled by the RMS magnitude of its prior,
+\begin{equation}
+  s_b
+  =\left[
+      \frac{1}{N_\tau N_\sigma}
+      \sum_{i=1}^{N_\tau}\sum_{j=1}^{N_\sigma}
+      |P_{\mathrm K}^{(b)}(\tau_i,\sigma_j)|^2
+    \right]^{1/2}.
+  \label{eq:kerr-scale}
+\end{equation}
+This scale depends only on the deployment prior and is available at
+inference. The four input channels and the normalised target are
+\begin{align}
+  X_{\mathrm K}^{(b)}
+  &=\left[
+      \frac{\operatorname{Re}P_{\mathrm K}^{(b)}}{s_b},
+      \frac{\operatorname{Im}P_{\mathrm K}^{(b)}}{s_b},
+      \frac{a_b}{M},
+      \frac{\operatorname{Re}P_{\mathrm K}^{(b)}(0,\cdot)}{s_b}
+    \right],
+  \nonumber\\
+  Y_{\mathrm K}^{(b)}
+  &=\left[
+      \frac{\operatorname{Re}(u_b^\star-P_{\mathrm K}^{(b)})}{s_b},
+      \frac{\operatorname{Im}(u_b^\star-P_{\mathrm K}^{(b)})}{s_b}
+    \right].
+  \label{eq:kerr-input-target}
+\end{align}
+The spin channel and initial pulse specify the configuration, while
+the real and imaginary prior channels provide the reduced-resolution
+evolution.
+
+The FNO returns two normalised correction channels. Writing these as
+$\mathcal H_{\theta,1}$ and $\mathcal H_{\theta,2}$, the physical
+field is reconstructed by
+\begin{equation}
+  \Psi^{\mathrm{hyb}}_b
+  =P_{\mathrm K}^{(b)}
+   +s_b\left[
+      \mathcal H_{\theta,1}(X_{\mathrm K}^{(b)})
+      +\mathrm i\,\mathcal H_{\theta,2}(X_{\mathrm K}^{(b)})
+    \right].
+  \label{eq:kerr-reconstruct}
+\end{equation}
+The training objective is the uniform MSE over both correction
+channels,
+\begin{equation}
+  \mathcal L_{\mathrm K}(\theta)
+  =\frac{1}{2BN_\tau N_\sigma}
+   \sum_{b=1}^{B}\sum_{c=1}^{2}
+   \sum_{i=1}^{N_\tau}\sum_{j=1}^{N_\sigma}
+   \left[
+     \mathcal H_{\theta,c}(X_{\mathrm K}^{(b)})_{ij}
+     -Y_{\mathrm K,c,ij}^{(b)}
+   \right]^2.
+  \label{eq:kerr-loss}
+\end{equation}
+No $N=801$ field enters this loss. Those fields are used only to
+evaluate the hFNO after reconstruction.
+
+The correction operator has four Fourier layers, width $48$, retained
+modes $(K_\tau,K_\sigma)=(64,24)$, grid positional encodings and
+padding $(0.08,0.08)$. The greater number of temporal modes resolves
+the oscillatory ringdown, while the compactified radial dependence is
+smoother. The network contains $7{,}697{,}042$ trainable parameters
+and is trained in single precision with Adam, an initial learning
+rate of $10^{-3}$, weight decay $10^{-6}$ and batch size $8$. A
+cosine schedule reduces the learning rate over at most $200$ epochs.
+Training stops after $30$ epochs without validation improvement, and
+the checkpoint with the lowest validation MSE is used for evaluation.
+
+Unlike the Schwarzschild construction, the Kerr correction is not
+multiplied by a gradient gate. Unlike the Schwarzschild field, the
+hyperboloidal field is nonzero over nearly the entire domain, and
+phase and damping errors at $\scri$ persist into the low-amplitude
+ringdown. A prior-gradient gate would
+therefore suppress corrections where the QNM signal is measured. At
+inference, Eqs.~\eqref{eq:kerr-prior}
+and~\eqref{eq:kerr-reconstruct} require one $N=101$ solve and one FNO
+evaluation; the Richardson pair and fine reference field are absent.
+Figure~\ref{fig:kerr-arch} shows the training and inference paths.
 
 \begin{figure}[!htbp]
 \centering
@@ -1017,21 +1059,22 @@ normalised residual target.
   % ===== main vertical column =====
     \node[ic] (ic) {Sobol sample $(a/M,\,r_0,\,w)$,\quad $a/M\in[0,0.95]$};
   \node[solve, below=5mm of ic] (c101)
-       {coarse hyperboloidal solve $\Psi^{\mathrm{c}}$, $N = 101$\\
-        (MoL RK4 $+$ Kreiss--Oliger)};
+       {coarse hyperboloidal solve, $N = 101$\\
+        $P_{\mathrm K}=\mathcal U_\sigma\Psi_{101}^{\mathrm c}$};
   \node[inp, below=5mm of c101] (chan)
-      {normalise by $s_b=\mathrm{rms}(|\Psi^{\mathrm{c}}|)$\\
-       input channels: $\mathrm{Re}\,\Psi^{\mathrm{c}}/s_b$, $\mathrm{Im}\,\Psi^{\mathrm{c}}/s_b$,\\
-       broadcast $a/M$, and $\mathrm{Re}\,\Psi^{\mathrm{c}}(\tau{=}0)/s_b$};
+      {normalise by $s_b=\mathrm{rms}(|P_{\mathrm K}|)$\\
+       input channels: $\mathrm{Re}\,P_{\mathrm K}/s_b$, $\mathrm{Im}\,P_{\mathrm K}/s_b$,\\
+       broadcast $a/M$, and $\mathrm{Re}\,P_{\mathrm K}(\tau{=}0)/s_b$};
   \node[fno, below=5mm of chan] (fno)
-       {four-layer 2-D FNO $\mathcal{H}_{\theta}$,\
-        $7.7\times 10^{6}$ params\\
-        \textbf{no gradient gate} \ [adaptation iv]};
-  \node[outn, below=6mm of fno] (res)
-       {global residual $\delta\Psi_{\theta}$};
+     {four-layer 2-D FNO $\mathcal{H}_{\theta}$\\
+      width $48$, modes $(64,24)$,
+      $7.7\times 10^{6}$ params\\
+      \textbf{no gradient gate}};
+    \node[outn, below=6mm of fno] (res)
+      {normalised correction $\widehat{\delta\Psi}_{\theta}$};
   \node[sum, below=5mm of res] (sum) {$+$};
   \node[outn, fill=orange!45, below=5mm of sum] (hyb)
-      {$\Psi^{\mathrm{hyb}} = \Psi^{\mathrm{c}} + s_b\,\delta\Psi_{\theta}$,\
+      {$\Psi^{\mathrm{hyb}} = P_{\mathrm K} + s_b\,\widehat{\delta\Psi}_{\theta}$,\
         read at $\scri$ ($\sigma{=}0$)};
   \draw[arr] (ic) -- (c101);
   \draw[arr] (c101) -- (chan);
@@ -1044,15 +1087,15 @@ normalised residual target.
   \draw[arrs] (c101.west) -- ++(-2.0,0)
         node[pos=0.5, above, font=\scriptsize, blue!55!black]{skip: prior}
         |- (sum.west);
-  % ===== training-only path (right); target level-aligned with residual =====
+    % ===== training-only path (right); target level-aligned with correction =====
   \node[tgt, right=22mm of res] (tgt)
-       {order-4 Richardson target \ [adaptation i]\\
+      {fourth-order Richardson-extrapolated field\\
         $u^{\star} = (16\,u_{401} - u_{201})/15$,\
-        $N = 201, 401$ \ [adaptation ii]\\
-        $\delta\Psi_{\mathrm{R}} = u^{\star} - \Psi^{\mathrm{c}}$};
+       $N = 201, 401$\\
+        $Y_{\mathrm K} = (u^{\star} - P_{\mathrm K})/s_b$};
   \node[loss, below=6mm of tgt] (lo)
-       {$\mathcal{L} = \mathrm{MSE}
-        (\delta\Psi_{\theta},\, \delta\Psi_{\mathrm{R}})$};
+       {$\mathcal{L}_{\mathrm K} = \mathrm{MSE}
+        (\widehat{\delta\Psi}_{\theta},\,Y_{\mathrm K})$};
   \draw[arrt] (res.east) --
         node[pos=0.5, above, font=\scriptsize]{training only} (tgt.west);
   \draw[arr] (tgt) -- (lo);
@@ -1064,17 +1107,18 @@ normalised residual target.
 \end{tikzpicture}}
 \caption{Kerr hFNO pipeline of Sec.~\ref{sec:kerr-method}.
 The deployment path uses a single $N = 101$ hyperboloidal solve to
-produce the complex prior $\Psi^{\mathrm{c}}$, which is upsampled to
+produce the complex prior $P_{\mathrm K}$, which is upsampled to
 the fine $\sigma$ grid and normalised by the prior-derived scale
 $s_b$. The FNO receives the real and imaginary parts of the prior, the
 broadcast spin $a/M$, and the initial real pulse. It predicts a
-two-channel residual that is multiplied by $s_b$ and added to the
+two-channel correction that is multiplied by $s_b$ and added to the
 prior to give $\Psi^{\mathrm{hyb}}$ at $\scri$. The training-only path
 uses the $N = 201$ and $N = 401$ solves to form the fourth-order
-Richardson target $u^\star$ and hence the label-free residual
-$\delta\Psi_{\mathrm{R}}$, against which $\mathcal{H}_{\theta}$ is
-fitted by MSE. The fine solve is used only for evaluation. At
-inference the right-hand path is absent.}
+Richardson-extrapolated field $u^\star$ and hence the normalised
+correction target $Y_{\mathrm K}$, against which
+$\mathcal{H}_{\theta}$ is fitted by
+Eq.~\eqref{eq:kerr-loss}. The fine reference field is used only for evaluation.
+At inference the right-hand path is absent.}
 \label{fig:kerr-arch}
 \end{figure}
 
@@ -1082,231 +1126,187 @@ inference the right-hand path is absent.}
 \subsection{QNM extraction methods}
 \label{sec:qnm-methods}
 
-Once a model has produced a field, the QNM parameters
-$(\omega,\tau)$ are extracted post-hoc from its observer time
-series. The PINN fields are read at $\xq = 10\,M$ over
-$[10,50]\,M$. The Schwarzschild hFNO is read at the same observer
-over its $[10,100]\,M$ evolution, and the Kerr hFNO is read at
-null infinity (Sec.~\ref{sec:teukolsky-numerics}). In the intermediate
-ringdown regime, after the prompt response and before the
-late-time tail, the observer signal is modelled as a sum of
-damped sinusoids,
+QNM parameters $(\omega,\tau)$ are extracted from the Schwarzschild
+waveform at $\xq=10\,M$ and the Kerr waveform at $\scri$. Between the
+prompt response and late-time tail, a real signal is modelled as a
+sum of damped sinusoids,
 \begin{equation}
   \Phi(\xq, t) \;\approx\;
   \sum_{n} A_n\,\mathrm{e}^{-(t-t_0)/\tau_n}
   \cos\bigl(\omega_n(t-t_0) + \phi_n\bigr).
   \label{eq:qnm-template}
 \end{equation}
-For Schwarzschild we use five estimators. M1 and M2 reproduce the
-two estimators used by \citet{Patel2024pinn}. M3 adds an ESPRIT
-subspace estimator for damped exponentials \citep{Roy1989esprit}.
-M4 and M5 introduce one- and two-edge plateau scans over the fit
-window, relying on the operational definition below (formalised and
-motivated in Sec.~\ref{sec:plateau}). The Kerr analysis uses the
-same real-valued estimators on $\mathrm{Re}\,\Psi$ and
-$\mathrm{Im}\,\Psi$, together with the complex estimators defined
-below.
+The estimators are applied separately rather than sequentially. M1
+and M2 reproduce the procedures of \citet{Patel2024pinn}; M3 supplies
+a subspace estimate; and M4 and M5 test fit-window sensitivity with a
+two-mode model. For Kerr, the real-valued methods are applied to both
+field components, while c$\Phi$ and cES use the complex field. Each
+method returns a candidate $(\widehat\omega,\widehat\tau)$; the
+protocols below specify the windows, mode identification and
+aggregation used for each geometry.
 
-\begin{definition}[fit-window plateau]
-\label{def:plateau}
-We call a fit window $[t_0,\,\tend]$ stable when small changes of
-the window edges produce no significant change in the recovered
-$(\omega,\tau)$. Operationally, in M4 and M5 the plateau is the
-contiguous block of fixed size $w = \lfloor\tfrac12 N\rfloor$ along
-each scan axis that minimises the combined relative population
-standard deviation
-$\mathrm{std}(\omega)/|\bar\omega|+\mathrm{std}(\tau)/|\bar\tau|$ of
-the per-window fits inside the block (population standard deviation,
-divisor $N$).
-\end{definition}
+\subsubsection{Schwarzschild estimators and fit-window protocol}
+\label{sec:plateau}
 
-Each estimator is given as pseudocode in
-Algorithms~\ref{alg:m1}--\ref{alg:m5}. M1--M3 act on a single
-window. M1 estimates the damping time from the slope of the
-logarithmic envelope at waveform extrema,
+\paragraph{Fixed-window Schwarzschild estimators.} M1 estimates the
+damping time from the logarithmic envelope at waveform extrema and
+the frequency from the positive spectral maximum, following
+\citet{Patel2024pinn}. The implementation applies a Hann taper, zero
+padding and three-bin parabolic peak refinement. At the local maxima
+$t_k$ of $|\Phi|$,
 \begin{equation}
   \log|\Phi(\xq, t_k)| \;\approx\;
   \log A_{0} - \frac{t_k - t_0}{\tau_{0}},
   \label{eq:logline}
 \end{equation}
-and M3 applies ESPRIT to the uniformly sampled analytic signal,
-modelled as
+so $\widehat\tau_{\mathrm{M1}}$ is minus the reciprocal of the OLS
+slope. M2 instead fits the single-mode model directly,
 \begin{equation}
-  \Phi(\xq, k\Delta t)
+  (\widehat A,\widehat\omega,\widehat\tau,\widehat\phi)_{\mathrm{M2}}
+  =\underset{A,\,\omega>0,\,\tau>0,\,\phi}{\arg\min}
+  \sum_{t_j\in W}
+  \left[\Phi(\xq,t_j)-A e^{-t_j/\tau}
+  \cos(\omega t_j+\phi)\right]^2,
+  \label{eq:m2-fit}
+\end{equation}
+initialized by M1.
+
+M3 applies ESPRIT \citep{Roy1989esprit} to the uniformly sampled
+analytic signal $s_j=\Phi_j+i\mathcal H[\Phi]_j$, modelled as
+\begin{equation}
+  s_k
   \;\approx\; \sum_{n=0}^{K-1} c_{n}\, z_{n}^{\,k},
   \qquad
   z_{n} \;=\; e^{(-1/\tau_{n} + \mathrm{i}\omega_{n})\Delta t}.
   \label{eq:esprit-model}
 \end{equation}
-This places the Fourier/log-envelope, NLS, Prony/matrix-pencil
-and ESPRIT family of extractors in the same finite-window
-time-series setting
-\citep{Buonanno2007ringdown,Berti2007prony,HuaSarkar1990,Roy1989esprit}.
-M4 and M5 use a two-component damped-sinusoid model, motivated by
-the overtone sensitivity discussed by \citet{Giesler2019overtones},
+If $U_K$ contains the leading $K$ left singular vectors of the
+Hankel matrix $H_{ij}=s_{i+j}$, the poles are the eigenvalues
+\begin{equation}
+  \{z_n\}_{n=0}^{K-1}
+  =\operatorname{eig}\!\left[
+  (U_K^{\uparrow})^{+}U_K^{\downarrow}\right],
+  \qquad
+  \widehat\omega_n=\frac{\operatorname{Im}\log z_n}{\Delta t},
+  \qquad
+  \widehat\tau_n=-\frac{\Delta t}{\operatorname{Re}\log z_n}.
+  \label{eq:esprit-poles}
+\end{equation}
+Here $+$ denotes the Moore--Penrose inverse and the arrows remove the
+last and first rows, respectively. M3 returns the positive-frequency,
+positive-damping pole with the largest fitted amplitude $|c_n|$
+\citep{HuaSarkar1990,Roy1989esprit}.
+
+The damped-sinusoid model is appropriate after the prompt response
+and before the late-time tail. A fixed interval can therefore bias an
+otherwise valid estimator. M4 varies the start time at fixed end time,
+while M5 varies both window edges. Both report the most stable
+contiguous block rather than selecting one fit by hand. The resulting
+spread measures fit-window sensitivity, not statistical uncertainty.
+
+For the Schwarzschild $\ell=2$ fundamental, the relevant timescales
+are
+\begin{equation}
+  t_{\mathrm{burst}} \sim 5\,M, \qquad
+  \tau_1 = 3.651\,M, \qquad
+  \tau_0 = 11.241\,M, \qquad
+  t_{\mathrm{tail}} \gg 50\,M.
+  \label{eq:timescales}
+\end{equation}
+Here $t_{\mathrm{burst}}$ is set by the initial data and
+$t_{\mathrm{tail}}$ denotes the onset of the Price tail
+$\propto t^{-(2\ell+3)}$ \citep{Berti2009review}. PINN fits can
+extend to the end of the $50\,M$ evolution. For the longer hFNO
+waveform, M4 ends at the usable-signal cutoff and M5 scans the end
+time through $100\,M$.
+
+\citet{Patel2024pinn} use a single fit without reporting window
+sensitivity. Start-time scans are standard in ringdown analyses
+\citep{Buonanno2007ringdown,LIGO2016ringdown,Isi2021priors}; M5 also
+tests sensitivity to the end time.
+
+\paragraph{Plateau-based estimators.} M4 and M5 use a
+two-component damped-sinusoid model, motivated by the overtone
+sensitivity discussed by \citet{Giesler2019overtones},
 \begin{equation}
   \Phi_{\mathrm{model}}(t) =
   A_0\,e^{-t/\tau_0}\cos(\omega_0 t + \phi_0)
   + A_1\,e^{-t/\tau_1}\cos(\omega_1 t + \phi_1),
   \label{eq:two-mode}
 \end{equation}
-with the longer-$\tau$ component taken as the fundamental, so the
-second component can absorb early-time overtone power or residual
-prompt contamination that would otherwise bias a single-mode fit.
+with the longer-$\tau$ component taken as the fundamental. The second
+component can then absorb early-time overtone power or residual prompt
+contamination that would otherwise bias a single-mode fit.
+
+\begin{definition}[fit-window plateau]
+\label{def:plateau}
+For fitted values $(\widehat\omega_W,\widehat\tau_W)$ on candidate
+windows $W$, define the scatter of a contiguous block $B$ by
+\begin{equation}
+  S(B)=
+  \frac{\operatorname{std}_{W\in B}(\widehat\omega_W)}
+  {|\operatorname{mean}_{W\in B}(\widehat\omega_W)|}
+  +
+  \frac{\operatorname{std}_{W\in B}(\widehat\tau_W)}
+  {|\operatorname{mean}_{W\in B}(\widehat\tau_W)|}.
+  \label{eq:plateau-score}
+\end{equation}
+The plateau is $B^*=\arg\min_{B\in\mathcal B_d}S(B)$, where
+$\mathcal B_4$ contains contiguous eight-window blocks and
+$\mathcal B_5$ contiguous $5\times3$ rectangles. Standard deviations
+are population values.
+\end{definition}
 
 \begin{algorithm}[H]
-\caption{M1 --- spectral peak and log-envelope slope, the
-\citet{Patel2024pinn} procedure.}
-\label{alg:m1}
+\caption{Plateau selection for M4 and M5.}
+\label{alg:plateau}
 \begin{algorithmic}[1]
-\STATE \textbf{Input:} $\Phi(\xq,t)$ on window $[t_0,\tend]$.
-\STATE $\widehat{\Phi} \gets$ zero-padded, Hann-windowed FFT of $\Phi$.
-\STATE $\omega \gets$ parabolic interpolation of the peak bin of $|\widehat{\Phi}|$.
-\STATE $\{t_k\} \gets$ local maxima of $|\Phi(\xq,t)|$;\
-       $\tau \gets -1/\mathrm{slope}$ of the OLS fit of
-       Eq.~\eqref{eq:logline} to $\log|\Phi(\xq,t_k)|$ versus $t_k$.
-\STATE \textbf{return} $(\omega,\tau)$.
-\end{algorithmic}
-\end{algorithm}
-
-\begin{algorithm}[H]
-\caption{M2 --- single damped-sinusoid nonlinear least squares.}
-\label{alg:m2}
-\begin{algorithmic}[1]
-\STATE \textbf{Input:} $\Phi(\xq,t)$ on window $[t_0,\tend]$.
-\STATE $(A,\omega,\tau,\phi) \gets \arg\min \sum_{t}
-       \bigl[\Phi(\xq,t) - A\,e^{-t/\tau}\cos(\omega t + \phi)\bigr]^2$
-  by nonlinear least squares, initialised from M1.
-\STATE \textbf{return} $(\omega,\tau)$. \hfill{\footnotesize\itshape most overtone-sensitive}
-\end{algorithmic}
-\end{algorithm}
-
-\begin{algorithm}[H]
-\caption{M3 --- ESPRIT subspace decomposition \citep{Roy1989esprit}.}
-\label{alg:m3}
-\begin{algorithmic}[1]
-\STATE \textbf{Input:} $\Phi(\xq,t)$ on window $[t_0,\tend]$, model order $K$.
-\STATE $s \gets$ Hilbert-analytic signal of $\Phi(\xq,t)$.
-\STATE $\{z_n\}_{n=0}^{K-1} \gets$ ESPRIT poles of $s$
-       (model Eq.~\eqref{eq:esprit-model}),
-       $z_n = e^{(-1/\tau_n + i\omega_n)\Delta t}$.
-\STATE Keep physical poles with $\tau_n > 0$ and $\omega_n > 0$;
-  $(\omega_0,\tau_0) \gets$ the dominant pole for the Schwarzschild
-  real-signal estimator.
-\STATE \textbf{return} $(\omega_0,\tau_0)$.
-\end{algorithmic}
-\end{algorithm}
-
-\begin{algorithm}[H]
-\caption{M4 --- two-mode NLS with a 1-D start-time plateau scan.}
-\label{alg:m4}
-\begin{algorithmic}[1]
-\STATE \textbf{Input:} $\Phi(\xq,t)$,
-       grid $\{t_0^{(k)}\}_{k=1}^{16} \subset [10,25]\,M$,
-       fixed $\tend$ at the domain end, plateau width $w = 8$.
-\FOR{$k = 1,\dots,16$}
-  \STATE Fit Eq.~\eqref{eq:two-mode} to $\Phi(\xq,t)$ on $[t_0^{(k)},\tend]$
-         by NLS.
-  \STATE Identify the longer-$\tau$ component as the fundamental,
-         giving $(\omega_0^{(k)},\tau_0^{(k)})$.
+\STATE \textbf{Input:} waveform $\Phi$, candidate windows
+  $\mathcal W_d$ and admissible blocks $\mathcal B_d$ for
+  $d\in\{4,5\}$.
+\FOR{$W\in\mathcal W_d$}
+  \STATE $\widehat{\boldsymbol\theta}_W\gets
+    \arg\min_{\boldsymbol\theta}
+    \sum_{t_j\in W}[\Phi(\xq,t_j)-
+    \Phi_{\mathrm{model}}(t_j;\boldsymbol\theta)]^2$.
+  \STATE $(\widehat\omega_W,\widehat\tau_W)\gets$ fitted component
+    with the larger damping time.
 \ENDFOR
-\STATE Find the contiguous index range $k^* : k^*{+}w{-}1$ minimising
-       the combined relative scatter
-       $\mathrm{std}(\omega_0)/\bar\omega_0 + \mathrm{std}(\tau_0)/\bar\tau_0$.
-\STATE \textbf{return} plateau mean
-       $(\bar\omega_0,\bar\tau_0)$ and population standard deviation
-       $(\sigma_{\omega_0},\sigma_{\tau_0})$ over the plateau block.
+\STATE $B^*\gets\arg\min_{B\in\mathcal B_d}S(B)$.
+\STATE \textbf{return} $\operatorname{mean}_{W\in B^*}
+  (\widehat\omega_W,\widehat\tau_W)$ and the corresponding
+  population standard deviations.
 \end{algorithmic}
 \end{algorithm}
 
-\begin{algorithm}[H]
-\caption{M5 --- two-mode NLS with a 2-D two-edge plateau scan.}
-\label{alg:m5}
-\begin{algorithmic}[1]
-\STATE \textbf{Input:} $\Phi(\xq,t)$, grid
-       $t_0 \in [10,25]\,M$ and $\tend$ from $30\,M$ to the domain
-       end ($10\times 6$),
-       plateau block $5\times 3$.
-\FOR{each window $(t_0,\tend)$ on the grid}
-  \STATE Fit Eq.~\eqref{eq:two-mode} by NLS; the longer-$\tau$ component
-         is the fundamental, giving $(\omega_0,\tau_0)$.
-\ENDFOR
-\STATE Find the contiguous $5\times 3$ rectangle minimising the combined
-       relative scatter
-       $\mathrm{std}(\omega_0)/\bar\omega_0 + \mathrm{std}(\tau_0)/\bar\tau_0$
-       (Def.~\ref{def:plateau}, applied per axis).
-\STATE \textbf{return} plateau mean $(\bar\omega_0,\bar\tau_0)$ and
-       spread $(\sigma_{\omega_0},\sigma_{\tau_0})$ over the rectangle.
-\end{algorithmic}
-\end{algorithm}
+\begin{table}[!htbp]
+\centering
+\caption{Schwarzschild QNM extraction windows at $\xq=10\,M$. The
+reproduction uses only M1 and M2, following \citet{Patel2024pinn}.}
+\label{tab:qnm-windows}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}lccc@{}}
+\toprule
+Field & M1--M3 window & M4 scan & M5 scan \\
+\midrule
+Reproduction PINN and FD
+ & $[10,50]M$ & not reported & not reported \\
+Enhanced PINN and FD
+ & $[10,50]M$ & $t_0\in[10,25]M$, $\tend=50M$
+ & $t_0\in[10,25]M$, $\tend\in[30,50]M$ \\
+hFNO canonical configuration
+ & $[10,80]M$ & $t_0\in[10,25]M$, $\tend=80M$
+ & $t_0\in[10,25]M$, $\tend\in[30,100]M$ \\
+hFNO ($100$ configurations)
+ & $[10,100]M$ & $t_0\in[10,25]M$, $\tend=100M$
+ & $t_0\in[10,25]M$, $\tend\in[30,100]M$ \\
+\bottomrule
+\end{tabular*}
+\end{table}
 
-Our implementation evaluates M1--M5 simultaneously on each field
-and returns all five $(\omega,\tau)$ estimates; M4 and M5
-additionally supply the plateau spread
-$(\sigma_\omega,\sigma_\tau)$ as a window-sensitivity diagnostic,
-and the reporting convention of
-Sec.~\ref{sec:reporting} selects the primary value. ESPRIT (M3)
-is ill-conditioned on the PINN waveforms at $\xq = 10\,M$
-($K = 6$) and is quoted only where it
-is well-conditioned, on the hybrid-pipeline fields; to our
-knowledge M5 is the first two-edge plateau scan used for
-PINN-derived time-domain QNM extraction. Both plateau scans are
-sketched in Fig.~\ref{fig:windows}.
-
-\paragraph{Kerr complex estimators.} The Schwarzschild field is
-real, but the Teukolsky field read at $\scri$ is genuinely
-complex, $\Psi(t) = \sum_n A_n e^{-i\omega_n t}$
-(Sec.~\ref{sec:teukolsky-numerics}). In the Kerr case only, M1--M5
-are therefore run on $\mathrm{Re}\,\Psi$ and $\mathrm{Im}\,\Psi$
-separately and the suite is augmented with two complex-native
-estimators that act on $\Psi$ directly. The complex-phase fit
-c$\Phi$ (Algorithm~\ref{alg:cphi}) is the complex analogue of M1:
-a single mode has $\log|\Psi| = \log|A| - t/\tau_{\mathrm{d}}$ and
-$\arg\Psi = \arg A - \omega_R\,t$, so the damping time follows from
-the envelope slope and the frequency from the slope of the unwrapped
-phase, with no spectral peak-finding. Complex ESPRIT cES
-(Algorithm~\ref{alg:ces}) is the complex analogue of M3: because
-$\Psi$ is already a sum of complex exponentials, the subspace
-decomposition is applied to it with no Hilbert transform. In the
-ideal model each physical mode appears once, and nearby damped
-components can be separated when the window and model order are well
-conditioned. For Kerr, the labelled Leaver frequency identifies the
-target pole among multi-mode candidates. The reported value is then
-the best-of-suite estimate for the target $(4,2,0)$ multiplet.
-
-\begin{algorithm}[H]
-\caption{c$\Phi$ --- complex-phase fit (Kerr only), the complex
-analogue of M1.}
-\label{alg:cphi}
-\begin{algorithmic}[1]
-\STATE \textbf{Input:} complex $\Psi(\scri,\tau)$ on window
-       $[\tau_0,\tend]$.
-\STATE $1/\tau_{\mathrm{d}} \gets -\,\mathrm{slope}$ of the OLS fit
-  of $\log|\Psi|$ versus $\tau$; \ $\tau \gets \tau_{\mathrm{d}}$.
-\STATE $\omega_R \gets -\,\mathrm{slope}$ of the OLS fit of the
-       unwrapped phase $\arg\Psi$ versus $\tau$.
-\STATE \textbf{return} $(\omega_R,\tau)$.
-\end{algorithmic}
-\end{algorithm}
-
-\begin{algorithm}[H]
-\caption{cES --- complex ESPRIT (Kerr only), the complex analogue
-of M3.}
-\label{alg:ces}
-\begin{algorithmic}[1]
-\STATE \textbf{Input:} complex $\Psi(\scri,\tau)$ on window
-  $[\tau_0,\tend]$, model order $K$.
-\STATE $\{z_n\}_{n=0}^{K-1} \gets$ ESPRIT poles of $\Psi$ directly
-  (no Hilbert transform).
-\STATE Convert poles using
-  $\omega_{R,n} = -\mathrm{Im}(\log z_n)/\Delta\tau$ and
-  $\tau_n = -\Delta\tau/\mathrm{Re}(\log z_n)$.
-\STATE Keep physical modes ($\tau_n > 0$), sorted by descending
-  $\tau_n$; in the Kerr target-mode analysis $K$ is scanned and
-  the labelled Leaver frequency identifies the target pole.
-\STATE \textbf{return} the selected target-mode value $(\omega_R,\tau)$.
-\end{algorithmic}
-\end{algorithm}
+M3 uses model order $K=6$ for the PINN fields and $K=4$ for the hFNO
+fields.
 
 \begin{figure}[t]
 \centering
@@ -1384,7 +1384,7 @@ representative damped waveform on the same time axis.}
 dots are candidate fit windows on a $10\times 6$ grid with
 $t_0\in[10,25]\,M$, $\tend\in[30,100]\,M$. The shaded red rectangle
 (plateau) is the contiguous $5\times 3$ block of lowest combined
-relative scatter measured on the hybrid waveform,
+relative scatter measured on the Schwarzschild hFNO waveform,
 $t_0\in[10,16.7]\,M$ and $\tend\in[44,72]\,M$.}
 \label{fig:m5}
 \end{subfigure}
@@ -1395,92 +1395,95 @@ rectangle in the $(t_0,\tend)$ plane.}
 \label{fig:windows}
 \end{figure}
 
+\FloatBarrier
+
 % --------------------------------------------------------------
-\subsection{Plateau-based fit-window selection}
-\label{sec:plateau}
+\subsubsection{Kerr target-mode protocol}
+\label{sec:kerr-qnm}
 
-The damped-sinusoid template
-$A\,e^{-t/\tau}\cos(\omega t + \phi)$ is an appropriate
-approximation for $\Phi(\xq,t)$ only inside the QNM regime, after
-the prompt response has passed and before the power-law tail becomes
-comparable to the exponential. Fitting it outside this regime is
-\emph{model misspecification}, not a noise problem. The resulting
-biases do not vanish with more data, so the fit window is a
-hyperparameter of the extraction and a robust
-$(\omega,\tau)$ measurement requires a reproducible criterion
-for it. Definition~\ref{def:plateau} captures the criterion
-adopted in M4 and M5; inside the plateau the recovered
-$(\omega,\tau)$ are stationary in the window edges, and their
-variation across it is reported as a window-sensitivity diagnostic.
-Because the block is chosen precisely to minimise this scatter,
-$\sigma_\omega$ is by construction an optimistic estimate, a lower
-bound on the window sensitivity. The spread across the full scan
-range, visible in the M4 diagnostics of Sec.~\ref{sec:results},
-brackets it from above.
+Kerr extraction introduces a mode-identification problem in addition
+to fit-window sensitivity. The labelled $(4,2,0)$ pole can become
+subdominant to more slowly decaying late-time components, so a valid
+fit need not correspond to the mode being evaluated. We therefore
+separate candidate generation, mode identification and robust
+aggregation. The Leaver pole is used only for identification; it does
+not replace any fitted value.
 
-For the Schwarzschild $\ell = 2$ fundamental at our parameters the
-four relevant timescales are summarised by
-\begin{equation}
-  t_{\mathrm{burst}} \sim 5\,M, \qquad
-  \tau_1 = 3.651\,M, \qquad
-  \tau_0 = 11.241\,M, \qquad
-  t_{\mathrm{tail}} \gg 50\,M,
-  \label{eq:timescales}
-\end{equation}
-where $t_{\mathrm{burst}}$ is the prompt-burst duration set by
-the initial condition Eq.~\eqref{eq:ic} and $t_{\mathrm{tail}}$
-is the onset of the power-law Price tail
-$\propto t^{-(2\ell+3)}$ \citep{Berti2009review}. For our setup
-the QNM dominates $\Phi(\xq,t)$ over the entire simulation
-interval (confirmed by direct inspection of the FD reference),
-so any right edge inside $[0,50]\,M$ lies within the QNM regime
-as borne out by the M5 plateaus extending in $\tend$ to the domain
-end (Sec.~\ref{sec:results}).
-This differs from the single-window practice of
-\citet{Patel2024pinn}, who specify no numerical $t_0$ or $\tend$
-and report no window sensitivity. The closest precedents are the
-start-time stability scans of \citet{Buonanno2007ringdown} and
-the GW150914 ringdown analysis \citep{LIGO2016ringdown}, both
-sweeping $t_0$ at fixed $\tend$, and the Bayesian start-time
-marginalisation of \citet{Isi2021priors}. The present approach
-extends these by sweeping both edges simultaneously (M5) and by
-quoting the plateau spread as a window-sensitivity diagnostic,
-in lieu of the nonlinear-fit covariance which our
-M2 implementation discards (Sec.~\ref{sec:reporting}).
+\paragraph{Complex estimators.} For the estimator formulas, let $u$
+denote hyperboloidal time and $\tau_{\mathrm d}$ the damping time. A
+single complex mode has
+$\Psi(\scri,u)=A\exp[(-1/\tau_{\mathrm d}-i\omega_R)(u-u_0)]$,
+so $\log|\Psi|$ and the unwrapped phase are linear in $u$. The
+c$\Phi$ estimator fits these two slopes. cES instead applies the
+ESPRIT construction directly to the complex waveform, without a
+Hilbert transform.
+
+\begin{algorithm}[H]
+\caption{c$\Phi$ complex-phase estimator.}
+\label{alg:cphi}
+\begin{algorithmic}[1]
+\STATE \textbf{Input:} $\Psi(\scri,u_j)$ on a window $W$.
+\STATE $(\widehat a,\widehat b)\gets
+  \arg\min_{a,b}\sum_{j\in W}[\log|\Psi_j|-(a+b u_j)]^2$.
+\STATE $(\widehat c,\widehat d)\gets
+  \arg\min_{c,d}\sum_{j\in W}
+  [\operatorname{unwrap}\arg\Psi_j-(c+d u_j)]^2$.
+\STATE \textbf{return}
+  $(\widehat\omega_R,\widehat\tau_{\mathrm d})
+  =(-\widehat d,-1/\widehat b)$.
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{cES complex ESPRIT estimator.}
+\label{alg:ces}
+\begin{algorithmic}[1]
+\STATE \textbf{Input:} $\Psi(\scri,u_j)$ on a window $W$ and
+       model order $K$.
+\STATE $\{z_n,c_n\}_{n=0}^{K-1}\gets\operatorname{ESPRIT}_K(\Psi_W)$
+       using Eq.~\eqref{eq:esprit-poles}.
+\STATE $(\widehat\omega_{R,n},\widehat\tau_{\mathrm d,n})\gets
+  [-\operatorname{Im}\log z_n/\Delta u,
+  -\Delta u/\operatorname{Re}\log z_n]$.
+\STATE \textbf{return} the physical pole selected below.
+\end{algorithmic}
+\end{algorithm}
+
+\paragraph{Candidate selection and consensus.} The Leaver damping
+time $\tau_{\mathrm{ref}}$ sets all window scales. Targeted M3
+($K=6$) and M4 fits are applied separately to
+$\operatorname{Re}\Psi$ and $\operatorname{Im}\Psi$ on a
+$3\times3$ grid with
+$u_{\mathrm{start}}/\tau_{\mathrm{ref}}\in[2,5]$,
+$u_{\mathrm{end}}/\tau_{\mathrm{ref}}\in[7,12]$ and duration at
+least $3\tau_{\mathrm{ref}}$; cES scans the same windows with
+$K\in\{3,4,5,6\}$. M2 on both field components and c$\Phi$ provide
+late-time cross-checks on an $8\times6$ grid with
+$u_{\mathrm{start}}/\tau_{\mathrm{ref}}\in[4,9]$ and
+$u_{\mathrm{end}}/\tau_{\mathrm{ref}}\in[10,14]$, with an
+envelope-slope upper cutoff. Multi-mode fits retain the pole nearest
+the labelled Leaver pole, and each scan is reduced to its median
+candidate. Candidates more than $12\%$ from
+$\omega_{R,\mathrm{ref}}$ are rejected. Frequency and damping-time
+candidates are filtered independently using the larger of $12\%$ of
+their median and three scaled median absolute deviations. The median
+survivors are reported; their population standard deviation measures
+inter-estimator spread rather than statistical uncertainty. Complete
+per-estimator results are reported in Appendix~\ref{app:kerr-extractors}.
 % --------------------------------------------------------------
 \subsection{Reporting convention}
 \label{sec:reporting}
 
-We quote one $(\omega,\tau)$ per experiment. The five Schwarzschild
-extractors of Sec.~\ref{sec:qnm-methods} do not use the Leaver
-reference during extraction. As expected of a heterogeneous
-suite, some fail on a given field. A fixed-window fit can land off the
-plateau, ESPRIT can mis-order the modes, and a single draw may form no
-plateau at all. We therefore report, \emph{per experiment and per
-quantity}, the estimator whose value lies closest to the Leaver
-reference, annotated with the estimator used (e.g.\ $0.152\%$~(M4)).
-For the labelled Kerr corpus, the Leaver frequency is additionally
-used to identify the target pole among multi-mode candidates, as
-described in Sec.~\ref{sec:teukolsky-numerics}. Where the selected
-$\omega$ is the M4 plateau mean, the $\sigma_\omega$ quoted alongside
-it is the M4 plateau standard deviation (Algorithm~\ref{alg:m4},
-line~7), reported as a window-sensitivity diagnostic in the sense of
-Def.~\ref{def:plateau}.
-
-The lower edge $t = 10\,M$, used unchanged across all
-extraction variants, sits just before the first ringdown peak
-of the FD reference ($t \approx 10.8\,M$).
-
-Full per-window per-method results are tabulated in the
-repository documentation; the summary table
-in Sec.~\ref{sec:results} collects only the values selected by
-this convention.
-
-Quoting different estimators for $\omega$ and $\tau$ follows
-established numerical-relativity practice
-\citep{Berti2007ringdown,Patel2024pinn}: $\omega$ is best
-estimated from phase information aggregated across many cycles
---- the M4 plateau is the lowest-variance such estimator here,
-with $\sigma_\omega \sim 10^{-5}$ for the converged runs ---
-and $\tau$ from amplitude information over the longest available
-decay range, motivating the wide M2 window.
+Frequency and damping time are reported separately because phase
+evolution primarily constrains $\omega$, whereas amplitude decay
+constrains $\tau$ \citep{Berti2007ringdown,Patel2024pinn}.
+No Schwarzschild fit uses Leaver values. For the Schwarzschild summary
+statistics, the estimator with the smallest Leaver error is selected
+separately for frequency and damping time after extraction. The reproduction
+comparison is restricted to M1 and M2, while M4 scatter measures
+fit-window sensitivity only.
+For Kerr, Leaver values identify the $(4,2,0)$ candidate among
+multi-mode fits. We report both the pre-specified target-mode
+ensemble and the retrospective Leaver-closest summary, with complete
+extractor results in Appendix~\ref{app:kerr-extractors}. Each reported
+quantity identifies the selected estimator.

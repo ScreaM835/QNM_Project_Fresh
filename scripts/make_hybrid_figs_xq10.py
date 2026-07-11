@@ -55,17 +55,17 @@ def main() -> None:
 
     # ---- ringdown overlay -------------------------------------------------
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 7), sharex=True)
-    ax1.plot(t, y_fine, label="FD fine", linewidth=1.2)
-    ax1.plot(t, y_base, label="coarse + upsample", linewidth=1.0,
+    ax1.plot(t, y_fine, label="Fine FD reference", linewidth=1.2)
+    ax1.plot(t, y_base, label="Numerical prior", linewidth=1.0,
              linestyle=":", alpha=0.8, color="grey")
-    ax1.plot(t, y_hyb, label="Hybrid", linewidth=1.2, linestyle="--")
+    ax1.plot(t, y_hyb, label="hFNO", linewidth=1.2, linestyle="--")
     ax1.set_ylabel(r"$\Phi(x_q, t)$")
-    ax1.set_title(r"Ringdown at $x_q = 10\,M$, canonical BH")
+    ax1.set_title(r"Ringdown at $x_q = 10\,M$, canonical configuration")
     ax1.legend(); ax1.grid(True, alpha=0.3)
-    ax2.semilogy(t, np.abs(y_fine) + 1e-30, label="FD fine", linewidth=1.2)
-    ax2.semilogy(t, np.abs(y_base) + 1e-30, label="coarse + upsample",
+    ax2.semilogy(t, np.abs(y_fine) + 1e-30, label="Fine FD reference", linewidth=1.2)
+    ax2.semilogy(t, np.abs(y_base) + 1e-30, label="Numerical prior",
                  linewidth=1.0, linestyle=":", alpha=0.8, color="grey")
-    ax2.semilogy(t, np.abs(y_hyb) + 1e-30, label="Hybrid", linewidth=1.2,
+    ax2.semilogy(t, np.abs(y_hyb) + 1e-30, label="hFNO", linewidth=1.2,
                  linestyle="--")
     ax2.set_xlabel("t / M"); ax2.set_ylabel(r"$|\Phi(x_q, t)|$")
     ax2.legend(); ax2.grid(True, alpha=0.3)

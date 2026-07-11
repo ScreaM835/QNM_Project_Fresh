@@ -232,8 +232,8 @@ def fig_snapshots():
     out = OUT_DIR / "hybrid_snapshots.png"
     pinn_plot.plot_snapshots(
         x=x, t=t, phi_fd=pf, phi_pinn=ph, times=times,
-        outpath=str(out), model_label="Hybrid",
-        title=("Hybrid vs FD-fine reference, canonical "
+        outpath=str(out), model_label="hFNO",
+        title=("hFNO vs fine FD reference, canonical "
                r"$M=1,\,x_0=4,\,\sigma=5$"),
     )
     print(f"[fig] {out}")
@@ -250,7 +250,7 @@ def fig_abs_diff_snapshots():
     pinn_plot.plot_abs_diff_snapshots(
         x=x, t=t, phi_fd=pf, phi_pinn=ph, times=times,
         outpath=str(out),
-        title="Absolute difference — Hybrid surrogate (canonical BH)",
+        title="Absolute difference, Schwarzschild hFNO (canonical configuration)",
     )
     print(f"[fig] {out}")
 
@@ -271,10 +271,10 @@ def fig_pointwise_error():
     im = ax.pcolormesh(x, t, err_clip, shading="auto", cmap="magma_r",
                        norm=LogNorm(vmin=vmin, vmax=vmax))
     cbar = fig.colorbar(im, ax=ax, pad=0.02)
-    cbar.set_label(r"$|\Phi_{\mathrm{FD\,fine}} - \Phi_{\mathrm{Hybrid}}|$"
+    cbar.set_label(r"$|\Phi_{\mathrm{FD\,fine}} - \Phi_{\mathrm{hFNO}}|$"
                    f"  (shared log scale, max={vmax:.2e})")
     ax.set_xlabel(r"$x_* / M$"); ax.set_ylabel("t / M")
-    ax.set_title("Hybrid pointwise error (canonical BH)")
+    ax.set_title("Schwarzschild hFNO pointwise error (canonical configuration)")
     fig.tight_layout()
     out = OUT_DIR / "hybrid_pointwise_error.png"
     fig.savefig(out, dpi=200); plt.close(fig)
@@ -297,10 +297,10 @@ def fig_pointwise_error_baseline():
     im = ax.pcolormesh(x, t, err_clip, shading="auto", cmap="magma_r",
                        norm=LogNorm(vmin=vmin, vmax=vmax))
     cbar = fig.colorbar(im, ax=ax, pad=0.02)
-    cbar.set_label(r"$|\Phi_{\mathrm{FD\,fine}} - \Phi_{\mathrm{coarse\!-\!up}}|$"
+    cbar.set_label(r"$|\Phi_{\mathrm{FD\,fine}} - \Phi_{\mathrm{prior}}|$"
                    f"  (shared log scale, max={vmax:.2e})")
     ax.set_xlabel(r"$x_* / M$"); ax.set_ylabel("t / M")
-    ax.set_title(r"Baseline (coarse FD + quintic upsample) pointwise error")
+    ax.set_title("Numerical-prior pointwise error (canonical configuration)")
     fig.tight_layout()
     out = OUT_DIR / "hybrid_pointwise_error_baseline.png"
     fig.savefig(out, dpi=200); plt.close(fig)
@@ -620,8 +620,8 @@ def fig_loss_curve():
         ax.text(n_adam, ax.get_ylim()[1], " L-BFGS \N{RIGHTWARDS ARROW}",
                 fontsize=8, va="top", ha="left", color="grey")
     ax.set_xlabel("epoch")
-    ax.set_ylabel(r"MSE on residual $\delta\Phi$")
-    ax.set_title("Hybrid training history")
+    ax.set_ylabel(r"MSE on correction $\delta\Phi$")
+    ax.set_title("Schwarzschild hFNO training history")
     ax.grid(True, alpha=0.3, which="both")
     ax.legend(loc="best", fontsize=9)
     fig.tight_layout()

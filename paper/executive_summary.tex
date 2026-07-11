@@ -7,13 +7,15 @@
 \usepackage{lmodern}
 \usepackage{microtype}
 \usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{float}
 \usepackage[font=footnotesize,labelfont=bf]{caption}
 \usepackage{titlesec}
 \titleformat{\section}{\normalsize\bfseries}{}{0pt}{}
 \titlespacing{\section}{0pt}{0.9em}{0.35em}
 
-\title{\large\bfseries A UNIFIED DEEP-LEARNING FRAMEWORK FOR SCHWARZSCHILD
-QUASI-NORMAL-MODE EXTRACTION\\[0.3em]
+\title{\large\bfseries HYBRID FOURIER NEURAL OPERATORS FOR TIME-DOMAIN
+BLACK-HOLE PERTURBATIONS AND QUASINORMAL MODE EXTRACTION\\[0.3em]
 \normalfont\normalsize\scshape Executive Summary}
 \author{\small Jonathan Chung \quad$|$\quad MPhil Data Intensive Science
 \quad$|$\quad University of Cambridge}
@@ -24,154 +26,182 @@ QUASI-NORMAL-MODE EXTRACTION\\[0.3em]
 
 \section{Motivation \& Scientific Justification}
 
-The ringdown of a perturbed black hole is a superposition of damped
-sinusoids, the quasinormal modes (QNMs), whose frequencies and
-damping times are fixed entirely by the black hole's mass and spin
-[1]. Measuring them from gravitational-wave data and comparing
-against the predictions of general relativity is among the cleanest
-strong-field tests available, and has been an observational
-programme since the ringdown analysis of GW150914 [2]. The precision
-of such tests rests on the accuracy of the underlying waveform and on
-the time interval used to fit its damped modal content [3,4].
+A perturbed black hole settles by emitting a ringdown signal composed
+of damped oscillations, the quasinormal modes (QNMs). For each mode of
+a Kerr black hole, general relativity fixes the frequency and damping
+time through the remnant mass and spin [1,2]. Measuring these tones in
+gravitational-wave data tests whether the remnant is consistent with
+the Kerr prediction, an observational programme opened by the
+ringdown analysis of GW150914 [3]. Reliable spectroscopy requires an
+accurate time-domain waveform and a fit interval in which the QNM
+model is valid [4].
 
-Physics-informed neural networks (PINNs) solve differential
-equations by minimising the equation residual directly; the only
-prior PINN treatment of the time-domain Schwarzschild problem,
-however, reports a $28\%$ relative waveform error that dominates its
-QNM error budget, with a fit window fixed by hand [5]. This project
-first tests whether that calculation can be reproduced and improved.
-It then addresses the per-instance training cost of a PINN with a
-hybrid Fourier neural operator (hFNO), which learns to correct a
-coarse numerical trajectory across a family of initial data. The
-same coarse-prior-plus-residual framework is subsequently adapted to
-the complex Teukolsky field of rotating Kerr black holes [9].
+Physics-informed neural networks (PINNs) approximate differential
+equations by minimising their governing-equation, initial-data and
+boundary residuals. Patel et al. [5] solve the Regge--Wheeler and
+Zerilli equations in the time domain, but report relative $L^2$ field
+errors of $23.59\%$ and $28.06\%$, respectively, and select one fit
+window manually. We first reproduce and improve this calculation. We
+then introduce a Schwarzschild hybrid Fourier neural operator (hFNO)
+that corrects a reduced-resolution numerical prior across mass and
+initial-data parameters. A single trained hFNO predicts fields for new
+configurations without per-configuration neural-network retraining.
 
 \section{Methodology}
 
-Four numerical tests are evaluated. (i) A
-\emph{reproduction} PINN, architecture-matched to the prior study
-[5], establishes a trustworthy baseline. (ii) An \emph{enhanced
-forward} PINN doubles the quasi-Newton optimisation budget and adds
-residual-greedy sampling, which concentrates training points where
-the equation residual is largest. (iii) The Schwarzschild hFNO uses
-a $k=4$ finite-difference trajectory as an additive prior and a
-$1.13$-million-parameter FNO [6] to predict its discretisation error,
-following the solver-correction literature [7,8]. Its label-free
-target is formed by Richardson extrapolation of the $k=4$ and $k=2$
-solves, and a prior-gradient gate confines the correction to
-under-resolved wavefronts. Coarsening both space and time by four
-reduces the finite-difference point-update count by approximately a
-factor of sixteen; the total wall-clock speedup has not been
-measured. (iv) For Kerr, the framework is adapted to a complex
-hyperboloidal Teukolsky field and retrained across spin. The
-deployment prior uses $N=101$, while independent $N=201$ and $N=401$
-fields form the Richardson target and an $N=801$ field is retained
-for evaluation.
+The reproduction uses Patel et al.'s network architecture, loss
+weights and optimiser schedule. An enhanced PINN then doubles the
+L-BFGS optimisation budget and adds residual-greedy sampling, placing
+more training points where the equation residual is largest.
 
-Each field is analysed with the post-hoc extraction framework of the
-report. Five real-signal estimators are used for Schwarzschild, with
-complex-signal extensions for Kerr. One- and two-edge plateau scans
-sweep the fit window and report the variation of the fitted
-frequency and damping time across its most stable contiguous block
-(Figure~2).
+For the Schwarzschild hFNO, Richardson extrapolation of the $k=2$ and
+$k=4$ coarse fields produces a field estimate whose difference from
+the deployment prior defines the correction target [6]. At inference,
+the reconstruction is
+\begin{equation}
+	\Phi^{\mathrm{hyb}}(x,t)
+	= \mathcal U\Phi^{\mathrm c}(x,t)
+	+ g(x,t)\,\mathcal H_\theta(X)(x,t).
+	\label{eq:es-hfno}
+\end{equation}
+Here $\mathcal U$ denotes quintic upsampling, $\Phi^{\mathrm c}$ the
+deployed $k=4$ coarse field, $\mathcal H_\theta$ the four-layer FNO
+correction operator [7--9], and $g$ the deterministic fixed-scale
+gradient gate derived from the numerical prior. The fine FD reference
+field is used only for evaluation and does not enter the training
+loss. Coarsening both space and time by four reduces the
+finite-difference point-update count to approximately one-sixteenth of
+the fine-grid evolution. Each new configuration requires one $k=4$
+evolution, quintic upsampling and one neural-operator evaluation.
 
-\begin{figure}[!tb]
-\centering
-\includegraphics[width=\columnwidth]{../outputs/hybrid/fno_sw_gate_s1em3_t100/figs/hybrid_ringdown_xq10.png}
-\caption{Ringdown waveform at the observer for the benchmark
-configuration, on linear (top) and logarithmic (bottom) scales: the
-Schwarzschild hFNO (dashed) overlaid on the fine finite-difference
-reference (solid) and the coarse prior (dotted).}
-\label{fig:es-ringdown}
-\end{figure}
-
-\begin{figure}[!tb]
-\centering
-\includegraphics[width=\columnwidth]{../outputs/hybrid/fno_sw_gate_s1em3_t100/figs/hybrid_plateau_m4_xq10.png}
-\caption{The plateau scan underlying the extraction protocol:
-recovered frequency (left) and damping time (right) as the
-fit-window start time is swept for the Schwarzschild hFNO. Red
-markers form the selected contiguous block; dotted lines mark the
-continued-fraction values.}
-\label{fig:es-plateau}
-\end{figure}
+An independently trained Kerr hFNO corrects the complex spin-$-2$
+Teukolsky field evolved on a horizon-penetrating hyperboloidal domain
+[10,11]. Its correction target is constructed from independently
+evolved $N=201$ and $N=401$ fourth-order fields; the $N=801$ fine
+reference field is used only for evaluation. Unlike the Schwarzschild
+model, the Kerr correction is ungated because a gradient gate would
+suppress corrections in the low-amplitude ringdown at future null
+infinity. QNMs are extracted from the Schwarzschild observer waveform
+at $x_q=10M$ and the Kerr waveform at future null infinity. For
+Schwarzschild, fit-window scans identify stable contiguous blocks of
+frequency and damping-time estimates. For Kerr, real-component and
+complex-field estimators generate candidate poles, and the
+spin-dependent Leaver pole identifies the labelled $(4,2,0)$ mode
+without replacing the fitted values.
 
 \section{Key Findings}
 
-The reproduction reduces the prior study's waveform error by an
-order of magnitude on both of its benchmark potentials (relative
-$L^{2}$ error $2.61\%$ versus $28.06\%$, and $2.67\%$ versus
-$23.59\%$). The enhanced forward PINN reaches $0.58\%$, from which
-the best-of-suite estimates recover the fundamental frequency to
-$0.029\%$ and damping time to $1.99\%$ relative to Leaver's values.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.78\columnwidth]{../outputs/hybrid/fno_sw_gate_s1em3_t100/figs/hybrid_pointwise_error_baseline.png}\\[-0.2em]
+\includegraphics[width=0.78\columnwidth]{../outputs/hybrid/fno_sw_gate_s1em3_t100/figs/hybrid_pointwise_error.png}
+\caption{Pointwise Schwarzschild field error on the canonical
+configuration for the numerical prior (top) and hFNO (bottom), shown
+on the same logarithmic scale. The hFNO substantially reduces the
+coherent numerical-prior error bands, while structured wavefront and
+late-time errors remain.}
+\label{fig:es-error-maps}
+\end{figure}
 
-Across the $100$-configuration Schwarzschild test population, the
-hFNO reduces the mean field error from $13.39\%$ to $1.85\%$ and the
-field MSE by a factor of $46$, without using fine-grid fields in its
-training loss. Its population frequency error is $0.152\%$. After
-adaptation and separate retraining, the Kerr hFNO reduces the median
-field error from $59.5\%$ to $0.78\%$ across $128$ test
-configurations. In the high-spin bin, the median frequency error
-falls from $4.71\%$ for the coarse prior to $0.38\%$. The damping
-time is the exception: its population error increases from $0.52\%$
-to $1.52\%$, consistent with a residual in the low-amplitude late
-ringdown.
+Our reproduction obtains relative $L^2$ field errors of $2.61\%$ for
+Zerilli and $2.67\%$ for Regge--Wheeler, compared with the published
+$28.06\%$ and $23.59\%$. The enhanced PINN reaches $0.58\%$ relative
+$L^2$ field error. From its observer waveform, the M4 two-mode
+fit-window plateau estimate gives a $0.029\%$ fundamental-frequency
+error, while the M2 single-mode nonlinear least-squares fit gives a
+$1.99\%$ damping-time error relative to Leaver's continued-fraction
+values [12].
+
+Across $100$ independent Schwarzschild configurations, the hFNO
+reduces the mean relative $L^2$ error from $13.39\%$ for the numerical
+prior to $1.85\%$, and the mean-squared field error by a factor of
+$46$. M4 gives a median fundamental QNM frequency error of $0.152\%$.
+Figure~1 shows that the hFNO substantially reduces the coherent
+wavefront-error bands of the numerical prior, while structured
+wavefront and late-time errors remain.
+
+Across $128$ independent Kerr configurations spanning
+$a/M\in[0,0.95]$, the independently trained hFNO reduces the median
+relative $L^2$ error from $59.5\%$ for the numerical prior to
+$0.78\%$. Under retrospective Leaver-closest reporting, the candidate
+estimate with the smallest Leaver error is selected separately for
+frequency and damping time after extraction. The resulting median
+errors are $0.33\%$ in frequency and $1.52\%$ in damping time,
+compared with $0.05\%$ and $0.27\%$ for the fine reference field.
+Complete per-estimator results show substantial method dependence.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.96\columnwidth]{../outputs/kerr/figs/hybrid_ringdown_scri.png}
+\caption{Kerr ringdown at future null infinity for a test
+configuration nearest $a/M=0.70$. The Kerr hFNO follows the fine
+reference through the prompt response and early ringdown, whereas the
+numerical prior is visibly under-resolved. The logarithmic panel
+reveals the hFNO's late-time residual, which limits damping-time
+recovery.}
+\label{fig:es-kerr-ringdown}
+\end{figure}
 
 \section{Recommendation \& Next Steps}
 
-The immediate priorities are an objective that gives greater weight
-to the late-time envelope, and an end-to-end runtime comparison that
-includes interpolation and neural inference. Tests outside the
-training ranges and under changes of domain and resolution are also
-needed before broader deployment. A later inference study could
-combine the hFNO waveform family with reduced-order likelihood
-methods to test whether rapid field generation produces a practical
-gain in Bayesian parameter estimation.
+The first priority is a late-time-sensitive training objective that
+improves the low-amplitude Kerr ringdown. Further tests should cover
+additional harmonics and initial data, parameters outside the training
+ranges, and changes of numerical domain and resolution. End-to-end
+timing should quantify the wall-clock reduction and training
+break-even point, including numerical evolution, interpolation and
+neural inference. The resulting waveform families can then be
+combined with reduced-order likelihood methods to test their practical
+value for Bayesian parameter estimation [13].
 
 \section{Research Impact \& Conclusion}
 
-The central result is that learning a correction to a coarse
-numerical prior gives accurate fields across the tested
-Schwarzschild and Kerr parameter families without fine-grid fields
-in the training loss. The classical solver retains propagation and
-boundary structure, while the operator concentrates on the
-discretisation defect. The Kerr damping-time result also identifies
-the present limit clearly: global field accuracy does not by itself
-guarantee an accurate low-amplitude late-time envelope.
+The separately trained Schwarzschild and Kerr hFNOs each combine a
+reduced-resolution numerical prior with a correction learned across
+their respective parameter family. The numerical prior supplies
+characteristic propagation, potential scattering and boundary
+treatment, while the neural operator predicts a discretisation-error
+correction. Neither hFNO uses fine-grid reference fields in its
+training loss, and neither requires per-configuration neural-network
+retraining. The Schwarzschild M4 analysis and retrospective Kerr
+analysis both give sub-percent median fundamental-frequency errors
+while reducing the required numerical evolution. The hFNOs support
+repeated field generation across the tested families and can be
+assessed directly in future gravitational-wave likelihood
+calculations. The coexistence of $0.78\%$ median global Kerr field
+error and $1.52\%$ damping-time error is consistent with gridwise MSE
+giving little weight to the low-amplitude late-time ringdown.
 
-\begin{thebibliography}{9}
-\footnotesize
-\bibitem{v70} C. V. Vishveshwara. Scattering of gravitational
-radiation by a Schwarzschild black-hole. \emph{Nature}, volume 227,
-1970.
+\begin{thebibliography}{13}
+\scriptsize
+\setlength{\itemsep}{0pt}
+\setlength{\parskip}{0pt}
+\bibitem{v70} C. V. Vishveshwara, \emph{Nature} \textbf{227},
+936--938 (1970).
+\bibitem{berti09} E. Berti, V. Cardoso, and A. O. Starinets,
+\emph{Class. Quantum Grav.} \textbf{26}, 163001 (2009).
 \bibitem{ligo16} LIGO Scientific Collaboration and Virgo
-Collaboration. Tests of general relativity with GW150914.
-\emph{Physical Review Letters}, volume 116, 2016.
-\bibitem{leaver85} E. W. Leaver. An analytic representation for the
-quasi-normal modes of Kerr black holes. \emph{Proceedings of the
-Royal Society of London A}, volume 402, 1985.
-\bibitem{berti09} E. Berti, V. Cardoso, and A. O. Starinets.
-Quasinormal modes of black holes and black branes. \emph{Classical
-and Quantum Gravity}, volume 26, 2009.
-\bibitem{patel24} N. Patel, A. Aykutalp, and P. Laguna. Calculating
-quasi-normal modes of Schwarzschild black holes with physics
-informed neural networks. \emph{arXiv:2401.01440}, 2024.
-\bibitem{li21} Z. Li, N. Kovachki, K. Azizzadenesheli, B. Liu,
-K. Bhattacharya, A. Stuart, and A. Anandkumar. Fourier neural
-operator for parametric partial differential equations.
-\emph{International Conference on Learning Representations}, 2021.
-\bibitem{um20} K. Um, R. Brand, Y. Fei, P. Holl, and N. Thuerey.
-Solver-in-the-loop: learning from differentiable physics to
-interact with iterative PDE-solvers. \emph{Advances in Neural
-Information Processing Systems}, volume 33, 2020.
-\bibitem{kochkov21} D. Kochkov, J. A. Smith, A. Alieva, Q. Wang,
-M. P. Brenner, and S. Hoyer. Machine learning-accelerated
-computational fluid dynamics. \emph{Proceedings of the National
-Academy of Sciences}, volume 118, 2021.
-\bibitem{teukolsky73} S. A. Teukolsky. Perturbations of a rotating
-black hole. I. Fundamental equations for gravitational,
-electromagnetic, and neutrino-field perturbations.
-\emph{Astrophysical Journal}, volume 185, 1973.
+Collaboration, \emph{Phys. Rev. Lett.} \textbf{116}, 221101 (2016).
+\bibitem{isi21} M. Isi and W. M. Farr, arXiv:2107.05609 [gr-qc]
+(2021).
+\bibitem{patel24} N. Patel, A. Aykutalp, and P. Laguna,
+arXiv:2401.01440 [gr-qc] (2024).
+\bibitem{richardson11} L. F. Richardson, \emph{Phil. Trans. R. Soc.
+A} \textbf{210}, 307--357 (1911).
+\bibitem{li21} Z. Li \emph{et al.}, International Conference on
+Learning Representations (2021).
+\bibitem{um20} K. Um \emph{et al.}, \emph{Adv. Neural Inf. Process.
+Syst.} \textbf{33}, 6111--6122 (2020).
+\bibitem{kochkov21} D. Kochkov \emph{et al.}, \emph{Proc. Natl.
+Acad. Sci. USA} \textbf{118}, e2101784118 (2021).
+\bibitem{teukolsky73} S. A. Teukolsky, \emph{Astrophys. J.}
+\textbf{185}, 635--648 (1973).
+\bibitem{harms13} E. Harms, S. Bernuzzi, and B. Br\"ugmann,
+\emph{Class. Quantum Grav.} \textbf{30}, 115013 (2013).
+\bibitem{leaver85} E. W. Leaver, \emph{Proc. R. Soc. Lond. A}
+\textbf{402}, 285--298 (1985).
+\bibitem{canizares15} P. Canizares \emph{et al.}, \emph{Phys. Rev.
+Lett.} \textbf{114}, 071104 (2015).
 \end{thebibliography}
 
 \end{document}
